@@ -1,0 +1,39 @@
+
+--Tabla para crear un Perito (v 1.0.2)
+CREATE TABLE Perito (
+    CIP VARCHAR(20) PRIMARY KEY,
+    Nombres VARCHAR(100) NOT NULL,
+    Apellidos VARCHAR(120) NOT NULL,
+    Email VARCHAR(100) UNIQUE NOT NULL,
+    NombreUsuario VARCHAR(60) NOT NULL,
+    Contrasena CHAR(60) NOT NULL,
+    DNI CHAR(8) NOT NULL,
+    FechaIntegracion DATE,
+    FechaIncorporacion DATE,
+    CodigoCodofin VARCHAR(20) NOT NULL,
+    Domicilio VARCHAR(150),
+    Seccion VARCHAR(50),
+    Especialidad VARCHAR(80),
+    Grado VARCHAR(30),
+    Telefono VARCHAR(15),
+    CursosInstitucionales JSON,
+    CursosExtranjero JSON,
+    UltimoCenso VARCHAR(80),
+    Fotografia LONGTEXT,
+    Firma LONGTEXT  
+)
+
+--Tabla para crear administrador (v 1.0.1)
+CREATE TABLE Administrador(
+    CIP VARCHAR(20) PRIMARY KEY,
+    NombreUsuario VARCHAR(60) NOT NULL,
+    Contrasena CHAR(60) NOT NULL,
+    Nombre VARCHAR(100) NOT NULL
+)
+
+--Tabla para prioridad (esta en progreso)
+CREATE TABLE Oficio(
+    numero_registro INT PRIMARY KEY AUTO_INCREMENT,
+    prioridad ENUM('Con detenido - Flagrancia', 'Flagrancia', 'Normal')
+    estado ENUM('Proceso', 'Tomo de muestra', 'Diligencia')
+)
