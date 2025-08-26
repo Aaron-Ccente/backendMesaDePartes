@@ -1,5 +1,5 @@
 
---Tabla para crear un Perito (v 1.0.2)
+--Tabla para crear un Perito (v 1.0.3)
 CREATE TABLE Perito (
     CIP VARCHAR(20) PRIMARY KEY,
     Nombres VARCHAR(100) NOT NULL,
@@ -12,28 +12,73 @@ CREATE TABLE Perito (
     FechaIncorporacion DATE,
     CodigoCodofin VARCHAR(20) NOT NULL,
     Domicilio VARCHAR(150),
-    Seccion VARCHAR(50),
-    Especialidad VARCHAR(80),
-    Grado VARCHAR(30),
+    Seccion VARCHAR(50),        --quitar
+    Especialidad VARCHAR(80),   --quitar
+    Grado VARCHAR(30),          --quitar
     Telefono VARCHAR(15),
-    CursosInstitucionales JSON,
+    CursosInstitucionales JSON, 
     CursosExtranjero JSON,
     UltimoCenso VARCHAR(80),
-    Fotografia LONGTEXT,
-    Firma LONGTEXT  
+    Fotografia LONGTEXT NOT NULL,
+    Firma LONGTEXT NOT NULL
+)
+--Tabla para especialidades (v 1.0.0)
+CREATE TABLE especialidad (
+    id_especiadlidad INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(60) UNIQUE NOT NLL
+)
+--Tabla para grados (v 1.0.0)
+CREATE TABLE grado (
+    id_grado INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(60) UNIQUE NOT NLL
+)
+--Tabla para seccion (v 1.0.0)
+CREATE TABLE seccion (
+    id_seccion INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(60) UNIQUE NOT NLL
 )
 
---Tabla para crear administrador (v 1.0.1)
+--ER Perito - Especialidad (v 1.0.0)
+CREATE TABLE perito_especialidad(
+    id_perito_especialidad INT PRIMARY KEY AUTO_INCREMENT,
+    CIP VARCHAR(20) NOT NULL,
+    id_especiadlidad INT NOT NULL,
+    FOREIGN KEY (CIP) REFERENCES perito(CIP),
+    FOREIGN KEY (id_especiadlidad) REFERENCES especialidad(id_especiadlidad)
+)
+--ER Perito - grado (v 1.0.0)
+CREATE TABLE perito_grado(
+    id_perito_grado INT PRIMARY KEY AUTO_INCREMENT,
+    CIP VARCHAR(20) NOT NULL,
+    id_grado INT NOT NULL,
+    FOREIGN KEY (CIP) REFERENCES perito(CIP),
+    FOREIGN KEY (id_grado) REFERENCES grado(id_grado)
+)
+
+--ER Perito - seccion (v 1.0.0)
+CREATE TABLE perito_seccion(
+    id_perito_seccion INT PRIMARY KEY AUTO_INCREMENT,
+    CIP VARCHAR(20) NOT NULL,
+    id_seccion INT NOT NULL,
+    FOREIGN KEY (CIP) REFERENCES perito(CIP),
+    FOREIGN KEY (id_seccion) REFERENCES seccion(id_seccion)
+)
+
+--Tabla para crear administrador (v 1.0.2)
 CREATE TABLE Administrador(
     CIP VARCHAR(20) PRIMARY KEY,
+    Nombre VARCHAR(100) NOT NULL,
     NombreUsuario VARCHAR(60) NOT NULL,
-    Contrasena CHAR(60) NOT NULL,
-    Nombre VARCHAR(100) NOT NULL
+    Contrasena CHAR(60) NOT NULL
 )
 
 --Tabla para prioridad (esta en progreso)
 CREATE TABLE Oficio(
-    numero_registro INT PRIMARY KEY AUTO_INCREMENT,
+    numero_registro INT PRIMARY KEY,
     prioridad ENUM('Con detenido - Flagrancia', 'Flagrancia', 'Normal')
-    estado ENUM('Proceso', 'Tomo de muestra', 'Diligencia')
+    estado ENUM('Proceso', 'Tomo de muestra', 'Diligencia'),
+    departamento_header VARCHAR(100) NOT NULL,
+    sede_header VARCHAR(100) NOT NULL,
+    date DATETIME DEFAULT CURRENT_TIMESTAP,
+    
 )
