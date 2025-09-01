@@ -183,13 +183,12 @@ CREATE TABLE usuario_seccion (
     FOREIGN KEY (id_seccion) REFERENCES seccion(id_seccion)
 );
 
--- Tabla para administradores (separada como solicitado)
+-- Tabla para administradores
 CREATE TABLE administradores (
-    id_administrador VARCHAR(20) PRIMARY KEY, -- CIP
+    CIP VARCHAR(20) PRIMARY KEY, -- CIP
     nombres VARCHAR(100) NOT NULL,
     nombre_usuario VARCHAR(60) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    email VARCHAR(100) UNIQUE,
     estado VARCHAR(20) DEFAULT 'ACTIVO',
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -258,7 +257,7 @@ CREATE TABLE requerimientos (
     FOREIGN KEY (actualizado_por) REFERENCES usuarios(id_usuario)
 );
 
--- Tabla de oficios (solicitada)
+-- Tabla de oficios
 CREATE TABLE oficios (
     numero_registro INT PRIMARY KEY AUTO_INCREMENT,
     id_requerimiento CHAR(36) NOT NULL,
@@ -693,9 +692,9 @@ INSERT INTO departamentos (nombre_departamento, descripcion, jefe_departamento, 
 
 -- BLOQUE 12: Usuarios iniciales
 
--- Usuario administrador (en tabla separada como solicitado)
+-- Usuario administrador
 INSERT INTO administradores (
-    id_administrador, 
+    CIP, 
     nombres, 
     nombre_usuario, 
     password_hash, 
