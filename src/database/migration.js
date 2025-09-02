@@ -174,7 +174,7 @@ const usuario_seccion = `CREATE TABLE usuario_seccion (
 const administradores = `CREATE TABLE administradores (
                 CIP VARCHAR(20) PRIMARY KEY, -- CIP
                 nombres VARCHAR(100) NOT NULL,
-                nombre_usuario VARCHAR(60) NOT NULL UNIQUE,
+                nombre_usuario VARCHAR(60) NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
                 estado VARCHAR(20) DEFAULT 'HABILITADO',
                 fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

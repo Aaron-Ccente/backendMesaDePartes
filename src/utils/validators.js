@@ -195,9 +195,9 @@ export class Validators {
   
   // Validar credenciales de login
   static validateLoginCredentials(credentials) {
-    const { CIP, Contrasena } = credentials;
+    const { CIP, password_hash } = credentials;
     
-    if (!CIP || !Contrasena) {
+    if (!CIP || !password_hash) {
       return { isValid: false, message: 'CIP y contraseña son requeridos' };
     }
     
@@ -206,7 +206,7 @@ export class Validators {
       return cipValidation;
     }
     
-    if (!Contrasena || typeof Contrasena !== 'string') {
+    if (!password_hash || typeof password_hash !== 'string') {
       return { isValid: false, message: 'Contraseña es requerida' };
     }
     
