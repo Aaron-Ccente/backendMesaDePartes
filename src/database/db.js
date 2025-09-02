@@ -7,6 +7,7 @@ const db = mysql2.createConnection({
     password: DB_PASSWORD,
     database: DB_NAME,
     port: DB_PORT,
+    multipleStatements: true,
     charset: 'utf8mb4',
     supportBigNumbers: true,
     bigNumberStrings: true,
