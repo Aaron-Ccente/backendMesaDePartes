@@ -5,7 +5,7 @@ import peritoRoutes from './perito.routes.js';
 const router = express.Router();
 
 // Ruta raíz de la API
-router.get('/', (req, res) => {
+router.get('/', (_, res) => {
   res.json({
     message: 'API Mesa de Partes PNP',
     version: '1.0.0',
@@ -16,14 +16,6 @@ router.get('/', (req, res) => {
   });
 });
 
-// Health check
-router.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
 
 // Rutas de autenticación
 router.use('/api/auth', authRoutes);
