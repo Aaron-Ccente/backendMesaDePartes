@@ -167,7 +167,7 @@ export class Validators {
 
   // Validar datos completos de administrador
   static validateAdminData(adminData) {
-    const { CIP, NombreUsuario, Contrasena, Nombre } = adminData;
+    const { CIP, nombre_usuario, password_hash, nombres, estado } = adminData;
     
     // Validar cada campo
     const cipValidation = this.validateCIP(CIP);
@@ -175,17 +175,17 @@ export class Validators {
       return cipValidation;
     }
     
-    const usernameValidation = this.validateUsername(NombreUsuario);
+    const usernameValidation = this.validateUsername(nombre_usuario);
     if (!usernameValidation.isValid) {
       return usernameValidation;
     }
     
-    const passwordValidation = this.validatePassword(Contrasena);
+    const passwordValidation = this.validatePassword(password_hash);
     if (!passwordValidation.isValid) {
       return passwordValidation;
     }
     
-    const nameValidation = this.validateFullName(Nombre);
+    const nameValidation = this.validateFullName(nombres);
     if (!nameValidation.isValid) {
       return nameValidation;
     }
