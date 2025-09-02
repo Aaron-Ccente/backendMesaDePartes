@@ -37,13 +37,14 @@ export class AuthController {
   // Registro de administrador
   static async registerAdmin(req, res) {
     try {
-      const { CIP, NombreUsuario, Contrasena, Nombre } = req.body;
+      const { CIP, nombre_usuario, password_hash, nombres, estado } = req.body;
       // Validar datos
       const validation = Validators.validateAdminData({
         CIP,
-        NombreUsuario,
-        Contrasena,
-        Nombre
+        nombre_usuario,
+        password_hash,
+        nombres,
+        estado
       });
       
       if (!validation.isValid) {
@@ -56,9 +57,10 @@ export class AuthController {
       // Procesar el registro
       const result = await AuthService.registerAdmin({
         CIP,
-        NombreUsuario,
-        Contrasena,
-        Nombre
+        nombre_usuario,
+        password_hash,
+        nombres,
+        estado
       });
       
       res.status(201).json(result);
