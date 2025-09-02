@@ -7,8 +7,8 @@ export class AuthService {
   static generateToken(adminData) {
     const payload = {
       CIP: adminData.CIP,
-      NombreUsuario: adminData.NombreUsuario,
-      Nombre: adminData.Nombre,
+      nombre_usuario: adminData.nombre_usuario,
+      nombres: adminData.nombres,
       role: 'admin'
     };
     
@@ -27,15 +27,15 @@ export class AuthService {
   // Login de administrador
   static async loginAdmin(credentials) {
     try {
-      const { CIP, contrasena } = credentials;
+      const { CIP, password_hash } = credentials;
       
       // Validar campos requeridos
-      if (!CIP || !contrasena) {
+      if (!CIP || !password_hash) {
         throw new Error('CIP y contraseña son requeridos');
       }
       
       // Verificar credenciales
-      const admin = await Admin.verifyCredentials(CIP, contrasena);
+      const admin = await Admin.verifyCredentials(CIP, password_hash);
       
       if (!admin) {
         throw new Error('Credenciales inválidas');
@@ -50,8 +50,9 @@ export class AuthService {
         token,
         admin: {
           CIP: admin.CIP,
-          NombreUsuario: admin.NombreUsuario,
-          Nombre: admin.Nombre
+          nombre_usuario: admin.nombre_usuario,
+          nombres: admin.Nombre,
+          estado: admin.estado
         }
       };
     } catch (error) {
@@ -62,15 +63,15 @@ export class AuthService {
   // Registro de administrador
   static async registerAdmin(adminData) {
     try {
-      const { CIP, NombreUsuario, Contrasena, Nombre } = adminData;
+      const { CIP, nombre_usuario, password_hash, nombres } = adminData;
       
       // Validar campos requeridos
-      if (!CIP || !NombreUsuario || !Contrasena || !Nombre) {
+      if (!CIP || !nombre_usuario || !password_hash || !nombres) {
         throw new Error('Todos los campos son requeridos');
       }
       
       // Validar longitud mínima de contraseña
-      if (Contrasena.length < 6) {
+      if (password_hash.length < 6) {
         throw new Error('La contraseña debe tener al menos 6 caracteres');
       }
       
