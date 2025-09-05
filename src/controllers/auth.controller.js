@@ -37,14 +37,13 @@ export class AuthController {
   // Registro de administrador
   static async registerAdmin(req, res) {
     try {
-      const { CIP, nombre_usuario, password_hash, nombres, estado } = req.body;
+      const { CIP, nombre_usuario, password_hash, nombre_completo } = req.body;
       // Validar datos
       const validation = Validators.validateAdminData({
         CIP,
         nombre_usuario,
         password_hash,
-        nombres,
-        estado
+        nombre_completo
       });
       
       if (!validation.isValid) {
@@ -59,8 +58,7 @@ export class AuthController {
         CIP,
         nombre_usuario,
         password_hash,
-        nombres,
-        estado
+        nombre_completo,
       });
       
       res.status(201).json(result);
