@@ -1,7 +1,7 @@
 import mysql2 from 'mysql2'
 import { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT } from '../config/config.js'
 
-const db = mysql2.createConnection({
+const db = mysql2.createPool({
     host: DB_HOST,
     user: DB_USER,
     password: DB_PASSWORD,
@@ -11,6 +11,9 @@ const db = mysql2.createConnection({
     charset: 'utf8mb4',
     supportBigNumbers: true,
     bigNumberStrings: true,
+    connectionLimit: 10,
+    waitForConnections: true,
+    queueLimit: 0
 })
 
 // Manejar errores de conexión
