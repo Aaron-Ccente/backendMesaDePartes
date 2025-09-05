@@ -60,14 +60,14 @@ export class Validators {
       return { isValid: false, message: 'Nombre es requerido y debe ser una cadena de texto' };
     }
     
-    if (Nombre.length < 2 || Nombre.length > 100) {
-      return { isValid: false, message: 'Nombre debe tener entre 2 y 100 caracteres' };
+    if (Nombre.length < 2 || Nombre.length > 150) {
+      return { isValid: false, message: 'Nombre debe tener entre 2 y 150 caracteres' };
     }
     
     // Permitir solo letras, espacios, guiones y apóstrofes
     const nameRegex = /^[a-zA-ZÀ-ÿ\s\-']+$/;
     if (!nameRegex.test(Nombre)) {
-      return { isValid: false, message: 'Nombre solo puede contener letras, espacios, guiones y apóstrofes' };
+      return { isValid: false, message: 'El nombre completo del usuario solo puede contener letras, espacios, guiones y apóstrofes' };
     }
     
     return { isValid: true };
@@ -167,7 +167,7 @@ export class Validators {
 
   // Validar datos completos de administrador
   static validateAdminData(adminData) {
-    const { CIP, nombre_usuario, password_hash, nombres, estado } = adminData;
+    const { CIP, nombre_usuario, password_hash, nombre_completo } = adminData;
     
     // Validar cada campo
     const cipValidation = this.validateCIP(CIP);
@@ -185,7 +185,7 @@ export class Validators {
       return passwordValidation;
     }
     
-    const nameValidation = this.validateFullName(nombres);
+    const nameValidation = this.validateFullName(nombre_completo);
     if (!nameValidation.isValid) {
       return nameValidation;
     }
