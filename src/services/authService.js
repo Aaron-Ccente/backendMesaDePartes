@@ -8,7 +8,7 @@ export class AuthService {
     const payload = {
       CIP: adminData.CIP,
       nombre_usuario: adminData.nombre_usuario,
-      nombres: adminData.nombres,
+      nombre_completo: adminData.nombre_completo,
       role: 'admin'
     };
     
@@ -51,8 +51,7 @@ export class AuthService {
         admin: {
           CIP: admin.CIP,
           nombre_usuario: admin.nombre_usuario,
-          nombres: admin.Nombre,
-          estado: admin.estado
+          nombre_completo: admin.nombre_completo
         }
       };
     } catch (error) {
@@ -63,10 +62,10 @@ export class AuthService {
   // Registro de administrador
   static async registerAdmin(adminData) {
     try {
-      const { CIP, nombre_usuario, password_hash, nombres } = adminData;
+      const { CIP, nombre_usuario, password_hash, nombre_completo } = adminData;
       
       // Validar campos requeridos
-      if (!CIP || !nombre_usuario || !password_hash || !nombres) {
+      if (!CIP || !nombre_usuario || !password_hash || !nombre_completo) {
         throw new Error('Todos los campos son requeridos');
       }
       

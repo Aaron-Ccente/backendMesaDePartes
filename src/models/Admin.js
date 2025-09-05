@@ -4,37 +4,57 @@ import bcrypt from 'bcryptjs';
 export class Admin {
   // Crear un nuevo administrador
   static async create(adminData) {
+    const connection = await db.promise().getConnection();
     try {
-      const { CIP, nombre_usuario, password_hash, nombres } = adminData;
-      
-      // Verificar si el CIP ya existe
-      const [existingAdmin] = await db.promise().query(
-        'SELECT CIP FROM administradores WHERE CIP = ?',
+      const { CIP, nombre_usuario, password_hash, nombre_completo } = adminData;
+      if (!CIP || !nombre_usuario || !password_hash || !nombre_completo) {
+        throw new Error('Todos los campos son obligatorios');
+      }
+      const [existingAdmin] = await connection.query(
+        'SELECT id_usuario FROM usuario WHERE CIP = ?',
         [CIP]
       );
-      
+
       if (existingAdmin.length > 0) {
-        throw new Error('El CIP ya está registrado');
+        throw new Error('El CIP ya está registrados');
       }
-      
-      // Encriptar la contraseña
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password_hash, saltRounds);
-      
-      // Insertar el nuevo administrador
-      const [result] = await db.promise().query(
-        'INSERT INTO administradores (CIP, nombre_usuario, password_hash, nombres) VALUES (?, ?, ?, ?)',
-        [CIP, nombre_usuario, hashedPassword, nombres]
+      await connection.beginTransaction();
+      // Insertar el nuevo usuario adminstrador
+      const [result] = await connection.query(
+        'INSERT INTO usuario (CIP, nombre_usuario, password_hash, nombre_completo) VALUES (?, ?, ?, ?)',
+        [CIP, nombre_usuario, hashedPassword, nombre_completo]
       );
-      
+      const id_usuario = result.insertId;
+      await connection.query(
+        'INSERT INTO usuario_rol (id_usuario, id_rol) VALUES (?, ?)',
+        [id_usuario, 1]
+      );
+      // Insertar estado (HABILITADO o DESHABILITADO)
+      await connection.query(
+        'INSERT INTO estado_usuario (id_usuario, id_estado) VALUES (?, ?)',
+        [id_usuario, 1]
+      );
+      // Confirmar transacción si ocurre algun error
+      await connection.commit();
       return {
-        id: result.insertId,
+        id_usuario,
         CIP,
         nombre_usuario,
-        nombres
+        nombre_completo
       };
     } catch (error) {
-      throw error;
+      // Rollback en caso alguna consulta falla (usuario_rol, estado_usuario)
+      await connection.rollback();
+
+      if (error.code === 'ER_DUP_ENTRY') {
+        throw new Error('Ya existe un registro con ese CIP o nombre de usuario');
+      }
+
+      throw new Error(`Error al crear administrador: ${error.message}`);
+    } finally {
+      connection.release();
     }
   }
   
@@ -42,7 +62,7 @@ export class Admin {
   static async findByCIP(CIP) {
     try {
       const [rows] = await db.promise().query(
-        'SELECT CIP, nombre_usuario, password_hash, nombres FROM administradores WHERE CIP = ?',
+        'SELECT CIP, nombre_usuario, password_hash, nombre_completo FROM usuario WHERE CIP = ?',
         [CIP]
       );
       
@@ -56,7 +76,7 @@ export class Admin {
   static async findByUsername(NombreUsuario) {
     try {
       const [rows] = await db.promise().query(
-        'SELECT CIP, nombre_usuario, password_hash, nombres FROM administradores WHERE nombre_usuario = ?',
+        'SELECT CIP, nombre_usuario, password_hash, nombre_completo FROM usuario WHERE nombre_usuario = ?',
         [NombreUsuario]
       );
       
@@ -94,7 +114,7 @@ export class Admin {
   static async findAll() {
     try {
       const [rows] = await db.promise().query(
-        'SELECT CIP, nombre_usuario, nombres FROM administradores'
+        'SELECT CIP, nombre_usuario, nombre_completo FROM usuarios'
       );
       
       return rows;
@@ -111,7 +131,7 @@ export class Admin {
       // Verificar si el nombre de usuario ya existe en otro administrador
       if (nombre_usuario) {
         const [existingUsername] = await db.promise().query(
-          'SELECT CIP FROM administradores WHERE nombre_usuario = ? AND CIP != ?',
+          'SELECT CIP FROM usuario WHERE nombre_usuario = ? AND CIP != ?',
           [nombre_usuario, CIP]
         );
         
@@ -135,7 +155,7 @@ export class Admin {
   static async delete(CIP) {
     try {
       const [result] = await db.promise().query(
-        'DELETE FROM administradores WHERE CIP = ?',
+        'DELETE FROM usuario WHERE CIP = ?',
         [CIP]
       );
       
