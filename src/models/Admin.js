@@ -27,6 +27,12 @@ export class Admin {
         [CIP, nombre_usuario, hashedPassword, nombre_completo]
       );
       const id_usuario = result.insertId;
+      // Insertar el id del usuario en la tabla de administradores.
+      await connection.query(
+        'INSERT INTO administrador (id_usuario) VALUES (?)',
+        [id_usuario]
+      );
+      // 1 es ADMINISTRADOR (rol del usuario)
       await connection.query(
         'INSERT INTO usuario_rol (id_usuario, id_rol) VALUES (?, ?)',
         [id_usuario, 1]
