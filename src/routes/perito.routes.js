@@ -18,7 +18,7 @@ router.post('/', PeritoController.createPerito);
 // Obtener todos los peritos (con paginación y búsqueda)
 router.get('/', PeritoController.getAllPeritos);
 
-// Obtener perito por CIP
+// Obtener perito con sus especialidades, grado, seccion y tipo de departamento por CIP
 router.get('/:cip', PeritoController.getPeritoByCIP);
 
 // Actualizar perito
