@@ -42,109 +42,157 @@ export class Perito {
 
   // Crear nuevo perito
   static async create(peritoData) {
-    try {
-      const {
-        CIP, Nombres, Apellidos, Email, NombreUsuario, Contrasena, DNI,
-        FechaIntegracion, FechaIncorporacion, CodigoCodofin, Domicilio,
-        Seccion, Especialidad, Grado, Telefono, UltimoCenso, Fotografia, Firma
-      } = peritoData;
+  try {
+    const {
+      CIP, Nombres, Apellidos, Email, NombreUsuario, Contrasena, DNI,
+      Unidad, FechaIntegracion, FechaIncorporacion, CodigoCodofin, Domicilio,
+      Telefono, CursosInstitucionales, CursosExtranjero, UltimoAscensoPNP,
+      Fotografia
+    } = peritoData;
 
-      // Validar campos requeridos
-      if (!CIP || !Nombres || !Apellidos || !Email || !NombreUsuario || !Contrasena || !DNI || !CodigoCodofin) {
-        throw new Error('Todos los campos marcados con * son requeridos');
-      }
-
-      // Verificar si el CIP ya existe
-      const existingPerito = await this.findByCIP(CIP);
-      if (existingPerito) {
-        throw new Error('Ya existe un perito con ese CIP');
-      }
-
-      // Verificar si el nombre de usuario ya existe
-      const existingUsername = await this.findByUsername(NombreUsuario);
-      if (existingUsername) {
-        throw new Error('Ya existe un perito con ese nombre de usuario');
-      }
-
-      // Hashear contraseña
-      const hashedPassword = await bcrypt.hash(Contrasena, 10);
-
-      // Preparar valores para inserción
-      const values = [
-        CIP, Nombres, Apellidos, Email, NombreUsuario, hashedPassword, DNI,
-        FechaIntegracion || null, FechaIncorporacion || null, CodigoCodofin,
-        Domicilio || null, Seccion || null, Especialidad || null, Grado || null,
-        Telefono || null, UltimoCenso || null, 
-        this.validateWebPBase64(Fotografia), 
-        this.validateWebPBase64(Firma)
-      ];
-
-      // Verificar que las validaciones de imagen fueron exitosas
-      const fotoIndex = 16;
-      const firmaIndex = 17;
-      
-      if (Fotografia && !values[fotoIndex]) {
-        throw new Error('Error validando fotografía, debe ser formato WebP Base64 válido');
-      }
-      if (Firma && !values[firmaIndex]) {
-        throw new Error('Error validando firma, debe ser formato WebP Base64 válido');
-      }
-
-      // Query de inserción
-      const query = `
-        INSERT INTO Perito (
-          CIP, Nombres, Apellidos, Email, NombreUsuario, Contrasena, DNI,
-          FechaIntegracion, FechaIncorporacion, CodigoCodofin, Domicilio,
-          Seccion, Especialidad, Grado, Telefono, UltimoCenso, Fotografia, Firma
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-
-      const [result] = await db.promise().query(query, values);
-      return {
-        success: true,
-        message: 'Perito creado exitosamente',
-        data: { CIP, insertId: result.insertId }
-      };
-    } catch (error) {
-      throw error;
+    // Validar campos requeridos
+    if (!CIP || !Nombres || !Apellidos || !NombreUsuario || !Contrasena || !DNI) {
+      throw new Error('Todos los campos marcados con * son requeridos');
     }
+
+    // Verificar si el CIP ya existe en usuario
+    const existingUser = await this.findByCIP(CIP);
+    if (existingUser) {
+      throw new Error('Ya existe un usuario con ese CIP');
+    }
+
+    // Verificar si el nombre de usuario ya existe
+    const existingUsername = await this.findByUsername(NombreUsuario);
+    if (existingUsername) {
+      throw new Error('Ya existe un usuario con ese nombre de usuario');
+    }
+
+    // Hashear contraseña
+    const hashedPassword = await bcrypt.hash(Contrasena, 10);
+
+    // Concatenar nombre completo
+    const nombreCompleto = `${Nombres} ${Apellidos}`;
+
+    // --- 1. Crear usuario ---
+    const queryUsuario = `
+      INSERT INTO usuario (
+        CIP, nombre_completo, nombre_usuario, password_hash
+      ) VALUES (?, ?, ?, ?)
+    `;
+    const [usuarioResult] = await db.promise().query(queryUsuario, [
+      CIP, nombreCompleto, NombreUsuario, hashedPassword
+    ]);
+
+    const idUsuario = usuarioResult.insertId;
+
+    // --- 2. Crear perito ---
+    const queryPerito = `
+      INSERT INTO perito (
+        id_usuario, dni, email, unidad, fecha_integracion_pnp, fecha_incorporacion,
+        codigo_codofin, domicilio, telefono, cursos_institucionales,
+        cursos_extranjero, ultimo_ascenso_pnp, fotografia_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const [peritoResult] = await db.promise().query(queryPerito, [
+      idUsuario, DNI, Email || null, Unidad || null,
+      FechaIntegracion || null, FechaIncorporacion || null,
+      CodigoCodofin || null, Domicilio || null, Telefono || null,
+      CursosInstitucionales ? JSON.stringify(CursosInstitucionales) : null,
+      CursosExtranjero ? JSON.stringify(CursosExtranjero) : null,
+      UltimoAscensoPNP || null,
+      this.validateWebPBase64(Fotografia)
+    ]);
+
+    // Validar imagen (fotografía)
+    if (Fotografia && !this.validateWebPBase64(Fotografia)) {
+      throw new Error('Error validando fotografía, debe ser formato WebP Base64 válido');
+    }
+
+    return {
+      success: true,
+      message: 'Perito creado exitosamente',
+      data: {
+        id_usuario: idUsuario,
+        id_perito: peritoResult.insertId,
+        CIP
+      }
+    };
+  } catch (error) {
+    throw error;
   }
+}
+
 
   // Buscar perito por CIP
   static async findByCIP(cip) {
     try {
       const [rows] = await db.promise().query(
-        'SELECT * FROM Perito WHERE CIP = ?',
-        [cip]
-      );
+      `
+      SELECT 
+        a.id_usuario,
+        a.CIP,
+        a.nombre_completo,
+        a.nombre_usuario,
+
+        -- Especialidad
+        b.id_usuario_especialidad,
+        b.id_especialidad,
+        b.fecha_asignacion AS fecha_asignacion_especialidad,
+        c.nombre AS nombre_especialidad,
+
+        -- Departamento (tipo_departamento)
+        ud.id_usuario_departamento,
+        ud.id_tipo_departamento,
+        td.nombre_departamento AS nombre_tipo_departamento,
+
+        -- Grado
+        ug.id_usuario_grado,
+        g.id_grado,
+        g.nombre AS nombre_grado,
+
+        -- Seccion
+        us.id_usuario_seccion,
+        s.id_seccion,
+        s.nombre AS nombre_seccion
+
+      FROM usuario AS a
+      LEFT JOIN usuario_especialidad AS b 
+        ON a.id_usuario = b.id_usuario
+      LEFT JOIN especialidad AS c 
+        ON b.id_especialidad = c.id_especialidad
+
+      LEFT JOIN usuario_departamento AS ud 
+        ON a.id_usuario = ud.id_usuario
+      LEFT JOIN tipo_departamento AS td 
+        ON ud.id_tipo_departamento = td.id_tipo_departamento
+
+      LEFT JOIN usuario_grado AS ug 
+        ON a.id_usuario = ug.id_usuario
+      LEFT JOIN grado AS g 
+        ON ug.id_grado = g.id_grado
+
+      LEFT JOIN usuario_seccion AS us 
+        ON a.id_usuario = us.id_usuario
+      LEFT JOIN seccion AS s 
+        ON us.id_seccion = s.id_seccion
+
+      WHERE a.CIP = ?
+      `,
+      [cip]
+    );
       
       if (rows[0]) {
         const perito = rows[0];
-        // Mostrar foto y firma
-        if (perito.Fotografia) {
+        if (perito.fotografia_url) {
           try {
-            if (typeof perito.Fotografia === 'string' && perito.Fotografia.startsWith('data:image/')) {
+            if (typeof perito.fotografia_url === 'string' && perito.fotografia_url.startsWith('data:image/')) {
             } else {
-              const base64 = this.blobToBase64(perito.Fotografia);
-              perito.Fotografia = `data:image/webp;base64,${base64}`;
+              const base64 = this.blobToBase64(perito.fotografia_url);
+              perito.fotografia_url = `data:image/webp;base64,${base64}`;
             }
           } catch (error) {
-            perito.Fotografia = null;
-          }
-        }
-        if (perito.Firma) {
-          try {
-            // Si ya es Base64, usarlo directamente
-            if (typeof perito.Firma === 'string' && perito.Firma.startsWith('data:image/')) {
-              console.log('Firma ya está en formato Base64');
-            } else {
-              // convertirlo a Base64
-              const base64 = this.blobToBase64(perito.Firma);
-              perito.Firma = `data:image/webp;base64,${base64}`;
-            }
-          } catch (error) {
-            console.error('Error procesando firma:', error);
-            perito.Firma = null;
+            perito.fotografia_url = null;
           }
         }
         return perito;

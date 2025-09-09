@@ -169,13 +169,13 @@ const usuario_rol = `CREATE TABLE usuario_rol(
                      FOREIGN KEY (id_rol) REFERENCES rol(id_rol)
     );`
 
-const usuario_seccion = `CREATE TABLE usuario_seccion (
+const usuario_seccion = `CREATE TABLE usuario_turno (
                 id_usuario_seccion INT PRIMARY KEY AUTO_INCREMENT,
                 id_usuario INT NOT NULL,
-                id_seccion INT NOT NULL,
+                id_turno INT NOT NULL,
                 fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
-                FOREIGN KEY (id_seccion) REFERENCES seccion(id_seccion)
+                FOREIGN KEY (id_seccion) REFERENCES seccion(id_turno)
             );`
 
 const estado_usuario = `CREATE TABLE estado_usuario(
