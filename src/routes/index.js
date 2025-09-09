@@ -1,7 +1,8 @@
 import express from 'express';
 import authRoutes from './auth.routes.js';
 import peritoRoutes from './perito.routes.js';
-
+import especialidadesRoutes from './especialidad.routes.js'
+import TipoDepartamentoRoutes from './tipodepartamento.routes.js'
 const router = express.Router();
 
 // Ruta raíz de la API
@@ -22,5 +23,13 @@ router.use('/api/auth', authRoutes);
 
 // Rutas de peritos
 router.use('/api/peritos', peritoRoutes);
+
+// Rutas para especialidades
+router.use('/api/especialidades', especialidadesRoutes)
+
+// Rutas para los tipos de departamentos
+router.use('/api/tipodepartamentos', TipoDepartamentoRoutes)
+
+
 
 export default router;
