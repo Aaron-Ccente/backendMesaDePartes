@@ -295,4 +295,35 @@ export class PeritoController {
       });
     }
   }
+
+  static async getAllRelations(req, res){
+    try {
+      const {cip} = req.params;
+      if (!cip) {
+        return res.status(400).json({
+          success: false,
+          message: 'cip es requerido requeridos'
+        });
+      }
+
+      // Buscar relaciones del perito por CIP
+      const perito = await Perito.findAllRelations(cip);
+      
+      if (!perito) {
+        return res.status(200).json({
+          success: false,
+          message: 'El perito no tiene especialidades, grados, secciones o un departamento'
+        });
+      }else{
+        return res.status(200).json({message: 'Datos de las relaciones del perito cargados correctamente', success: true, data: perito})
+      }
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
 }
