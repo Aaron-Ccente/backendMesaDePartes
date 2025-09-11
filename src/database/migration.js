@@ -13,7 +13,7 @@ const deleteTables = `
         tipo_departamento,
         especialidad,
         grado,
-        seccion,
+        turno,
         departamentos,
         usuario,
         administrador,
@@ -21,7 +21,7 @@ const deleteTables = `
         usuario_especialidad,
         usuario_grado,
         usuario_rol,
-        usuario_seccion,
+        usuario_turno,
         estado_usuario,
         usuario_departamento;
     SET FOREIGN_KEY_CHECKS = 1;
@@ -78,8 +78,8 @@ const grado = `CREATE TABLE grado (
             );`
 
 // -- Tabla para seccion
-const seccion = `CREATE TABLE seccion (
-                id_seccion INT PRIMARY KEY AUTO_INCREMENT,
+const turno = `CREATE TABLE turno (
+                id_turno INT PRIMARY KEY AUTO_INCREMENT,
                 nombre VARCHAR(60) UNIQUE NOT NULL
             );`
 
@@ -169,13 +169,13 @@ const usuario_rol = `CREATE TABLE usuario_rol(
                      FOREIGN KEY (id_rol) REFERENCES rol(id_rol)
     );`
 
-const usuario_seccion = `CREATE TABLE usuario_turno (
-                id_usuario_seccion INT PRIMARY KEY AUTO_INCREMENT,
+const usuario_turno = `CREATE TABLE usuario_turno (
+                id_usuario_turno INT PRIMARY KEY AUTO_INCREMENT,
                 id_usuario INT NOT NULL,
                 id_turno INT NOT NULL,
                 fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
-                FOREIGN KEY (id_seccion) REFERENCES seccion(id_turno)
+                FOREIGN KEY (id_turno) REFERENCES turno(id_turno)
             );`
 
 const estado_usuario = `CREATE TABLE estado_usuario(
@@ -466,7 +466,7 @@ const createTables = `
     ${tipos_departamento}
     ${especialidad}
     ${grado}
-    ${seccion}
+    ${turno}
     ${departamentos}
     ${usuarios}
     ${administradores}
@@ -474,7 +474,7 @@ const createTables = `
     ${usuario_especialidad}
     ${usuario_grado}
     ${usuario_rol}
-    ${usuario_seccion}
+    ${usuario_turno}
     ${estado_usuario}
     ${usuario_departamento}
 `
