@@ -151,10 +151,10 @@ export class Perito {
         g.id_grado,
         g.nombre AS nombre_grado,
 
-        -- Seccion
-        us.id_usuario_seccion,
-        s.id_seccion,
-        s.nombre AS nombre_seccion
+        -- Turno
+        ut.id_usuario_turno,
+        t.id_turno,
+        t.nombre AS nombre_turno
 
       FROM usuario AS a
       LEFT JOIN usuario_especialidad AS b 
@@ -172,10 +172,10 @@ export class Perito {
       LEFT JOIN grado AS g 
         ON ug.id_grado = g.id_grado
 
-      LEFT JOIN usuario_seccion AS us 
-        ON a.id_usuario = us.id_usuario
-      LEFT JOIN seccion AS s 
-        ON us.id_seccion = s.id_seccion
+      LEFT JOIN usuario_turno AS ut
+        ON a.id_usuario = ut.id_usuario
+      LEFT JOIN turno AS t
+        ON ut.id_turno = t.id_turno
 
       WHERE a.CIP = ?
       `,
