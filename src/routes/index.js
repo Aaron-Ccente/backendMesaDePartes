@@ -3,6 +3,8 @@ import authRoutes from './auth.routes.js';
 import peritoRoutes from './perito.routes.js';
 import especialidadesRoutes from './especialidad.routes.js'
 import TipoDepartamentoRoutes from './tipodepartamento.routes.js'
+import gradosRoutes from './grado.routes.js'
+import turnos from './turno.routes.js'
 const router = express.Router();
 
 // Ruta raíz de la API
@@ -30,6 +32,10 @@ router.use('/api/especialidades', especialidadesRoutes)
 // Rutas para los tipos de departamentos
 router.use('/api/tipodepartamentos', TipoDepartamentoRoutes)
 
+// Rutas para los grados
+router.use('/api/grados', gradosRoutes)
 
+// Rutas para los turnos
+router.use('/api/turnos', turnos)
 
 export default router;
