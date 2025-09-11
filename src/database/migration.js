@@ -27,173 +27,171 @@ const deleteTables = `
     SET FOREIGN_KEY_CHECKS = 1;
 `
 
-
 // -- BLOQUE 1: Tablas de referencia
-// -- Tabla para tipos de roles de usuario
 const roles = `CREATE TABLE rol (
-                id_rol TINYINT PRIMARY KEY AUTO_INCREMENT,
-                nombre_rol VARCHAR(20) NOT NULL UNIQUE,
-                descripcion TEXT
-            );`
+    id_rol TINYINT PRIMARY KEY AUTO_INCREMENT,
+    nombre_rol VARCHAR(20) NOT NULL UNIQUE,
+    descripcion TEXT
+);`
 
-// -- Tabla para estados de requerimientos
 const estados_requerimientos = `CREATE TABLE estados_requerimiento (
-                id_estado TINYINT PRIMARY KEY AUTO_INCREMENT,
-                nombre_estado VARCHAR(20) NOT NULL UNIQUE,
-                descripcion TEXT
-            );`
+    id_estado TINYINT PRIMARY KEY AUTO_INCREMENT,
+    nombre_estado VARCHAR(20) NOT NULL UNIQUE,
+    descripcion TEXT
+);`
 
-// -- Tabla para tipos de prioridad
 const tipos_prioridad = `CREATE TABLE tipos_prioridad (
-                id_prioridad TINYINT PRIMARY KEY AUTO_INCREMENT,
-                nombre_prioridad VARCHAR(20) NOT NULL UNIQUE,
-                nivel_prioridad TINYINT NOT NULL,
-                descripcion TEXT
-            );`
+    id_prioridad TINYINT PRIMARY KEY AUTO_INCREMENT,
+    nombre_prioridad VARCHAR(20) NOT NULL UNIQUE,
+    nivel_prioridad TINYINT NOT NULL,
+    descripcion TEXT
+);`
 
-// -- Tabla para estados de usuario
 const estados = `CREATE TABLE estado (
-                id_estado TINYINT PRIMARY KEY AUTO_INCREMENT,
-                nombre_estado VARCHAR(20) NOT NULL UNIQUE,
-                descripcion TEXT
-            );`
+    id_estado TINYINT PRIMARY KEY AUTO_INCREMENT,
+    nombre_estado VARCHAR(20) NOT NULL UNIQUE,
+    descripcion TEXT
+);`
 
-// -- Tabla para tipos de departamento
 const tipos_departamento = `CREATE TABLE tipo_departamento (
-                id_tipo_departamento TINYINT PRIMARY KEY AUTO_INCREMENT,
-                nombre_departamento VARCHAR(50) NOT NULL UNIQUE,
-                descripcion TEXT
-            );`
+    id_tipo_departamento TINYINT PRIMARY KEY AUTO_INCREMENT,
+    nombre_departamento VARCHAR(50) NOT NULL UNIQUE,
+    descripcion TEXT
+);`
 
-// -- Tabla para especialidad
 const especialidad = `CREATE TABLE especialidad (
-                id_especialidad INT PRIMARY KEY AUTO_INCREMENT,
-                nombre VARCHAR(60) UNIQUE NOT NULL
-            );`
+    id_especialidad INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(60) UNIQUE NOT NULL
+);`
 
-// -- Tabla para grado
 const grado = `CREATE TABLE grado (
-                id_grado INT PRIMARY KEY AUTO_INCREMENT,
-                nombre VARCHAR(60) UNIQUE NOT NULL
-            );`
+    id_grado INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(60) UNIQUE NOT NULL
+);`
 
-// -- Tabla para seccion
 const turno = `CREATE TABLE turno (
-                id_turno INT PRIMARY KEY AUTO_INCREMENT,
-                nombre VARCHAR(60) UNIQUE NOT NULL
-            );`
+    id_turno INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(60) UNIQUE NOT NULL
+);`
 
 // -- BLOQUE 2: Gestión de perito
-// -- Tabla de departamentos
 const departamentos = `CREATE TABLE departamentos (
-                id_departamento INT PRIMARY KEY AUTO_INCREMENT,
-                id_tipo_departamento TINYINT NOT NULL,
-                descripcion TEXT,
-                jefe_departamento VARCHAR(20), -- CIP del jefe
-                activo TINYINT(1) DEFAULT 1,
-                fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (id_tipo_departamento) REFERENCES tipo_departamento(id_tipo_departamento)
-            );`
-
-const usuarios= `CREATE TABLE usuario (
-                id_usuario INT PRIMARY KEY AUTO_INCREMENT,
-                CIP VARCHAR(20) UNIQUE NOT NULL,
-                nombre_completo VARCHAR(150) NOT NULL,
-                nombre_usuario VARCHAR(60) NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                ultimo_acceso TIMESTAMP NULL,
-                CONSTRAINT chk_cip_format CHECK (CIP REGEXP '^[A-Z0-9]+$')
+    id_departamento INT PRIMARY KEY AUTO_INCREMENT,
+    id_tipo_departamento TINYINT NOT NULL,
+    descripcion TEXT,
+    jefe_departamento VARCHAR(20),
+    activo TINYINT(1) DEFAULT 1,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_tipo_departamento) REFERENCES tipo_departamento(id_tipo_departamento)
+        ON DELETE RESTRICT ON UPDATE CASCADE
 );`
 
-// -- Tabla para administradores
+const usuarios = `CREATE TABLE usuario (
+    id_usuario INT PRIMARY KEY AUTO_INCREMENT,
+    CIP VARCHAR(20) UNIQUE NOT NULL,
+    nombre_completo VARCHAR(150) NOT NULL,
+    nombre_usuario VARCHAR(60) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    ultimo_acceso TIMESTAMP NULL,
+    CONSTRAINT chk_cip_format CHECK (CIP REGEXP '^[A-Z0-9]+$')
+);`
+
 const administradores = `CREATE TABLE administrador (
-                id_administrador INT PRIMARY KEY AUTO_INCREMENT,
-                id_usuario INT NOT NULL,
-                FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
-            );`
+    id_administrador INT PRIMARY KEY AUTO_INCREMENT,
+    id_usuario INT NOT NULL,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);`
 
-// -- Tabla principal de perito con información completa del personal PNP
 const peritos = `CREATE TABLE perito (
-                id_perito INT PRIMARY KEY AUTO_INCREMENT,
-                id_usuario INT NOT NULL,
-                dni VARCHAR(8) NOT NULL UNIQUE,
-                email VARCHAR(100) UNIQUE,
-                -- Información específica PNP
-                unidad VARCHAR(100),
-                fecha_integracion_pnp DATE,
-                fecha_incorporacion DATE,
-                codigo_codofin VARCHAR(20),
-                domicilio TEXT,
-                telefono VARCHAR(15),
-                
-                -- Formación académica
-                cursos_institucionales TEXT, -- JSON en lugar de array
-                cursos_extranjero TEXT, -- JSON en lugar de array
-                ultimo_ascenso_pnp DATE,
-                
-                -- Archivos digitales
-                fotografia_url TEXT,
-                
-                -- Constraints
-                CONSTRAINT chk_dni_format CHECK (dni REGEXP '^[0-9]{8}$'),
-                FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
-                );`
+    id_perito INT PRIMARY KEY AUTO_INCREMENT,
+    id_usuario INT NOT NULL,
+    dni VARCHAR(8) NOT NULL UNIQUE,
+    email VARCHAR(100) UNIQUE,
+    unidad VARCHAR(100),
+    fecha_integracion_pnp DATE,
+    fecha_incorporacion DATE,
+    codigo_codofin VARCHAR(20),
+    domicilio TEXT,
+    telefono VARCHAR(15),
+    cursos_institucionales TEXT,
+    cursos_extranjero TEXT,
+    ultimo_ascenso_pnp DATE,
+    fotografia_url TEXT,
+    CONSTRAINT chk_dni_format CHECK (dni REGEXP '^[0-9]{8}$'),
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);`
 
-// -- Tablas de relación para especialidad, grado, estado y sección
+// -- Tablas de relación
 const usuario_especialidad = `CREATE TABLE usuario_especialidad (
-                id_usuario_especialidad INT PRIMARY KEY AUTO_INCREMENT,
-                id_usuario INT NOT NULL,
-                id_especialidad INT NOT NULL,
-                fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
-                FOREIGN KEY (id_especialidad) REFERENCES especialidad(id_especialidad)
-            );`
+    id_usuario_especialidad INT PRIMARY KEY AUTO_INCREMENT,
+    id_usuario INT NOT NULL,
+    id_especialidad INT NOT NULL,
+    fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (id_especialidad) REFERENCES especialidad(id_especialidad)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);`
 
 const usuario_grado = `CREATE TABLE usuario_grado (
-                id_usuario_grado INT PRIMARY KEY AUTO_INCREMENT,
-                id_usuario INT NOT NULL,
-                id_grado INT NOT NULL,
-                fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
-                FOREIGN KEY (id_grado) REFERENCES grado(id_grado)
-            );`
+    id_usuario_grado INT PRIMARY KEY AUTO_INCREMENT,
+    id_usuario INT NOT NULL,
+    id_grado INT NOT NULL,
+    fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (id_grado) REFERENCES grado(id_grado)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);`
 
-const usuario_rol = `CREATE TABLE usuario_rol(
-                     id_usuario_rol INT PRIMARY KEY AUTO_INCREMENT,
-                     id_usuario INT NOT NULL,
-                     id_rol TINYINT NOT NULL,
-                     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
-                     FOREIGN KEY (id_rol) REFERENCES rol(id_rol)
-    );`
+const usuario_rol = `CREATE TABLE usuario_rol (
+    id_usuario_rol INT PRIMARY KEY AUTO_INCREMENT,
+    id_usuario INT NOT NULL,
+    id_rol TINYINT NOT NULL,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (id_rol) REFERENCES rol(id_rol)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);`
 
 const usuario_turno = `CREATE TABLE usuario_turno (
-                id_usuario_turno INT PRIMARY KEY AUTO_INCREMENT,
-                id_usuario INT NOT NULL,
-                id_turno INT NOT NULL,
-                fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
-                FOREIGN KEY (id_turno) REFERENCES turno(id_turno)
-            );`
+    id_usuario_turno INT PRIMARY KEY AUTO_INCREMENT,
+    id_usuario INT NOT NULL,
+    id_turno INT NOT NULL,
+    fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (id_turno) REFERENCES turno(id_turno)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);`
 
-const estado_usuario = `CREATE TABLE estado_usuario(
-                id_estado_usuario INT PRIMARY KEY AUTO_INCREMENT,
-                id_usuario INT NOT NULL,
-                id_estado TINYINT NOT NULL,
-                fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
-                FOREIGN KEY (id_estado) REFERENCES estado(id_estado)
-                );`
+const estado_usuario = `CREATE TABLE estado_usuario (
+    id_estado_usuario INT PRIMARY KEY AUTO_INCREMENT,
+    id_usuario INT NOT NULL,
+    id_estado TINYINT NOT NULL,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (id_estado) REFERENCES estado(id_estado)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);`
 
 const usuario_departamento = `CREATE TABLE usuario_departamento (
-                id_usuario_departamento INT PRIMARY KEY AUTO_INCREMENT,
-                id_usuario INT NOT NULL,
-                id_tipo_departamento TINYINT NOT NULL,
-                FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
-                FOREIGN KEY (id_tipo_departamento) REFERENCES tipo_departamento(id_tipo_departamento)
+    id_usuario_departamento INT PRIMARY KEY AUTO_INCREMENT,
+    id_usuario INT NOT NULL,
+    id_tipo_departamento TINYINT NOT NULL,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (id_tipo_departamento) REFERENCES tipo_departamento(id_tipo_departamento)
+        ON DELETE RESTRICT ON UPDATE CASCADE
 );`
+
+
 // -- BLOQUE 3: Gestión de requerimientos y oficios
 // -- Tabla principal de requerimientos
 
