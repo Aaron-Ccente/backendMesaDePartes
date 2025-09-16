@@ -6,6 +6,8 @@ const deleteAll = `DELETE FROM rol;
                    DELETE FROM especialidad;
                    DELETE FROM grado;
                    DELETE FROM turno;
+                   DELETE FROM seccion;
+                   DELETE FROM tipo_departamento_seccion;
                     `;
 const roles = `INSERT INTO rol (id_rol, nombre_rol, descripcion) VALUES 
                (1,'ADMINISTRADOR','Administra a todos los peritos - control total.'), 
@@ -27,6 +29,10 @@ const tipos_departamento = `INSERT INTO tipo_departamento (id_tipo_departamento,
                 (8,'CONTABILIDAD Y TASACIÓN FORENSE','Contabilidad y Tasación Forense - descripción'),
                 (9,'PSICOLOGÍA FORENSE','Psicología Forense - descripción'),
                 (10,'IDENTIFICACIÓN CRIMINALÍSTICA','Identificación Criminalísitica - descripción');`
+
+const secciones = `INSERT INTO seccion (id_seccion, nombre, descripcion) VALUES
+                (1, 'Análisis', 'Seccion para los análisis'),
+                (2, 'Prueba', 'Seccion para los pruebas');`
 
 const especialidades = `INSERT INTO especialidad (id_especialidad, nombre) VALUES
                 (1,'Levantamiento de evidencias físicas'),
@@ -92,14 +98,21 @@ const turnos = `INSERT INTO turno (id_turno, nombre) VALUES
                 (3,'Noche'),
                 (4,'Guardia 24 horas');`
 
+const tipo_departamento_seccion = `INSERT INTO tipo_departamento_seccion (id_tipo_departamento_seccion, id_tipo_departamento, id_seccion) VALUES
+                (1, 1, 1),
+                (2, 1, 2),
+                (3, 2, 2);`
+
 const dbseed = `  
                 ${deleteAll}
                 ${roles}              
                 ${estados}                
                 ${tipos_departamento}                
                 ${especialidades}                
+                ${secciones}                
                 ${grados}                
                 ${turnos}                
+                ${tipo_departamento_seccion}                
 `;
 
 db.query(dbseed, (err, result)=>{
