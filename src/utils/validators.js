@@ -216,8 +216,8 @@ export class Validators {
   // Validar datos completos de perito
   static validatePeritoData(peritoData) {
     const {
-      CIP, Nombres, Apellidos, Email, NombreUsuario, Contrasena,
-      DNI, CodigoCodofin
+      CIP, nombre_completo, email, nombre_usuario, password_hash,
+      dni, codigo_codofin
     } = peritoData;
     
     // Validar campos requeridos
@@ -226,37 +226,32 @@ export class Validators {
       return cipValidation;
     }
     
-    const nombresValidation = this.validateFullName(Nombres);
+    const nombresValidation = this.validateFullName(nombre_completo);
     if (!nombresValidation.isValid) {
       return nombresValidation;
     }
     
-    const apellidosValidation = this.validateFullName(Apellidos);
-    if (!apellidosValidation.isValid) {
-      return apellidosValidation;
-    }
-    
-    const emailValidation = this.validateEmail(Email);
+    const emailValidation = this.validateEmail(email);
     if (!emailValidation.isValid) {
       return emailValidation;
     }
     
-    const usernameValidation = this.validateUsername(NombreUsuario);
+    const usernameValidation = this.validateUsername(nombre_usuario);
     if (!usernameValidation.isValid) {
       return usernameValidation;
     }
     
-    const passwordValidation = this.validatePassword(Contrasena);
+    const passwordValidation = this.validatePassword(password_hash);
     if (!passwordValidation.isValid) {
       return passwordValidation;
     }
     
-    const dniValidation = this.validateDNI(DNI);
+    const dniValidation = this.validateDNI(dni);
     if (!dniValidation.isValid) {
       return dniValidation;
     }
     
-    const codigoValidation = this.validateCodigoCodofin(CodigoCodofin);
+    const codigoValidation = this.validateCodigoCodofin(codigo_codofin);
     if (!codigoValidation.isValid) {
       return codigoValidation;
     }

@@ -13,6 +13,7 @@ const deleteTables = `
         tipo_departamento,
         especialidad,
         grado,
+        seccion,
         turno,
         departamentos,
         usuario,
@@ -23,6 +24,7 @@ const deleteTables = `
         usuario_rol,
         usuario_turno,
         estado_usuario,
+        tipo_departamento_seccion,
         usuario_departamento;
     SET FOREIGN_KEY_CHECKS = 1;
 `
@@ -54,15 +56,16 @@ const estados = `CREATE TABLE estado (
 );`
 
 const tipos_departamento = `CREATE TABLE tipo_departamento (
-    id_tipo_departamento TINYINT PRIMARY KEY AUTO_INCREMENT,
+    id_tipo_departamento INT PRIMARY KEY AUTO_INCREMENT,
     nombre_departamento VARCHAR(50) NOT NULL UNIQUE,
     descripcion TEXT
 );`
 
 const seccion = `CREATE TABLE seccion (
     id_seccion INT PRIMARY KEY AUTO_INCREMENT,
-    
-)`
+    nombre VARCHAR(50) NOT NULL,
+    descripcion TEXT
+);`
 
 const especialidad = `CREATE TABLE especialidad (
     id_especialidad INT PRIMARY KEY AUTO_INCREMENT,
@@ -82,7 +85,7 @@ const turno = `CREATE TABLE turno (
 // -- BLOQUE 2: Gestión de perito
 const departamentos = `CREATE TABLE departamentos (
     id_departamento INT PRIMARY KEY AUTO_INCREMENT,
-    id_tipo_departamento TINYINT NOT NULL,
+    id_tipo_departamento INT NOT NULL,
     descripcion TEXT,
     jefe_departamento VARCHAR(20),
     activo TINYINT(1) DEFAULT 1,
@@ -189,10 +192,20 @@ const estado_usuario = `CREATE TABLE estado_usuario (
 const usuario_departamento = `CREATE TABLE usuario_departamento (
     id_usuario_departamento INT PRIMARY KEY AUTO_INCREMENT,
     id_usuario INT NOT NULL,
-    id_tipo_departamento TINYINT NOT NULL,
+    id_tipo_departamento INT NOT NULL,
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
         ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (id_tipo_departamento) REFERENCES tipo_departamento(id_tipo_departamento)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);`
+
+const tipo_departamento_seccion = `CREATE TABLE tipo_departamento_seccion (
+    id_tipo_departamento_seccion INT PRIMARY KEY AUTO_INCREMENT,
+    id_tipo_departamento INT NOT NULL,
+    id_seccion INT NOT NULL,
+    FOREIGN KEY (id_tipo_departamento) REFERENCES tipo_departamento(id_tipo_departamento)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (id_seccion) REFERENCES seccion(id_seccion)
         ON DELETE RESTRICT ON UPDATE CASCADE
 );`
 
@@ -466,6 +479,7 @@ const createTables = `
     ${estados_requerimientos}
     ${tipos_prioridad}
     ${estados}
+    ${seccion}
     ${tipos_departamento}
     ${especialidad}
     ${grado}
@@ -480,6 +494,7 @@ const createTables = `
     ${usuario_turno}
     ${estado_usuario}
     ${usuario_departamento}
+    ${tipo_departamento_seccion}
 `
 
 db.query(createTables, (err, result)=>{
