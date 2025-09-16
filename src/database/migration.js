@@ -59,6 +59,11 @@ const tipos_departamento = `CREATE TABLE tipo_departamento (
     descripcion TEXT
 );`
 
+const seccion = `CREATE TABLE seccion (
+    id_seccion INT PRIMARY KEY AUTO_INCREMENT,
+    
+)`
+
 const especialidad = `CREATE TABLE especialidad (
     id_especialidad INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(60) UNIQUE NOT NULL
