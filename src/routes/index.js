@@ -4,6 +4,7 @@ import peritoRoutes from './perito.routes.js';
 import especialidadesRoutes from './especialidad.routes.js'
 import TipoDepartamentoRoutes from './tipodepartamento.routes.js'
 import gradosRoutes from './grado.routes.js'
+import seccionesRoutes from './seccion.routes.js'
 import turnos from './turno.routes.js'
 const router = express.Router();
 
@@ -37,5 +38,8 @@ router.use('/api/grados', gradosRoutes)
 
 // Rutas para los turnos
 router.use('/api/turnos', turnos)
+
+// Rutas para las secciones
+router.use('/api/secciones', seccionesRoutes)
 
 export default router;
