@@ -50,15 +50,15 @@ export class PeritoController {
       
       if (search) {
         peritos = await Perito.search(search, parseInt(limit), offset);
-        total = await Perito.count(); // TODO: Implementar búsqueda con conteo
+        total = await Perito.count();
       } else {
         peritos = await Perito.findAll(parseInt(limit), offset);
         total = await Perito.count();
       }
 
-      // Remover contraseñas de la respuesta
+      // Remover contraseña
       const peritosSinPassword = peritos.map(perito => {
-        const { Contrasena, ...peritoSinPassword } = perito;
+        const { password_hash, ...peritoSinPassword } = perito;
         return peritoSinPassword;
       });
 

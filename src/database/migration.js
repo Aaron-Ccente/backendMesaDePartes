@@ -25,7 +25,7 @@ const deleteTables = `
         usuario_turno,
         estado_usuario,
         tipo_departamento_seccion,
-        usuario_departamento;
+        usuario_seccion;
     SET FOREIGN_KEY_CHECKS = 1;
 `
 
@@ -189,13 +189,13 @@ const estado_usuario = `CREATE TABLE estado_usuario (
         ON DELETE RESTRICT ON UPDATE CASCADE
 );`
 
-const usuario_departamento = `CREATE TABLE usuario_departamento (
-    id_usuario_departamento INT PRIMARY KEY AUTO_INCREMENT,
+const usuario_seccion = `CREATE TABLE usuario_seccion (
+    id_usuario_seccion INT PRIMARY KEY AUTO_INCREMENT,
     id_usuario INT NOT NULL,
-    id_tipo_departamento INT NOT NULL,
+    id_seccion INT NOT NULL,
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
         ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (id_tipo_departamento) REFERENCES tipo_departamento(id_tipo_departamento)
+    FOREIGN KEY (id_seccion) REFERENCES seccion(id_seccion)
         ON DELETE RESTRICT ON UPDATE CASCADE
 );`
 
@@ -493,7 +493,7 @@ const createTables = `
     ${usuario_rol}
     ${usuario_turno}
     ${estado_usuario}
-    ${usuario_departamento}
+    ${usuario_seccion}
     ${tipo_departamento_seccion}
 `
 
