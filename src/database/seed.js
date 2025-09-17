@@ -100,8 +100,7 @@ const turnos = `INSERT INTO turno (id_turno, nombre) VALUES
 
 const tipo_departamento_seccion = `INSERT INTO tipo_departamento_seccion (id_tipo_departamento_seccion, id_tipo_departamento, id_seccion) VALUES
                 (1, 1, 1),
-                (2, 1, 2),
-                (3, 2, 2);`
+                (2, 1, 2)`
 
 const dbseed = `  
                 ${deleteAll}
