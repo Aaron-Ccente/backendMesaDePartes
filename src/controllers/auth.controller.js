@@ -5,9 +5,9 @@ export class AuthController {
   // Login de administrador
   static async loginAdmin(req, res) {
     try {
-      const { CIP, Contrasena } = req.body;
+      const { CIP, password_hash } = req.body;
       // Validar credenciales
-      const validation = Validators.validateLoginCredentials({ CIP, Contrasena });
+      const validation = Validators.validateLoginCredentials({ CIP, password_hash });
       if (!validation.isValid) {
         return res.status(400).json({
           success: false,
@@ -16,7 +16,7 @@ export class AuthController {
       }
     
       // Procesar el login
-      const result = await AuthService.loginAdmin({ CIP, contrasena: Contrasena });
+      const result = await AuthService.loginAdmin({ CIP, password_hash });
       res.status(200).json(result);
     } catch (error) {
       if (error.message === 'Credenciales inválidas') {
@@ -37,14 +37,13 @@ export class AuthController {
   // Registro de administrador
   static async registerAdmin(req, res) {
     try {
-      const { CIP, nombre_usuario, password_hash, nombres, estado } = req.body;
+      const { CIP, nombre_usuario, password_hash, nombre_completo } = req.body;
       // Validar datos
       const validation = Validators.validateAdminData({
         CIP,
         nombre_usuario,
         password_hash,
-        nombres,
-        estado
+        nombre_completo
       });
       
       if (!validation.isValid) {
@@ -59,8 +58,7 @@ export class AuthController {
         CIP,
         nombre_usuario,
         password_hash,
-        nombres,
-        estado
+        nombre_completo,
       });
       
       res.status(201).json(result);

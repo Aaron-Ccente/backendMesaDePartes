@@ -2,32 +2,29 @@ import db from '../database/db.js';
 import bcrypt from 'bcryptjs';
 
 export class Perito {
-  // Función utilitaria para convertir BLOB a Base64 (solo para lectura)
+  // Función utilitaria para convertir BLOB a Base64
   static blobToBase64(blob) {
     if (!blob) return null;
-    if (typeof blob === 'string') return blob; // Si ya es Base64, devolverlo
+    if (typeof blob === 'string') return blob;
     if (Buffer.isBuffer(blob)) {
       return blob.toString('base64');
     }
     return null;
   }
 
-  // Función utilitaria para validar Base64 WebP (sin convertir a BLOB)
+  // Función utilitaria para validar Base64 WebP
   static validateWebPBase64(base64String) {
     if (!base64String) return null;
     
     try {
       if (typeof base64String === 'string' && base64String.startsWith('data:image/webp;base64,')) {
-        // Validar que sea Base64 WebP válido
         const base64Data = base64String.split(',')[1];
         if (!base64Data) {
           return null;
         }
-        
-        // Verificar que se pueda decodificar
         try {
           Buffer.from(base64Data, 'base64');
-          return base64String; // Devolver el string completo
+          return base64String;
         } catch (decodeError) {
           return null;
         }
@@ -42,70 +39,119 @@ export class Perito {
 
   // Crear nuevo perito
   static async create(peritoData) {
+  try {
+    const {
+      CIP, nombre_completo, email, nombre_usuario, password_hash, dni,
+      unidad, fecha_integracion_pnp, fecha_incorporacion, codigo_codofin, domicilio,
+      telefono, cursos_institucionales, cursos_extranjero, ultimo_ascenso_pnp,
+      fotografia_url, id_especialidad, id_grado, id_seccion, id_turno
+    } = peritoData;
+
+    if (!CIP || !nombre_completo || !nombre_usuario || !password_hash || !dni || !fecha_integracion_pnp || !fecha_incorporacion || !codigo_codofin || !domicilio || !telefono || !fotografia_url || !id_especialidad || !id_grado || !id_seccion || !id_turno) {
+      throw new Error('Hay campos no rellenados.');
+    }
+
+    const existingUser = await this.findByCIPPerito(CIP);
+    if (existingUser) {
+      throw new Error('Ya existe un usuario con ese CIP');
+    }
+
+    const existingDNI = await this.findByDNI(dni);
+    if (existingDNI) {
+      throw new Error('Ya existe un usuario con el DNI ingresado');
+    }
+    const hashedPassword = await bcrypt.hash(password_hash, 10);
+
+    const validatedFotografia = fotografia_url ? this.validateWebPBase64(fotografia_url) : null;
+    if (fotografia_url && !validatedFotografia) {
+      throw new Error('Error validando fotografía, debe ser formato WebP Base64 válido');
+    }
+
+    const queryUsuario = `
+      INSERT INTO usuario (
+        CIP, nombre_completo, nombre_usuario, password_hash
+      ) VALUES (?, ?, ?, ?)
+    `;
+    const queryPerito = `
+      INSERT INTO perito (
+        id_usuario, dni, email, unidad, fecha_integracion_pnp, fecha_incorporacion,
+        codigo_codofin, domicilio, telefono, cursos_institucionales,
+        cursos_extranjero, ultimo_ascenso_pnp, fotografia_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const queryRelationsPeritoEspecialidad = `INSERT INTO usuario_especialidad (id_usuario, id_especialidad) VALUES (?,?);`
+    const queryRelationsPeritogrado = `INSERT INTO usuario_grado (id_usuario, id_grado) VALUES (?,?);`
+    const queryRelationsPeritoTurno = `INSERT INTO usuario_turno (id_usuario, id_turno) VALUES (?,?);`
+    const queryRelationsPeritoSeccion = `INSERT INTO usuario_seccion (id_usuario, id_seccion) VALUES (?,?);`
+    const queryRelationsPeritoEstado = `INSERT INTO estado_usuario (id_usuario, id_estado) VALUES (?,?);`
+    const queryRelationsPeritoRol = `INSERT INTO usuario_rol (id_usuario, id_rol) VALUES (?,?);`
+
+    const connection = await db.promise().getConnection();
     try {
-      const {
-        CIP, Nombres, Apellidos, Email, NombreUsuario, Contrasena, DNI,
-        FechaIntegracion, FechaIncorporacion, CodigoCodofin, Domicilio,
-        Seccion, Especialidad, Grado, Telefono, UltimoCenso, Fotografia, Firma
-      } = peritoData;
+      await connection.beginTransaction();
 
-      // Validar campos requeridos
-      if (!CIP || !Nombres || !Apellidos || !Email || !NombreUsuario || !Contrasena || !DNI || !CodigoCodofin) {
-        throw new Error('Todos los campos marcados con * son requeridos');
+      const [usuarioResult] = await connection.query(queryUsuario, [
+        CIP, nombre_completo, nombre_usuario, hashedPassword
+      ]);
+      const idUsuario = usuarioResult.insertId;
+
+      const [peritoResult] = await connection.query(queryPerito, [
+        idUsuario, dni, email || null, unidad || null,
+        fecha_integracion_pnp || null, fecha_incorporacion || null,
+        codigo_codofin || null, domicilio || null, telefono || null,
+        cursos_institucionales ? JSON.stringify(cursos_institucionales) : null,
+        cursos_extranjero ? JSON.stringify(cursos_extranjero) : null,
+        ultimo_ascenso_pnp || null,
+        validatedFotografia
+      ]);
+      await connection.query(queryRelationsPeritoEstado, [idUsuario, 1]);
+      await connection.query(queryRelationsPeritoRol, [idUsuario, 2]);
+
+      if (id_especialidad) {
+        await connection.query(queryRelationsPeritoEspecialidad, [idUsuario, id_especialidad]);
+      }
+      if (id_grado) {
+        await connection.query(queryRelationsPeritogrado, [idUsuario, id_grado]);
+      }
+      if (id_turno) {
+        await connection.query(queryRelationsPeritoTurno, [idUsuario, id_turno]);
+      }
+      if (id_seccion) {
+        await connection.query(queryRelationsPeritoSeccion, [idUsuario, id_seccion]);
       }
 
-      // Verificar si el CIP ya existe
-      const existingPerito = await this.findByCIP(CIP);
-      if (existingPerito) {
-        throw new Error('Ya existe un perito con ese CIP');
-      }
+      await connection.commit();
+      connection.release();
 
-      // Verificar si el nombre de usuario ya existe
-      const existingUsername = await this.findByUsername(NombreUsuario);
-      if (existingUsername) {
-        throw new Error('Ya existe un perito con ese nombre de usuario');
-      }
-
-      // Hashear contraseña
-      const hashedPassword = await bcrypt.hash(Contrasena, 10);
-
-      // Preparar valores para inserción
-      const values = [
-        CIP, Nombres, Apellidos, Email, NombreUsuario, hashedPassword, DNI,
-        FechaIntegracion || null, FechaIncorporacion || null, CodigoCodofin,
-        Domicilio || null, Seccion || null, Especialidad || null, Grado || null,
-        Telefono || null, UltimoCenso || null, 
-        this.validateWebPBase64(Fotografia), 
-        this.validateWebPBase64(Firma)
-      ];
-
-      // Verificar que las validaciones de imagen fueron exitosas
-      const fotoIndex = 16;
-      const firmaIndex = 17;
-      
-      if (Fotografia && !values[fotoIndex]) {
-        throw new Error('Error validando fotografía, debe ser formato WebP Base64 válido');
-      }
-      if (Firma && !values[firmaIndex]) {
-        throw new Error('Error validando firma, debe ser formato WebP Base64 válido');
-      }
-
-      // Query de inserción
-      const query = `
-        INSERT INTO Perito (
-          CIP, Nombres, Apellidos, Email, NombreUsuario, Contrasena, DNI,
-          FechaIntegracion, FechaIncorporacion, CodigoCodofin, Domicilio,
-          Seccion, Especialidad, Grado, Telefono, UltimoCenso, Fotografia, Firma
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-
-      const [result] = await db.promise().query(query, values);
       return {
         success: true,
         message: 'Perito creado exitosamente',
-        data: { CIP, insertId: result.insertId }
+        data: {
+          id_usuario: idUsuario,
+          id_perito: peritoResult.insertId,
+          CIP
+        }
       };
+    } catch (txError) {
+      await connection.rollback();
+      connection.release();
+      throw txError;
+    }
+  } catch (error) {
+    throw error;
+  }
+}
+
+
+  static async findByCIPPerito(cip){
+    try {
+      const [rows] = await db.promise().query(
+        'SELECT * FROM usuario WHERE CIP = ?',
+        [cip]
+      );
+      return rows[0] || null;
     } catch (error) {
+      console.error('Error buscando perito por CIP:', error);
       throw error;
     }
   }
@@ -114,37 +160,75 @@ export class Perito {
   static async findByCIP(cip) {
     try {
       const [rows] = await db.promise().query(
-        'SELECT * FROM Perito WHERE CIP = ?',
-        [cip]
-      );
+      `
+      SELECT 
+        a.id_usuario,
+        a.CIP,
+        a.nombre_completo,
+        a.nombre_usuario,
+
+        -- Especialidad
+        b.id_usuario_especialidad,
+        b.id_especialidad,
+        b.fecha_asignacion AS fecha_asignacion_especialidad,
+        c.nombre AS nombre_especialidad,
+
+        -- Seccion (seccion)
+        s.id_seccion,
+        s.nombre AS nombre_seccion,
+        td.nombre_departamento AS nombre_tipo_departamento,
+
+        -- Grado
+        ug.id_usuario_grado,
+        g.id_grado,
+        g.nombre AS nombre_grado,
+
+        -- Turno
+        ut.id_usuario_turno,
+        t.id_turno,
+        t.nombre AS nombre_turno
+
+      FROM usuario AS a
+      LEFT JOIN usuario_especialidad AS b 
+        ON a.id_usuario = b.id_usuario
+      LEFT JOIN especialidad AS c 
+        ON b.id_especialidad = c.id_especialidad
+
+      LEFT JOIN usuario_seccion AS us
+        ON a.id_usuario = us.id_usuario
+      LEFT JOIN seccion AS s 
+        ON us.id_seccion = s.id_seccion
+      LEFT JOIN tipo_departamento_seccion AS tds 
+        ON us.id_seccion = tds.id_seccion
+      LEFT JOIN tipo_departamento td
+        ON tds.id_tipo_departamento = td.id_tipo_departamento
+
+      LEFT JOIN usuario_grado AS ug 
+        ON a.id_usuario = ug.id_usuario
+      LEFT JOIN grado AS g 
+        ON ug.id_grado = g.id_grado
+
+      LEFT JOIN usuario_turno AS ut
+        ON a.id_usuario = ut.id_usuario
+      LEFT JOIN turno AS t
+        ON ut.id_turno = t.id_turno
+
+      WHERE a.CIP = ?
+      `,
+      [cip]
+    );
       
       if (rows[0]) {
         const perito = rows[0];
-        // Mostrar foto y firma
-        if (perito.Fotografia) {
+        if (perito.fotografia_url) {
           try {
-            if (typeof perito.Fotografia === 'string' && perito.Fotografia.startsWith('data:image/')) {
+            if (typeof perito.fotografia_url === 'string' && perito.fotografia_url.startsWith('data:image/')) {
             } else {
-              const base64 = this.blobToBase64(perito.Fotografia);
-              perito.Fotografia = `data:image/webp;base64,${base64}`;
+              const base64 = this.blobToBase64(perito.fotografia_url);
+              perito.fotografia_url = `data:image/webp;base64,${base64}`;
             }
           } catch (error) {
-            perito.Fotografia = null;
-          }
-        }
-        if (perito.Firma) {
-          try {
-            // Si ya es Base64, usarlo directamente
-            if (typeof perito.Firma === 'string' && perito.Firma.startsWith('data:image/')) {
-              console.log('Firma ya está en formato Base64');
-            } else {
-              // convertirlo a Base64
-              const base64 = this.blobToBase64(perito.Firma);
-              perito.Firma = `data:image/webp;base64,${base64}`;
-            }
-          } catch (error) {
-            console.error('Error procesando firma:', error);
-            perito.Firma = null;
+            perito.fotografia_url = null;
           }
         }
         return perito;
@@ -161,7 +245,7 @@ export class Perito {
   static async findByEmail(email) {
     try {
       const [rows] = await db.promise().query(
-        'SELECT * FROM Perito WHERE Email = ?',
+        'SELECT * FROM perito WHERE email = ?',
         [email]
       );
       return rows[0] || null;
@@ -171,25 +255,11 @@ export class Perito {
     }
   }
 
-  // Buscar perito por nombre de usuario
-  static async findByUsername(username) {
-    try {
-      const [rows] = await db.promise().query(
-        'SELECT * FROM Perito WHERE NombreUsuario = ?',
-        [username]
-      );
-      return rows[0] || null;
-    } catch (error) {
-      console.error('Error buscando perito por username:', error);
-      throw error;
-    }
-  }
-
   // Buscar perito por DNI
   static async findByDNI(dni) {
     try {
       const [rows] = await db.promise().query(
-        'SELECT * FROM Perito WHERE DNI = ?',
+        'SELECT * FROM perito WHERE dni = ?',
         [dni]
       );
       return rows[0] || null;
@@ -203,44 +273,22 @@ export class Perito {
   static async findAll(limit = 50, offset = 0) {
     try {
       const [rows] = await db.promise().query(
-        'SELECT * FROM Perito ORDER BY Nombres, Apellidos LIMIT ? OFFSET ?',
+        `SELECT *, se.nombre AS nombre_seccion 
+        FROM usuario AS a
+        LEFT JOIN usuario_rol AS b
+        ON a.id_usuario = b.id_usuario 
+        LEFT JOIN perito AS pe ON a.id_usuario = pe.id_usuario
+        LEFT JOIN usuario_seccion AS us ON a.id_usuario = us.id_usuario
+        LEFT JOIN seccion as se ON se.id_seccion = us.id_seccion
+        LEFT JOIN tipo_departamento_seccion AS tds ON tds.id_seccion = se.id_seccion
+        LEFT JOIN tipo_departamento AS tdp ON tdp.id_tipo_departamento = tds.id_tipo_departamento
+
+        WHERE b.id_rol = 2
+        ORDER BY a.nombre_completo
+        LIMIT ? OFFSET ?`,
         [limit, offset]
       );
-      
-      // Convertir BLOB a Base64 para todas las imágenes
-      return rows.map(perito => {
-        if (perito.Fotografia) {
-          try {
-            // Si ya es Base64, usarlo directamente
-            if (typeof perito.Fotografia === 'string' && perito.Fotografia.startsWith('data:image/')) {
-              // Ya está en Base64
-            } else {
-              // Si es BLOB, convertirlo a Base64
-              const base64 = this.blobToBase64(perito.Fotografia);
-              perito.Fotografia = `data:image/webp;base64,${base64}`;
-            }
-          } catch (error) {
-            console.error('Error procesando foto a Base64:', error);
-            perito.Fotografia = null;
-          }
-        }
-        if (perito.Firma) {
-          try {
-            // Si ya es Base64, usarlo directamente
-            if (typeof perito.Firma === 'string' && perito.Firma.startsWith('data:image/')) {
-              // Ya está en Base64
-            } else {
-              // Si es BLOB, convertirlo a Base64
-              const base64 = this.blobToBase64(perito.Firma);
-              perito.Firma = `data:image/webp;base64,${base64}`;
-            }
-          } catch (error) {
-            console.error('Error procesando firma a Base64:', error);
-            perito.Firma = null;
-          }
-        }
-        return perito;
-      });
+      return rows;
     } catch (error) {
       console.error('Error obteniendo peritos:', error);
       throw error;
@@ -250,7 +298,7 @@ export class Perito {
   // Contar total de peritos
   static async count() {
     try {
-      const [rows] = await db.promise().query('SELECT COUNT(*) as total FROM Perito');
+      const [rows] = await db.promise().query('SELECT COUNT(*) as total FROM perito');
       return rows[0].total;
     } catch (error) {
       console.error('Error contando peritos:', error);
@@ -263,43 +311,29 @@ export class Perito {
     try {
       const searchPattern = `%${searchTerm}%`;
       const [rows] = await db.promise().query(
-        `SELECT * FROM Perito 
-         WHERE CIP LIKE ? OR Nombres LIKE ? OR Apellidos LIKE ? OR DNI LIKE ?
-         ORDER BY Nombres, Apellidos 
-         LIMIT ? OFFSET ?`,
-        [searchPattern, searchPattern, searchPattern, searchPattern, limit, offset]
+        `SELECT * 
+        FROM usuario AS a 
+        LEFT JOIN usuario_rol AS b ON a.id_usuario = b.id_usuario
+        WHERE (a.CIP LIKE ? OR a.nombre_completo LIKE ?) 
+          AND b.id_rol = 2
+        ORDER BY a.nombre_completo 
+        LIMIT ? OFFSET ?`,
+        [searchPattern, searchPattern, limit, offset]
       );
-      
+
       // Convertir BLOB a Base64 para todas las imágenes
       return rows.map(perito => {
         if (perito.Fotografia) {
           try {
-            // Si ya es Base64, usarlo directamente
+
             if (typeof perito.Fotografia === 'string' && perito.Fotografia.startsWith('data:image/')) {
-              // Ya está en Base64
             } else {
-              // Si es BLOB, convertirlo a Base64
               const base64 = this.blobToBase64(perito.Fotografia);
               perito.Fotografia = `data:image/webp;base64,${base64}`;
             }
           } catch (error) {
             console.error('Error procesando foto a Base64:', error);
             perito.Fotografia = null;
-          }
-        }
-        if (perito.Firma) {
-          try {
-            // Si ya es Base64, usarlo directamente
-            if (typeof perito.Firma === 'string' && perito.Firma.startsWith('data:image/')) {
-              // Ya está en Base64
-            } else {
-              // Si es BLOB, convertirlo a Base64
-              const base64 = this.blobToBase64(perito.Firma);
-              perito.Firma = `data:image/webp;base64,${base64}`;
-            }
-          } catch (error) {
-            console.error('Error procesando firma a Base64:', error);
-            perito.Firma = null;
           }
         }
         return perito;
@@ -445,13 +479,26 @@ export class Perito {
   // Obtener estadísticas
   static async getStats() {
     try {
-      const [totalPeritos] = await db.promise().query('SELECT COUNT(*) as total FROM Perito');
-      const [peritosPorSeccion] = await db.promise().query(
-        'SELECT Seccion, COUNT(*) as count FROM Perito WHERE Seccion IS NOT NULL GROUP BY Seccion'
-      );
-      const [peritosPorGrado] = await db.promise().query(
-        'SELECT Grado, COUNT(*) as count FROM Perito WHERE Grado IS NOT NULL GROUP BY Grado'
-      );
+      const [totalPeritos] = await db.promise().query('SELECT COUNT(*) as total FROM perito');
+      // Peritos por Sección
+      const [peritosPorSeccion] = await db.promise().query(`
+        SELECT s.nombre AS seccion, COUNT(p.id_perito) AS count
+        FROM perito p
+        INNER JOIN usuario_seccion us ON p.id_usuario = us.id_usuario
+        INNER JOIN seccion s ON us.id_seccion = s.id_seccion
+        GROUP BY s.id_seccion, s.nombre
+        ORDER BY count DESC
+      `);
+
+      // Peritos por Grado
+      const [peritosPorGrado] = await db.promise().query(`
+        SELECT g.nombre AS grado, COUNT(p.id_perito) AS count
+        FROM perito p
+        INNER JOIN usuario_grado ug ON p.id_usuario = ug.id_usuario
+        INNER JOIN grado g ON ug.id_grado = g.id_grado
+        GROUP BY g.id_grado, g.nombre
+        ORDER BY count DESC
+      `);
 
       return {
         totalPeritos: totalPeritos[0].total,

@@ -50,15 +50,15 @@ export class PeritoController {
       
       if (search) {
         peritos = await Perito.search(search, parseInt(limit), offset);
-        total = await Perito.count(); // TODO: Implementar búsqueda con conteo
+        total = await Perito.count();
       } else {
         peritos = await Perito.findAll(parseInt(limit), offset);
         total = await Perito.count();
       }
 
-      // Remover contraseñas de la respuesta
+      // Remover contraseña
       const peritosSinPassword = peritos.map(perito => {
-        const { Contrasena, ...peritoSinPassword } = perito;
+        const { password_hash, ...peritoSinPassword } = perito;
         return peritoSinPassword;
       });
 
@@ -287,6 +287,37 @@ export class PeritoController {
         message: 'Login exitoso',
         data: peritoSinPassword
       });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  static async getAllRelations(req, res){
+    try {
+      const {cip} = req.params;
+      if (!cip) {
+        return res.status(400).json({
+          success: false,
+          message: 'cip es requerido requeridos'
+        });
+      }
+
+      // Buscar relaciones del perito por CIP
+      const perito = await Perito.findAllRelations(cip);
+      
+      if (!perito) {
+        return res.status(200).json({
+          success: false,
+          message: 'El perito no tiene especialidades, grados, secciones o un departamento'
+        });
+      }else{
+        return res.status(200).json({message: 'Datos de las relaciones del perito cargados correctamente', success: true, data: perito})
+      }
+
     } catch (error) {
       res.status(500).json({
         success: false,

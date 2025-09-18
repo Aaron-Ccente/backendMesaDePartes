@@ -4,47 +4,63 @@ import bcrypt from 'bcryptjs';
 export class Admin {
   // Crear un nuevo administrador
   static async create(adminData) {
+    const connection = await db.promise().getConnection();
     try {
-      const { CIP, NombreUsuario, Contrasena, Nombre } = adminData;
-      
-      // Verificar si el CIP ya existe
-      const [existingAdmin] = await db.promise().query(
-        'SELECT CIP FROM Administrador WHERE CIP = ?',
+      const { CIP, nombre_usuario, password_hash, nombre_completo } = adminData;
+      if (!CIP || !nombre_usuario || !password_hash || !nombre_completo) {
+        throw new Error('Todos los campos son obligatorios');
+      }
+      const [existingAdmin] = await connection.query(
+        'SELECT id_usuario FROM usuario WHERE CIP = ?',
         [CIP]
       );
-      
+
       if (existingAdmin.length > 0) {
-        throw new Error('El CIP ya está registrado');
+        throw new Error('El CIP ya está registrados');
       }
-      
-      // Verificar si el nombre de usuario ya existe
-      const [existingUsername] = await db.promise().query(
-        'SELECT NombreUsuario FROM Administrador WHERE NombreUsuario = ?',
-        [NombreUsuario]
-      );
-      
-      if (existingUsername.length > 0) {
-        throw new Error('El nombre de usuario ya está en uso');
-      }
-      
-      // Encriptar la contraseña
       const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(Contrasena, saltRounds);
-      
-      // Insertar el nuevo administrador
-      const [result] = await db.promise().query(
-        'INSERT INTO Administrador (CIP, NombreUsuario, Contrasena, Nombre) VALUES (?, ?, ?, ?)',
-        [CIP, NombreUsuario, hashedPassword, Nombre]
+      const hashedPassword = await bcrypt.hash(password_hash, saltRounds);
+      await connection.beginTransaction();
+      // Insertar el nuevo usuario adminstrador
+      const [result] = await connection.query(
+        'INSERT INTO usuario (CIP, nombre_usuario, password_hash, nombre_completo) VALUES (?, ?, ?, ?)',
+        [CIP, nombre_usuario, hashedPassword, nombre_completo]
       );
-      
+      const id_usuario = result.insertId;
+      // Insertar el id del usuario en la tabla de administradores.
+      await connection.query(
+        'INSERT INTO administrador (id_usuario) VALUES (?)',
+        [id_usuario]
+      );
+      // 1 es ADMINISTRADOR (rol del usuario)
+      await connection.query(
+        'INSERT INTO usuario_rol (id_usuario, id_rol) VALUES (?, ?)',
+        [id_usuario, 1]
+      );
+      // Insertar estado (HABILITADO o DESHABILITADO)
+      await connection.query(
+        'INSERT INTO estado_usuario (id_usuario, id_estado) VALUES (?, ?)',
+        [id_usuario, 1]
+      );
+      // Confirmar transacción si ocurre algun error
+      await connection.commit();
       return {
-        id: result.insertId,
+        id_usuario,
         CIP,
-        NombreUsuario,
-        Nombre
+        nombre_usuario,
+        nombre_completo
       };
     } catch (error) {
-      throw error;
+      // Rollback en caso alguna consulta falla (usuario_rol, estado_usuario)
+      await connection.rollback();
+
+      if (error.code === 'ER_DUP_ENTRY') {
+        throw new Error('Ya existe un registro con ese CIP o nombre de usuario');
+      }
+
+      throw new Error(`Error al crear administrador: ${error.message}`);
+    } finally {
+      connection.release();
     }
   }
   
@@ -52,7 +68,7 @@ export class Admin {
   static async findByCIP(CIP) {
     try {
       const [rows] = await db.promise().query(
-        'SELECT CIP, NombreUsuario, Contrasena, Nombre FROM Administrador WHERE CIP = ?',
+        'SELECT CIP, nombre_usuario, password_hash, nombre_completo FROM usuario WHERE CIP = ?',
         [CIP]
       );
       
@@ -66,7 +82,7 @@ export class Admin {
   static async findByUsername(NombreUsuario) {
     try {
       const [rows] = await db.promise().query(
-        'SELECT CIP, NombreUsuario, Contrasena, Nombre FROM Administrador WHERE NombreUsuario = ?',
+        'SELECT CIP, nombre_usuario, password_hash, nombre_completo FROM usuario WHERE nombre_usuario = ?',
         [NombreUsuario]
       );
       
@@ -77,7 +93,7 @@ export class Admin {
   }
   
   // Verificar credenciales
-  static async verifyCredentials(CIP, contrasena) {
+  static async verifyCredentials(CIP, password_hash_compare) {
     try {
       const admin = await this.findByCIP(CIP);
       
@@ -86,14 +102,14 @@ export class Admin {
       }
       
       // Verificar la contraseña
-      const isPasswordValid = await bcrypt.compare(contrasena, admin.Contrasena);
+      const isPasswordValid = await bcrypt.compare(password_hash_compare, admin.password_hash);
       
       if (!isPasswordValid) {
         return null;
       }
       
       // Retornar datos del administrador sin la contraseña
-      const { Contrasena, ...adminData } = admin;
+      const { password_hash, ...adminData } = admin;
       return adminData;
     } catch (error) {
       throw error;
@@ -104,7 +120,7 @@ export class Admin {
   static async findAll() {
     try {
       const [rows] = await db.promise().query(
-        'SELECT CIP, NombreUsuario, Nombre FROM Administrador'
+        'SELECT CIP, nombre_usuario, nombre_completo FROM usuarios'
       );
       
       return rows;
@@ -116,13 +132,13 @@ export class Admin {
   // Actualizar administrador
   static async update(CIP, updateData) {
     try {
-      const { NombreUsuario, Nombre } = updateData;
+      const { nombre_usuario, nombres } = updateData;
       
       // Verificar si el nombre de usuario ya existe en otro administrador
-      if (NombreUsuario) {
+      if (nombre_usuario) {
         const [existingUsername] = await db.promise().query(
-          'SELECT CIP FROM Administrador WHERE NombreUsuario = ? AND CIP != ?',
-          [NombreUsuario, CIP]
+          'SELECT CIP FROM usuario WHERE nombre_usuario = ? AND CIP != ?',
+          [nombre_usuario, CIP]
         );
         
         if (existingUsername.length > 0) {
@@ -131,8 +147,8 @@ export class Admin {
       }
       
       const [result] = await db.promise().query(
-        'UPDATE Administrador SET NombreUsuario = ?, Nombre = ? WHERE CIP = ?',
-        [NombreUsuario, Nombre, CIP]
+        'UPDATE administradores SET nombre_usuario = ?, nombres = ? WHERE CIP = ?',
+        [nombre_usuario, nombres, CIP]
       );
       
       return result.affectedRows > 0;
@@ -145,7 +161,7 @@ export class Admin {
   static async delete(CIP) {
     try {
       const [result] = await db.promise().query(
-        'DELETE FROM Administrador WHERE CIP = ?',
+        'DELETE FROM usuario WHERE CIP = ?',
         [CIP]
       );
       

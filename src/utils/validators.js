@@ -60,14 +60,14 @@ export class Validators {
       return { isValid: false, message: 'Nombre es requerido y debe ser una cadena de texto' };
     }
     
-    if (Nombre.length < 2 || Nombre.length > 100) {
-      return { isValid: false, message: 'Nombre debe tener entre 2 y 100 caracteres' };
+    if (Nombre.length < 2 || Nombre.length > 150) {
+      return { isValid: false, message: 'Nombre debe tener entre 2 y 150 caracteres' };
     }
     
     // Permitir solo letras, espacios, guiones y apóstrofes
     const nameRegex = /^[a-zA-ZÀ-ÿ\s\-']+$/;
     if (!nameRegex.test(Nombre)) {
-      return { isValid: false, message: 'Nombre solo puede contener letras, espacios, guiones y apóstrofes' };
+      return { isValid: false, message: 'El nombre completo del usuario solo puede contener letras, espacios, guiones y apóstrofes' };
     }
     
     return { isValid: true };
@@ -167,7 +167,7 @@ export class Validators {
 
   // Validar datos completos de administrador
   static validateAdminData(adminData) {
-    const { CIP, nombre_usuario, password_hash, nombres, estado } = adminData;
+    const { CIP, nombre_usuario, password_hash, nombre_completo } = adminData;
     
     // Validar cada campo
     const cipValidation = this.validateCIP(CIP);
@@ -185,7 +185,7 @@ export class Validators {
       return passwordValidation;
     }
     
-    const nameValidation = this.validateFullName(nombres);
+    const nameValidation = this.validateFullName(nombre_completo);
     if (!nameValidation.isValid) {
       return nameValidation;
     }
@@ -195,9 +195,9 @@ export class Validators {
   
   // Validar credenciales de login
   static validateLoginCredentials(credentials) {
-    const { CIP, Contrasena } = credentials;
+    const { CIP, password_hash } = credentials;
     
-    if (!CIP || !Contrasena) {
+    if (!CIP || !password_hash) {
       return { isValid: false, message: 'CIP y contraseña son requeridos' };
     }
     
@@ -206,7 +206,7 @@ export class Validators {
       return cipValidation;
     }
     
-    if (!Contrasena || typeof Contrasena !== 'string') {
+    if (!password_hash || typeof password_hash !== 'string') {
       return { isValid: false, message: 'Contraseña es requerida' };
     }
     
@@ -216,8 +216,8 @@ export class Validators {
   // Validar datos completos de perito
   static validatePeritoData(peritoData) {
     const {
-      CIP, Nombres, Apellidos, Email, NombreUsuario, Contrasena,
-      DNI, CodigoCodofin
+      CIP, nombre_completo, email, nombre_usuario, password_hash,
+      dni, codigo_codofin
     } = peritoData;
     
     // Validar campos requeridos
@@ -226,37 +226,32 @@ export class Validators {
       return cipValidation;
     }
     
-    const nombresValidation = this.validateFullName(Nombres);
+    const nombresValidation = this.validateFullName(nombre_completo);
     if (!nombresValidation.isValid) {
       return nombresValidation;
     }
     
-    const apellidosValidation = this.validateFullName(Apellidos);
-    if (!apellidosValidation.isValid) {
-      return apellidosValidation;
-    }
-    
-    const emailValidation = this.validateEmail(Email);
+    const emailValidation = this.validateEmail(email);
     if (!emailValidation.isValid) {
       return emailValidation;
     }
     
-    const usernameValidation = this.validateUsername(NombreUsuario);
+    const usernameValidation = this.validateUsername(nombre_usuario);
     if (!usernameValidation.isValid) {
       return usernameValidation;
     }
     
-    const passwordValidation = this.validatePassword(Contrasena);
+    const passwordValidation = this.validatePassword(password_hash);
     if (!passwordValidation.isValid) {
       return passwordValidation;
     }
     
-    const dniValidation = this.validateDNI(DNI);
+    const dniValidation = this.validateDNI(dni);
     if (!dniValidation.isValid) {
       return dniValidation;
     }
     
-    const codigoValidation = this.validateCodigoCodofin(CodigoCodofin);
+    const codigoValidation = this.validateCodigoCodofin(codigo_codofin);
     if (!codigoValidation.isValid) {
       return codigoValidation;
     }
