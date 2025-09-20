@@ -162,67 +162,74 @@ export class Perito {
       const [rows] = await db.promise().query(
       `
       SELECT 
-        a.id_usuario,
-        a.CIP,
-        a.nombre_completo,
-        a.nombre_usuario,
+      u.id_usuario,
+      u.CIP,
+      u.nombre_completo,
+      u.nombre_usuario,
+      u.password_hash,
+      
+      -- Datos del perito
+      p.dni,
+      p.email,
+      p.unidad,
+      p.fecha_integracion_pnp,
+      p.fecha_incorporacion,
+      p.codigo_codofin,
+      p.domicilio,
+      p.telefono,
+      p.cursos_institucionales,
+      p.cursos_extranjero,
+      p.ultimo_ascenso_pnp,
+      p.fotografia_url,
 
-        -- Especialidad
-        b.id_usuario_especialidad,
-        b.id_especialidad,
-        b.fecha_asignacion AS fecha_asignacion_especialidad,
-        c.nombre AS nombre_especialidad,
+      -- Especialidad
+      ue.id_especialidad,
+      e.nombre AS nombre_especialidad,
 
-        -- Seccion (seccion)
-        s.id_seccion,
-        s.nombre AS nombre_seccion,
-        td.nombre_departamento AS nombre_tipo_departamento,
+      -- Sección y Tipo de Departamento
+      usec.id_seccion,
+      sec.nombre AS nombre_seccion,
+      tds.id_tipo_departamento,
+      td.nombre_departamento AS nombre_tipo_departamento,
 
-        -- Grado
-        ug.id_usuario_grado,
-        g.id_grado,
-        g.nombre AS nombre_grado,
+      -- Grado
+      ug.id_grado,
+      g.nombre AS nombre_grado,
 
-        -- Turno
-        ut.id_usuario_turno,
-        t.id_turno,
-        t.nombre AS nombre_turno
+      -- Turno
+      ut.id_turno,
+      t.nombre AS nombre_turno
 
-      FROM usuario AS a
-      LEFT JOIN usuario_especialidad AS b 
-        ON a.id_usuario = b.id_usuario
-      LEFT JOIN especialidad AS c 
-        ON b.id_especialidad = c.id_especialidad
+    FROM usuario u
+    INNER JOIN perito p ON u.id_usuario = p.id_usuario
 
-      LEFT JOIN usuario_seccion AS us
-        ON a.id_usuario = us.id_usuario
-      LEFT JOIN seccion AS s 
-        ON us.id_seccion = s.id_seccion
-      LEFT JOIN tipo_departamento_seccion AS tds 
-        ON us.id_seccion = tds.id_seccion
-      LEFT JOIN tipo_departamento td
-        ON tds.id_tipo_departamento = td.id_tipo_departamento
+    LEFT JOIN usuario_especialidad ue ON u.id_usuario = ue.id_usuario
+    LEFT JOIN especialidad e ON ue.id_especialidad = e.id_especialidad
 
-      LEFT JOIN usuario_grado AS ug 
-        ON a.id_usuario = ug.id_usuario
-      LEFT JOIN grado AS g 
-        ON ug.id_grado = g.id_grado
+    LEFT JOIN usuario_seccion usec ON u.id_usuario = usec.id_usuario
+    LEFT JOIN seccion sec ON usec.id_seccion = sec.id_seccion
+    LEFT JOIN tipo_departamento_seccion tds ON sec.id_seccion = tds.id_seccion
+    LEFT JOIN tipo_departamento td ON tds.id_tipo_departamento = td.id_tipo_departamento
 
-      LEFT JOIN usuario_turno AS ut
-        ON a.id_usuario = ut.id_usuario
-      LEFT JOIN turno AS t
-        ON ut.id_turno = t.id_turno
+    LEFT JOIN usuario_grado ug ON u.id_usuario = ug.id_usuario
+    LEFT JOIN grado g ON ug.id_grado = g.id_grado
 
-      WHERE a.CIP = ?
+    LEFT JOIN usuario_turno ut ON u.id_usuario = ut.id_usuario
+    LEFT JOIN turno t ON ut.id_turno = t.id_turno
+
+    WHERE u.CIP = ?
       `,
       [cip]
     );
       
       if (rows[0]) {
         const perito = rows[0];
+        
+        // Convertir BLOB a Base64 si es necesario
         if (perito.fotografia_url) {
           try {
             if (typeof perito.fotografia_url === 'string' && perito.fotografia_url.startsWith('data:image/')) {
+              // Ya está en formato base64
             } else {
               const base64 = this.blobToBase64(perito.fotografia_url);
               perito.fotografia_url = `data:image/webp;base64,${base64}`;
@@ -231,6 +238,24 @@ export class Perito {
             perito.fotografia_url = null;
           }
         }
+        
+        // Parsear JSON si es necesario
+        if (perito.cursos_institucionales && typeof perito.cursos_institucionales === 'string') {
+          try {
+            perito.cursos_institucionales = JSON.parse(perito.cursos_institucionales);
+          } catch (error) {
+            perito.cursos_institucionales = [];
+          }
+        }
+        
+        if (perito.cursos_extranjero && typeof perito.cursos_extranjero === 'string') {
+          try {
+            perito.cursos_extranjero = JSON.parse(perito.cursos_extranjero);
+          } catch (error) {
+            perito.cursos_extranjero = [];
+          }
+        }
+        
         return perito;
       }
       
@@ -345,68 +370,166 @@ export class Perito {
   }
 
   // Actualizar perito
-  static async update(cip, updateData) {
-    try {
-      const allowedFields = [
-        'Nombres', 'Apellidos', 'Email', 'DNI', 'FechaIntegracion',
-        'FechaIncorporacion', 'CodigoCodofin', 'Domicilio', 'Seccion',
-        'Especialidad', 'Grado', 'Telefono', 'UltimoCenso', 'Fotografia', 'Firma'
-      ];
+static async update(cip, updateData) {
+  const connection = await db.promise().getConnection();
+  try {
+    await connection.beginTransaction();
 
-      const fieldsToUpdate = [];
-      const values = [];
+    const {
+      nombre_completo, email, nombre_usuario, password_hash, dni,
+      unidad, fecha_integracion_pnp, fecha_incorporacion, codigo_codofin, domicilio,
+      telefono, cursos_institucionales, cursos_extranjero, ultimo_ascenso_pnp,
+      fotografia_url, id_especialidad, id_grado, id_seccion, id_turno
+    } = updateData;
 
-      // Solo actualizar campos permitidos
-      for (const [key, value] of Object.entries(updateData)) {
-        if (allowedFields.includes(key) && value !== undefined) {
-          fieldsToUpdate.push(`${key} = ?`);
-          
-          // Convertir Base64 a BLOB para imágenes
-          if (key === 'Fotografia' || key === 'Firma') {
-            if (value && typeof value === 'string' && value.startsWith('data:image/webp;base64,')) {
-              // Es Base64 WebP, validarlo y guardarlo directamente
-              const validatedBase64 = this.validateWebPBase64(value);
-              if (validatedBase64) {
-                values.push(validatedBase64);
-              } else {
-                console.warn(`Campo ${key} no es Base64 WebP válido, ignorando`);
-                continue;
-              }
-            } else if (value === null) {
-              // Si es null, mantener null
-              values.push(null);
-            } else {
-              // Si no es Base64 WebP válido, ignorar el campo
-              continue;
-            }
-          } else {
-            values.push(value);
-          }
-        }
-      }
-
-      if (fieldsToUpdate.length === 0) {
-        throw new Error('No hay campos válidos para actualizar');
-      }
-
-      values.push(cip);
-
-      const query = `UPDATE Perito SET ${fieldsToUpdate.join(', ')} WHERE CIP = ?`;
-      const [result] = await db.promise().query(query, values);
-
-      if (result.affectedRows === 0) {
-        throw new Error('Perito no encontrado');
-      }
-
-      return {
-        success: true,
-        message: 'Perito actualizado exitosamente'
-      };
-    } catch (error) {
-      console.error('Error actualizando perito:', error);
-      throw error;
+    // Actualizar tabla usuario
+    const usuarioFields = [];
+    const usuarioValues = [];
+    
+    if (nombre_completo !== undefined) {
+      usuarioFields.push('nombre_completo = ?');
+      usuarioValues.push(nombre_completo);
     }
+    
+    if (nombre_usuario !== undefined) {
+      usuarioFields.push('nombre_usuario = ?');
+      usuarioValues.push(nombre_usuario);
+    }
+    
+    if (password_hash !== undefined) {
+      const hashedPassword = await bcrypt.hash(password_hash, 10);
+      usuarioFields.push('password_hash = ?');
+      usuarioValues.push(hashedPassword);
+    }
+    
+    if (usuarioFields.length > 0) {
+      usuarioValues.push(cip);
+      const queryUsuario = `UPDATE usuario SET ${usuarioFields.join(', ')} WHERE CIP = ?`;
+      await connection.query(queryUsuario, usuarioValues);
+    }
+
+    // Actualizar tabla perito
+    const peritoFields = [];
+    const peritoValues = [];
+    
+    if (dni !== undefined) {
+      peritoFields.push('dni = ?');
+      peritoValues.push(dni);
+    }
+    
+    if (email !== undefined) {
+      peritoFields.push('email = ?');
+      peritoValues.push(email);
+    }
+    
+    if (unidad !== undefined) {
+      peritoFields.push('unidad = ?');
+      peritoValues.push(unidad);
+    }
+    
+    if (fecha_integracion_pnp !== undefined) {
+      peritoFields.push('fecha_integracion_pnp = ?');
+      peritoValues.push(fecha_integracion_pnp);
+    }
+    
+    if (fecha_incorporacion !== undefined) {
+      peritoFields.push('fecha_incorporacion = ?');
+      peritoValues.push(fecha_incorporacion);
+    }
+    
+    if (codigo_codofin !== undefined) {
+      peritoFields.push('codigo_codofin = ?');
+      peritoValues.push(codigo_codofin);
+    }
+    
+    if (domicilio !== undefined) {
+      peritoFields.push('domicilio = ?');
+      peritoValues.push(domicilio);
+    }
+    
+    if (telefono !== undefined) {
+      peritoFields.push('telefono = ?');
+      peritoValues.push(telefono);
+    }
+    
+    if (cursos_institucionales !== undefined) {
+      peritoFields.push('cursos_institucionales = ?');
+      peritoValues.push(JSON.stringify(cursos_institucionales));
+    }
+    
+    if (cursos_extranjero !== undefined) {
+      peritoFields.push('cursos_extranjero = ?');
+      peritoValues.push(JSON.stringify(cursos_extranjero));
+    }
+    
+    if (ultimo_ascenso_pnp !== undefined) {
+      peritoFields.push('ultimo_ascenso_pnp = ?');
+      peritoValues.push(ultimo_ascenso_pnp);
+    }
+    
+    if (fotografia_url !== undefined) {
+      const validatedFotografia = this.validateWebPBase64(fotografia_url);
+      peritoFields.push('fotografia_url = ?');
+      peritoValues.push(validatedFotografia);
+    }
+    
+    if (peritoFields.length > 0) {
+      peritoValues.push(cip);
+      const queryPerito = `
+        UPDATE perito p
+        JOIN usuario u ON p.id_usuario = u.id_usuario
+        SET ${peritoFields.join(', ')}
+        WHERE u.CIP = ?
+      `;
+      await connection.query(queryPerito, peritoValues);
+    }
+
+    // Actualizar relaciones
+    if (id_especialidad !== undefined) {
+      await connection.query(`
+        UPDATE usuario_especialidad 
+        SET id_especialidad = ? 
+        WHERE id_usuario = (SELECT id_usuario FROM usuario WHERE CIP = ?)
+      `, [id_especialidad, cip]);
+    }
+    
+    if (id_grado !== undefined) {
+      await connection.query(`
+        UPDATE usuario_grado 
+        SET id_grado = ? 
+        WHERE id_usuario = (SELECT id_usuario FROM usuario WHERE CIP = ?)
+      `, [id_grado, cip]);
+    }
+    
+    if (id_turno !== undefined) {
+      await connection.query(`
+        UPDATE usuario_turno 
+        SET id_turno = ? 
+        WHERE id_usuario = (SELECT id_usuario FROM usuario WHERE CIP = ?)
+      `, [id_turno, cip]);
+    }
+    
+    if (id_seccion !== undefined) {
+      await connection.query(`
+        UPDATE usuario_seccion 
+        SET id_seccion = ? 
+        WHERE id_usuario = (SELECT id_usuario FROM usuario WHERE CIP = ?)
+      `, [id_seccion, cip]);
+    }
+
+    await connection.commit();
+    connection.release();
+
+    return {
+      success: true,
+      message: 'Perito actualizado exitosamente'
+    };
+  } catch (error) {
+    await connection.rollback();
+    connection.release();
+    throw error;
   }
+}
 
   // Cambiar contraseña
   static async changePassword(cip, newPassword) {
