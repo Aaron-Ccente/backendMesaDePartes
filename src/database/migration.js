@@ -24,6 +24,7 @@ const deleteTables = `
         usuario_rol,
         usuario_turno,
         estado_usuario,
+        historial_usuario,
         tipo_departamento_seccion,
         usuario_seccion;
     SET FOREIGN_KEY_CHECKS = 1;
@@ -209,6 +210,13 @@ const tipo_departamento_seccion = `CREATE TABLE tipo_departamento_seccion (
         ON DELETE RESTRICT ON UPDATE CASCADE
 );`
 
+const historial_usuario = `CREATE TABLE historial_usuario (
+    id_historial_usuario INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario INT NOT NULL,
+    tipo_historial ENUM('ENTRADA', 'SALIDA') NOT NULL,
+    fecha_historial TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+);`
 
 // -- BLOQUE 3: Gestión de requerimientos y oficios
 // -- Tabla principal de requerimientos
@@ -495,6 +503,7 @@ const createTables = `
     ${estado_usuario}
     ${usuario_seccion}
     ${tipo_departamento_seccion}
+    ${historial_usuario}
 `
 
 db.query(createTables, (err, result)=>{
