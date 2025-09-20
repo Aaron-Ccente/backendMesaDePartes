@@ -251,8 +251,8 @@ export class PeritoController {
   // Login de perito
   static async loginPerito(req, res) {
     try {
-      const { CIP, contrasena } = req.body;
-      if (!CIP || !contrasena) {
+      const { CIP, password_hash } = req.body;
+      if (!CIP || !password_hash) {
         return res.status(400).json({
           success: false,
           message: 'CIP y contraseña son requeridos'
@@ -260,7 +260,7 @@ export class PeritoController {
       }
 
       // Buscar perito por CIP
-      const perito = await Perito.findByCIP(CIP);
+      const perito = await Perito.findByCIPPerito(CIP);
       
       if (!perito) {
         return res.status(401).json({
@@ -270,7 +270,7 @@ export class PeritoController {
       }
 
       // Verificar contraseña
-      const isValidPassword = await bcrypt.compare(contrasena, perito.Contrasena);
+      const isValidPassword = await bcrypt.compare(password_hash, perito.password_hash);
       if (!isValidPassword) {
         return res.status(401).json({
           success: false,

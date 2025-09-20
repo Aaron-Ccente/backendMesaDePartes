@@ -146,7 +146,7 @@ export class Perito {
   static async findByCIPPerito(cip){
     try {
       const [rows] = await db.promise().query(
-        'SELECT * FROM usuario WHERE CIP = ?',
+        'SELECT * FROM usuario AS us INNER JOIN usuario_rol AS ur ON us.id_usuario = ur.id_usuario INNER JOIN rol AS r ON ur.id_rol = r.id_rol WHERE CIP = ? AND r.nombre_rol = "PERITO"',
         [cip]
       );
       return rows[0] || null;
