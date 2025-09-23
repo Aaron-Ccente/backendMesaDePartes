@@ -283,81 +283,30 @@ export class Validators {
 
   // Validar datos de actualización de perito
   static validatePeritoUpdateData(updateData) {
-    // Validar que al menos un campo esté presente
     if (Object.keys(updateData).length === 0) {
-      return { isValid: false, message: 'Al menos un campo debe ser proporcionado para actualizar' };
+        return { isValid: false, message: 'Al menos un campo debe ser proporcionado para actualizar' };
     }
-    
-    // Validar cada campo presente
+
+    const validatedFields = {
+        'nombre_completo': this.validateFullName,
+        'nombre_usuario': this.validateFullName,
+        'email': this.validateEmail,
+        'dni': this.validateDNI,
+        'telefono': this.validateTelefono,
+        'fecha_integracion_pnp': (value) => this.validateDate(value, 'fecha_integracion_pnp'),
+        'fecha_incorporacion': (value) => this.validateDate(value, 'fecha_incorporacion'),
+        'codigo_codofin': this.validateCodigoCodofin
+    };
+
     for (const [key, value] of Object.entries(updateData)) {
-      switch (key) {
-        case 'Nombres':
-          const nombresValidation = this.validateFullName(value);
-          if (!nombresValidation.isValid) {
-            return nombresValidation;
-          }
-          break;
-          
-        case 'Apellidos':
-          const apellidosValidation = this.validateFullName(value);
-          if (!apellidosValidation.isValid) {
-            return apellidosValidation;
-          }
-          break;
-          
-        case 'Email':
-          const emailValidation = this.validateEmail(value);
-          if (!emailValidation.isValid) {
-            return emailValidation;
-          }
-          break;
-          
-        case 'DNI':
-          const dniValidation = this.validateDNI(value);
-          if (!dniValidation.isValid) {
-            return dniValidation;
-          }
-          break;
-          
-        case 'Telefono':
-          const telefonoValidation = this.validateTelefono(value);
-          if (!telefonoValidation.isValid) {
-            return telefonoValidation;
-          }
-          break;
-          
-        case 'FechaIntegracion':
-        case 'FechaIncorporacion':
-          const fechaValidation = this.validateDate(value, key);
-          if (!fechaValidation.isValid) {
-            return fechaValidation;
-          }
-          break;
-          
-        case 'CodigoCodofin':
-          const codigoValidation = this.validateCodigoCodofin(value);
-          if (!codigoValidation.isValid) {
-            return codigoValidation;
-          }
-          break;
-          
-        // Otros campos son opcionales y no requieren validación especial
-        case 'Seccion':
-        case 'Especialidad':
-        case 'Grado':
-        case 'UltimoCenso':
-        case 'Domicilio':
-        case 'Fotografia':
-        case 'Firma':
-        case 'NombreUsuario':
-          // Estos campos son opcionales y no requieren validación especial
-          break;
-          
-        default:
-          return { isValid: false, message: `Campo '${key}' no es válido para actualización` };
-      }
+        if (validatedFields[key]) {
+            const validation = validatedFields[key](value);
+            if (!validation.isValid) {
+                return validation;
+            }
+        }
     }
-    
+
     return { isValid: true };
-  }
+}
 }
