@@ -83,7 +83,6 @@ export class PeritoController {
   }
 
   // Obtener perito por CIP
-  // Obtener perito por CIP
   static async getPeritoByCIP(req, res) {
     try {
       const { cip } = req.params;
