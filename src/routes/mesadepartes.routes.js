@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { MesaDePartesController } from "../controllers/mesadepartes.controller.js";
+import { authenticateToken, requireAdmin } from '../middleware/authMiddleware.js';
 
 const router = Router()
 
