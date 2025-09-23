@@ -94,8 +94,8 @@ export class PeritoController {
         });
       }
 
-      // Remover contraseña de la respuesta
-      const { Contrasena, ...peritoSinPassword } = perito;
+      // Remover contraseña hasheada de la respuesta
+      const { password_hash, ...peritoSinPassword } = perito;
       res.status(200).json({
         success: true,
         data: peritoSinPassword
@@ -115,7 +115,7 @@ export class PeritoController {
       const { cip } = req.params;
       const updateData = req.body;
       // Validar que el perito existe
-      const existingPerito = await Perito.findByCIP(cip);
+      const existingPerito = await Perito.findByCIPPerito(cip);
       if (!existingPerito) {
         return res.status(404).json({
           success: false,

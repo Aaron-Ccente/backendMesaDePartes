@@ -120,7 +120,7 @@ export class Admin {
   static async findAll() {
     try {
       const [rows] = await db.promise().query(
-        'SELECT CIP, nombre_usuario, nombre_completo FROM usuarios'
+        'SELECT CIP, nombre_usuario, nombre_completo FROM usuario AS u LEFT JOIN usuario_rol AS ur ON u.id_usuario = ur.id_usuario LEFT JOIN rol AS r ON ur.id_rol = r.id_rol WHERE r.nombre_rol = "ADMINISTRADOR"'
       );
       
       return rows;
@@ -132,23 +132,10 @@ export class Admin {
   // Actualizar administrador
   static async update(CIP, updateData) {
     try {
-      const { nombre_usuario, nombres } = updateData;
-      
-      // Verificar si el nombre de usuario ya existe en otro administrador
-      if (nombre_usuario) {
-        const [existingUsername] = await db.promise().query(
-          'SELECT CIP FROM usuario WHERE nombre_usuario = ? AND CIP != ?',
-          [nombre_usuario, CIP]
-        );
-        
-        if (existingUsername.length > 0) {
-          throw new Error('El nombre de usuario ya está en uso');
-        }
-      }
-      
+      const { nombre_completo, nombre_usuario } = updateData;
       const [result] = await db.promise().query(
-        'UPDATE administradores SET nombre_usuario = ?, nombres = ? WHERE CIP = ?',
-        [nombre_usuario, nombres, CIP]
+        'UPDATE usuario SET nombre_completo = ?, nombre_usuario = ? WHERE CIP = ?',
+        [nombre_completo, nombre_usuario, CIP]
       );
       
       return result.affectedRows > 0;
