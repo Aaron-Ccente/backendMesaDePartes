@@ -15,6 +15,7 @@ const deleteTables = `
         grado,
         seccion,
         turno,
+        mesadepartes,
         departamentos,
         usuario,
         administrador,
@@ -113,6 +114,13 @@ const administradores = `CREATE TABLE administrador (
     id_usuario INT NOT NULL,
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
         ON DELETE CASCADE ON UPDATE CASCADE
+);`
+
+const mesadepartes = `CREATE TABLE mesadepartes (
+    id_mesadepartes INT PRIMARY KEY AUTO_INCREMENT,
+    id_usuario INT NOT NULL,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+    ON DELETE CASCADE ON UPDATE CASCADE
 );`
 
 const peritos = `CREATE TABLE perito (
@@ -495,6 +503,7 @@ const createTables = `
     ${departamentos}
     ${usuarios}
     ${administradores}
+    ${mesadepartes}
     ${peritos}
     ${usuario_especialidad}
     ${usuario_grado}

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { MesaDePartesController } from "../controllers/mesadepartes.controller.js";
+import { authenticateToken, requireAdmin } from '../middleware/authMiddleware.js';
 
 const router = Router()
 
@@ -16,6 +17,9 @@ router.post('/', MesaDePartesController.createMesaDePartes);
 
 // Obtener todos los peritos (con paginación y búsqueda)
 router.get('/', MesaDePartesController.getAllMesaDePartes);
+
+// Obtener un usuario de mesa de partes por su CIP
+router.get('/:cip', MesaDePartesController.getUserByCIP);
 
 // Actualizar perito
 router.put('/:cip', MesaDePartesController.updateMesaDePartes);
