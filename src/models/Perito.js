@@ -521,7 +521,7 @@ static async update(cip, updateData) {
       const hashedPassword = await bcrypt.hash(newPassword, 10);
       
       const [result] = await db.promise().query(
-        'UPDATE Perito SET Contrasena = ? WHERE CIP = ?',
+        'UPDATE usuario SET Contrasena = ? WHERE CIP = ?',
         [hashedPassword, cip]
       );
 
