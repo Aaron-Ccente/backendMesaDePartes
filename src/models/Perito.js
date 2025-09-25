@@ -295,7 +295,7 @@ export class Perito {
   }
 
   // Obtener todos los peritos
-  static async findAll(limit = 50, offset = 0) {
+  static async findAll(limit = 10, offset = 0) {
     try {
       const [rows] = await db.promise().query(
         `SELECT *, se.nombre AS nombre_seccion 
@@ -332,7 +332,7 @@ export class Perito {
   }
 
   // Buscar peritos con filtros
-  static async search(searchTerm, limit = 50, offset = 0) {
+  static async search(searchTerm, limit = 10, offset = 0) {
     try {
       const searchPattern = `%${searchTerm}%`;
       const [rows] = await db.promise().query(
@@ -345,24 +345,8 @@ export class Perito {
         LIMIT ? OFFSET ?`,
         [searchPattern, searchPattern, limit, offset]
       );
+      return rows;
 
-      // Convertir BLOB a Base64 para todas las imágenes
-      return rows.map(perito => {
-        if (perito.Fotografia) {
-          try {
-
-            if (typeof perito.Fotografia === 'string' && perito.Fotografia.startsWith('data:image/')) {
-            } else {
-              const base64 = this.blobToBase64(perito.Fotografia);
-              perito.Fotografia = `data:image/webp;base64,${base64}`;
-            }
-          } catch (error) {
-            console.error('Error procesando foto a Base64:', error);
-            perito.Fotografia = null;
-          }
-        }
-        return perito;
-      });
     } catch (error) {
       console.error('Error buscando peritos:', error);
       throw error;
@@ -559,7 +543,7 @@ static async update(cip, updateData) {
   static async delete(cip) {
     try {
       const [result] = await db.promise().query(
-        'DELETE FROM Perito WHERE CIP = ?',
+        'DELETE FROM usuario WHERE CIP = ?',
         [cip]
       );
 
