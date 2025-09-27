@@ -279,13 +279,13 @@ export class PeritoController {
       }
 
       // Remover contraseña de la respuesta
-      const { Contrasena, ...peritoSinPassword } = perito;
-      
+      delete perito.password_hash;
+
       // Generar JWT token para peritos
       res.status(200).json({
         success: true,
         message: 'Login exitoso',
-        data: peritoSinPassword
+        data: perito
       });
     } catch (error) {
       res.status(500).json({
