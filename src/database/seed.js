@@ -107,9 +107,12 @@ const user_default_admin = `INSERT INTO usuario (id_usuario, CIP, nombre_complet
                             INSERT INTO usuario_rol (id_usuario_rol, id_usuario, id_rol) VALUES (1,1,1);`
 
 const user_default_perito = `INSERT INTO usuario (id_usuario, CIP, nombre_completo, nombre_usuario, password_hash) VALUES (2, '2022', 'Perito', 'Ccente', '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK');
-                            INSERT INTO usuario_rol (id_usuario_rol, id_usuario, id_rol) VALUES (2,2,2);`
+                            INSERT INTO usuario_rol (id_usuario_rol, id_usuario, id_rol) VALUES (2,2,2);
+                            INSERT INTO usuario_grado (id_usuario_grado, id_usuario, id_grado) VALUES (1,2,3);
+                            INSERT INTO usuario_seccion (id_usuario_seccion, id_usuario, id_seccion) VALUES (1,2,2);`
 const user_default_mesadepartesa = `INSERT INTO usuario (id_usuario, CIP, nombre_completo, nombre_usuario, password_hash) VALUES (3, '2023', 'mesa de partes', 'Ccente', '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK');
-                            INSERT INTO usuario_rol (id_usuario_rol, id_usuario, id_rol) VALUES (3,3,3);`
+                            INSERT INTO usuario_rol (id_usuario_rol, id_usuario, id_rol) VALUES (3,3,3);
+                            `
 
 const dbseed = `  
                 ${deleteAll}
