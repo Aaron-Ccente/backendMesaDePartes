@@ -8,6 +8,7 @@ const deleteAll = `DELETE FROM rol;
                    DELETE FROM turno;
                    DELETE FROM seccion;
                    DELETE FROM tipo_departamento_seccion;
+                   DELETE FROM usuario_rol;
                     `;
 const roles = `INSERT INTO rol (id_rol, nombre_rol, descripcion) VALUES 
                (1,'ADMINISTRADOR','Administra a todos los peritos - control total.'), 
@@ -100,7 +101,15 @@ const turnos = `INSERT INTO turno (id_turno, nombre) VALUES
 
 const tipo_departamento_seccion = `INSERT INTO tipo_departamento_seccion (id_tipo_departamento_seccion, id_tipo_departamento, id_seccion) VALUES
                 (1, 1, 1),
-                (2, 1, 2)`
+                (2, 1, 2);`
+
+const user_default_admin = `INSERT INTO usuario (id_usuario, CIP, nombre_completo, nombre_usuario, password_hash) VALUES (1, '2021', 'Admin', 'Ccente', '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK');
+                            INSERT INTO usuario_rol (id_usuario_rol, id_usuario, id_rol) VALUES (1,1,1);`
+
+const user_default_perito = `INSERT INTO usuario (id_usuario, CIP, nombre_completo, nombre_usuario, password_hash) VALUES (2, '2022', 'Perito', 'Ccente', '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK');
+                            INSERT INTO usuario_rol (id_usuario_rol, id_usuario, id_rol) VALUES (2,2,2);`
+const user_default_mesadepartesa = `INSERT INTO usuario (id_usuario, CIP, nombre_completo, nombre_usuario, password_hash) VALUES (3, '2023', 'mesa de partes', 'Ccente', '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK');
+                            INSERT INTO usuario_rol (id_usuario_rol, id_usuario, id_rol) VALUES (3,3,3);`
 
 const dbseed = `  
                 ${deleteAll}
@@ -112,6 +121,9 @@ const dbseed = `
                 ${grados}                
                 ${turnos}                
                 ${tipo_departamento_seccion}                
+                ${user_default_admin}                
+                ${user_default_perito}                
+                ${user_default_mesadepartesa}                
 `;
 
 db.query(dbseed, (err, result)=>{
