@@ -173,7 +173,7 @@ const usuario_rol = `CREATE TABLE usuario_rol (
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
         ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (id_rol) REFERENCES rol(id_rol)
-        ON DELETE RESTRICT ON UPDATE CASCADE
+        ON DELETE CASCADE ON UPDATE CASCADE
 );`
 
 const usuario_turno = `CREATE TABLE usuario_turno (
