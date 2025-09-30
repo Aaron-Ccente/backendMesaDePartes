@@ -6,5 +6,6 @@ const router = Router()
 // Ruta GET - Obtener todos los turnos disponibles
 router.get("/", TurnoController.getAllTurnos)
 
+// Ruta POST - Crear un nuevo turno
 
 export default router
