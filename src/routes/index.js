@@ -7,6 +7,7 @@ import gradosRoutes from './grado.routes.js'
 import seccionesRoutes from './seccion.routes.js'
 import turnos from './turno.routes.js'
 import mesadepartesRoutes from './mesadepartes.routes.js'
+import googleRoutes from './googleapi.routes.js'
 const router = express.Router();
 
 // Ruta raíz de la API
@@ -46,4 +47,6 @@ router.use('/api/secciones', seccionesRoutes)
 // Rutas para mesa de partes
 router.use('/api/mesadepartes', mesadepartesRoutes)
 
+// Rutas para la api de google drive
+router.use('/api/google', googleRoutes)
 export default router;
