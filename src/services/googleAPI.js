@@ -31,28 +31,31 @@ const GoogleAPI = {
   async uploadFile({ buffer, mimeType, name, folderId }) {
     try {
       const drive = getDrive();
+      const parents = folderId ? [folderId] : (GOOGLE_DRIVE_FOLDER_ID ? [GOOGLE_DRIVE_FOLDER_ID] : undefined);
+
       const res = await drive.files.create({
         requestBody: {
           name,
-          parents: folderId ? [folderId] : (GOOGLE_DRIVE_FOLDER_ID ? [GOOGLE_DRIVE_FOLDER_ID] : undefined)
+          parents
         },
         media: {
           mimeType,
           body: buffer
         },
+        supportsAllDrives: true,
         fields: 'id,name,mimeType,parents,webViewLink'
       });
       return { success: true, data: res.data };
     } catch (err) {
       console.error('googleAPI.uploadFile error', err);
-      return { success: false, message: err.message, error: err };
+      return { success: false, message: err.message || 'Error subiendo archivo', error: err?.response?.data || err };
     }
   },
 
-    async listFiles({ folderId, pageSize = 100, q = '' } = {}) {
+  async listFiles({ folderId, pageSize = 100, q = '' } = {}) {
     try {
       const drive = getDrive();
-      const folder = GOOGLE_DRIVE_FOLDER_ID || folderId;
+      const folder = folderId || GOOGLE_DRIVE_FOLDER_ID;
 
       let queryParts = ['trashed = false'];
       if (folder) queryParts.push(`'${folder}' in parents`);
@@ -62,7 +65,9 @@ const GoogleAPI = {
       const res = await drive.files.list({
         q: query,
         pageSize,
-        fields: 'files(id,name,mimeType,parents,webViewLink,createdTime,modifiedTime,size)'
+        fields: 'files(id,name,mimeType,parents,webViewLink,createdTime,modifiedTime,size)',
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true
       });
 
       return { success: true, data: res.data.files || [] };
@@ -77,7 +82,8 @@ const GoogleAPI = {
       const drive = getDrive();
       const res = await drive.files.get({
         fileId,
-        fields: 'id,name,mimeType,parents,webViewLink,createdTime,modifiedTime,size'
+        fields: 'id,name,mimeType,parents,webViewLink,createdTime,modifiedTime,size',
+        supportsAllDrives: true
       });
       return { success: true, data: res.data };
     } catch (err) {
@@ -91,7 +97,7 @@ const GoogleAPI = {
       const drive = getDrive();
       const res = await drive.files.get(
         { fileId, alt: 'media' },
-        { responseType: 'stream' }
+        { responseType: 'stream', supportsAllDrives: true }
       );
       return { success: true, stream: res.data };
     } catch (err) {
@@ -103,7 +109,7 @@ const GoogleAPI = {
   async deleteFile(fileId) {
     try {
       const drive = getDrive();
-      await drive.files.delete({ fileId });
+      await drive.files.delete({ fileId, supportsAllDrives: true });
       return { success: true };
     } catch (err) {
       console.error('googleAPI.deleteFile error', err);
@@ -120,7 +126,8 @@ const GoogleAPI = {
           mimeType: 'application/vnd.google-apps.folder',
           parents: parentId ? [parentId] : undefined
         },
-        fields: 'id,name,parents'
+        fields: 'id,name,parents',
+        supportsAllDrives: true
       });
       return { success: true, data: res.data };
     } catch (err) {
