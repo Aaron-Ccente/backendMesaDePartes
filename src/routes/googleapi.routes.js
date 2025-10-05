@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { GoogleController } from '../controllers/google.controller.js';
-import { authenticateToken, requireAdmin } from '../middleware/authMiddleware.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB limite
@@ -20,9 +20,9 @@ router.get('/download/:id', authenticateToken, GoogleController.download);
 router.post('/upload', authenticateToken, upload.single('file'), GoogleController.upload);
 
 // Delete
-router.delete('/files/:id', authenticateToken, requireAdmin, GoogleController.delete);
+router.delete('/files/:id', authenticateToken, GoogleController.delete);
 
 // Create folder
-router.post('/folders', authenticateToken, requireAdmin, GoogleController.createFolder);
+router.post('/folders', authenticateToken, GoogleController.createFolder);
 
 export default router;
