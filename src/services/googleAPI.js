@@ -1,25 +1,60 @@
 import { google } from 'googleapis';
-import { GOOGLE_CLIENT_EMAIL, GOOGLE_DRIVE_FOLDER_ID, GOOGLE_PRIVATE_KEY  } from '../config/config.js';
+import { GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_REDIRECT_URI, GOOGLE_OAUTH_REFRESH_TOKEN, GOOGLE_CLIENT_EMAIL, GOOGLE_DRIVE_FOLDER_ID, GOOGLE_PRIVATE_KEY } from '../config/config.js';
 
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
-const getAuth = () => {
+/**
+ * Crea cliente OAuth2.
+ */
+const createOAuthClient = () => {
+  const clientId = GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = GOOGLE_OAUTH_CLIENT_SECRET;
+  const redirect = GOOGLE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
+  const refreshToken = GOOGLE_OAUTH_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) return null;
+
+  const oAuth2Client = new google.auth.OAuth2(clientId, clientSecret, redirect);
+  oAuth2Client.setCredentials({ refresh_token: refreshToken });
+  return oAuth2Client;
+};
+
+/**
+ * Crea cliente Service Account.
+ */
+const createServiceAccountClient = () => {
   const clientEmail = GOOGLE_CLIENT_EMAIL;
   let privateKey = GOOGLE_PRIVATE_KEY;
-  if (!clientEmail || !privateKey) {
-    throw new Error('Faltan GOOGLE_CLIENT_EMAIL o GOOGLE_PRIVATE_KEY en .env');
+  if (!clientEmail || !privateKey) return null;
+
+  if ((privateKey.startsWith('"') && privateKey.endsWith('"')) || (privateKey.startsWith("'") && privateKey.endsWith("'"))) {
+    privateKey = privateKey.slice(1, -1);
   }
-  privateKey = privateKey.replace(/\\n/g, '\n');
-  if (!privateKey.includes('BEGIN PRIVATE KEY') && !privateKey.includes('BEGIN RSA PRIVATE KEY')) {
-    throw new Error('GOOGLE_PRIVATE_KEY no tiene formato PEM válido. Debe pegar el campo private_key del JSON de la cuenta de servicio (usa \\n para saltos de línea en .env).');
+  privateKey = privateKey.replace(/\\n/g, '\n').trim();
+
+  if (!privateKey.includes('BEGIN PRIVATE KEY')) {
+    throw new Error('GOOGLE_PRIVATE_KEY no tiene formato PEM válido.');
   }
 
-  const jwt = new google.auth.JWT({
+  return new google.auth.JWT({
     email: clientEmail,
     key: privateKey,
-    scopes: SCOPES
+    scopes: SCOPES,
+    subject: process.env.GOOGLE_DELEGATED_USER || undefined
   });
-  return jwt;
+};
+
+const getAuth = () => {
+  // sube usando la cuota del usuario
+  const oauth = createOAuthClient();
+  if (oauth) {
+    // refrescar token
+    return oauth;
+  }
+  const sa = createServiceAccountClient();
+  if (sa) return sa;
+
+  throw new Error('No se encontró configuración válida de autenticación Google (OAuth2 o Service Account).');
 };
 
 const getDrive = () => {
@@ -47,8 +82,8 @@ const GoogleAPI = {
       });
       return { success: true, data: res.data };
     } catch (err) {
-      console.error('googleAPI.uploadFile error', err);
-      return { success: false, message: err.message || 'Error subiendo archivo', error: err?.response?.data || err };
+      console.error('googleAPI.uploadFile error', err?.response?.data || err?.message || err);
+      return { success: false, message: err?.response?.data?.error?.message || err?.message || 'Error subiendo archivo', error: err?.response?.data || err };
     }
   },
 
