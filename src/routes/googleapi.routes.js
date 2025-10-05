@@ -20,9 +20,9 @@ router.get('/download/:id', authenticateToken, GoogleController.download);
 router.post('/upload', authenticateToken, upload.single('file'), GoogleController.upload);
 
 // Delete
-router.delete('/files/:id', authenticateToken, requireAdmin, GoogleController.delete);
+router.delete('/files/:id', authenticateToken, GoogleController.delete);
 
 // Create folder
-router.post('/folders', authenticateToken, requireAdmin, GoogleController.createFolder);
+router.post('/folders', authenticateToken, GoogleController.createFolder);
 
 export default router;
