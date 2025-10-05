@@ -1,6 +1,8 @@
 import { Perito } from '../models/Perito.js';
 import { Validators } from '../utils/validators.js';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../config/config.js';
 
 export class PeritoController {
   // Crear nuevo perito
@@ -248,7 +250,7 @@ export class PeritoController {
     }
   }
 
-  // Login de perito
+  // Login de perito (ahora genera JWT)
   static async loginPerito(req, res) {
     try {
       const { CIP, password_hash } = req.body;
@@ -261,7 +263,6 @@ export class PeritoController {
 
       // Buscar perito por CIP
       const perito = await Perito.findByCIPPerito(CIP);
-      
       if (!perito) {
         return res.status(401).json({
           success: false,
@@ -277,15 +278,22 @@ export class PeritoController {
           message: 'Credenciales inválidas'
         });
       }
+      const { password_hash: _, ...peritoSinPassword } = perito;
 
-      // Remover contraseña de la respuesta
-      delete perito.password_hash;
+      // Generar JWT (24h)
+      const payload = {
+        CIP: perito.CIP,
+        nombre_usuario: perito.nombre_usuario,
+        nombre_completo: perito.nombre_completo,
+        role: 'perito'
+      };
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
 
-      // Generar JWT token para peritos
       res.status(200).json({
         success: true,
         message: 'Login exitoso',
-        data: perito
+        token,
+        data: peritoSinPassword
       });
     } catch (error) {
       res.status(500).json({
