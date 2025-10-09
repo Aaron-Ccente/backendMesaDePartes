@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { TurnoController } from "../controllers/turno.controller.js";
+import { authenticateToken } from "../middleware/authMiddleware.js";
 
 const router = Router()
 
+// Se requiere el token de usuarios autentificados (mesa de partes, perito y admin)
+router.use(authenticateToken);
 // Ruta GET - Obtener todos los turnos disponibles
 router.get("/", TurnoController.getAllTurnos)
 
