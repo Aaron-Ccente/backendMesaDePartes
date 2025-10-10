@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { MesaDePartes } from "../models/MesaDePartes.js";
 import { Validators } from "../utils/validators.js";
+import { JWT_SECRET } from "../config/config.js";
 
 export class MesaDePartesController {
   static async login(req, res) {
@@ -38,10 +40,21 @@ export class MesaDePartesController {
         });
       }
 
+      // Generar JWT (24h)
+      const payload = {
+        CIP: mesadepartes.CIP,
+        nombre_usuario: mesadepartes.nombre_usuario,
+        nombre_completo: mesadepartes.nombre_completo,
+        role: "mesadepartes",
+      };
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
+      const { password_hash: _, ...mesadepartesSinPassword } = mesadepartes;
+
       res.status(200).json({
         success: true,
         message: "Login exitoso",
-        data: mesadepartes,
+        token,
+        data: mesadepartesSinPassword,
       });
     } catch (error) {
       if (error.message === "Credenciales inválidas") {
