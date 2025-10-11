@@ -8,8 +8,14 @@ const router = express.Router();
 // Login de perito
 router.post('/login', PeritoController.loginPerito);
 
-// RUTAS PROTEGIDAS (requieren autenticación de administrador)
+// RUTAS PROTEGIDAS (requieren token de usuario autentificado)
 router.use(authenticateToken);
+
+// Obtener peritos segun la especialidad selecccionada
+router.get('/especialidad', PeritoController.getAllPeritoAccordingToSpecialty)
+
+// RUTAS PROTEGIDAS (requieren autenticación de administrador)
+
 router.use(requireAdmin);
 
 // Crear nuevo perito
