@@ -83,6 +83,31 @@ export class PeritoController {
       });
     }
   }
+  static async getAllPeritoAccordingToSpecialty(req, res){
+     try {
+      const { id_especialidad } = req.query;
+      const peritos = await Perito.findAccordingToSpecialty(id_especialidad);
+      if (!peritos) {
+        return res.status(404).json({
+          success: false,
+          message: 'Peritos no encontrados'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: peritos
+      });
+
+    } catch (error) {
+      console.error('Error obteniendo peritos:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
 
   // Obtener perito por CIP
   static async getPeritoByCIP(req, res) {
