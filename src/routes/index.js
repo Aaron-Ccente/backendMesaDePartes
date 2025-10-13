@@ -7,6 +7,7 @@ import gradosRoutes from './grado.routes.js'
 import seccionesRoutes from './seccion.routes.js'
 import turnos from './turno.routes.js'
 import mesadepartesRoutes from './mesadepartes.routes.js'
+import prioridadesRoutes from './prioridad.routes.js'
 import googleRoutes from './googleapi.routes.js'
 const router = express.Router();
 
@@ -42,10 +43,13 @@ router.use('/api/grados', gradosRoutes)
 router.use('/api/turnos', turnos)
 
 // Rutas para las secciones
-router.use('/api/secciones', seccionesRoutes)
+// router.use('/api/secciones', seccionesRoutes)
 
 // Rutas para mesa de partes
 router.use('/api/mesadepartes', mesadepartesRoutes)
+
+// Rutas para los tipos de prioridades de los oficios
+router.use('/api/prioridades', prioridadesRoutes)
 
 // Rutas para la api de google drive
 router.use('/api/google', googleRoutes)

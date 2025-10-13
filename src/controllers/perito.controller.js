@@ -44,7 +44,7 @@ export class PeritoController {
   // Obtener todos los peritos
   static async getAllPeritos(req, res) {
     try {
-      const { page = 1, limit = 50, search } = req.query;
+      const { page = 1, limit = 10, search } = req.query;
       const offset = (page - 1) * limit;
       
       let peritos;

@@ -13,7 +13,6 @@ const deleteTables = `
         tipo_departamento,
         especialidad,
         grado,
-        seccion,
         turno,
         mesadepartes,
         departamentos,
@@ -21,13 +20,12 @@ const deleteTables = `
         administrador,
         perito,
         usuario_especialidad,
+        usuario_tipo_departamento,
         usuario_grado,
         usuario_rol,
         usuario_turno,
         estado_usuario,
         historial_usuario,
-        tipo_departamento_seccion,
-        usuario_seccion;
     SET FOREIGN_KEY_CHECKS = 1;
 `
 
@@ -46,9 +44,7 @@ const estados_requerimientos = `CREATE TABLE estados_requerimiento (
 
 const tipos_prioridad = `CREATE TABLE tipos_prioridad (
     id_prioridad TINYINT PRIMARY KEY AUTO_INCREMENT,
-    nombre_prioridad VARCHAR(20) NOT NULL UNIQUE,
-    nivel_prioridad TINYINT NOT NULL,
-    descripcion TEXT
+    nombre_prioridad VARCHAR(40) NOT NULL UNIQUE
 );`
 
 const estados = `CREATE TABLE estado (
@@ -198,25 +194,25 @@ const estado_usuario = `CREATE TABLE estado_usuario (
         ON DELETE RESTRICT ON UPDATE CASCADE
 );`
 
-const usuario_seccion = `CREATE TABLE usuario_seccion (
-    id_usuario_seccion INT PRIMARY KEY AUTO_INCREMENT,
+const usuario_tipo_departamento = `CREATE TABLE usuario_tipo_departamento (
+    id_usuario_tipo_departamento INT PRIMARY KEY AUTO_INCREMENT,
     id_usuario INT NOT NULL,
-    id_seccion INT NOT NULL,
+    id_tipo_departamento INT NOT NULL,
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
         ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (id_seccion) REFERENCES seccion(id_seccion)
+    FOREIGN KEY (id_tipo_departamento) REFERENCES tipo_departamento(id_tipo_departamento)
         ON DELETE RESTRICT ON UPDATE CASCADE
 );`
 
-const tipo_departamento_seccion = `CREATE TABLE tipo_departamento_seccion (
-    id_tipo_departamento_seccion INT PRIMARY KEY AUTO_INCREMENT,
-    id_tipo_departamento INT NOT NULL,
-    id_seccion INT NOT NULL,
-    FOREIGN KEY (id_tipo_departamento) REFERENCES tipo_departamento(id_tipo_departamento)
-        ON DELETE RESTRICT ON UPDATE CASCADE,
-    FOREIGN KEY (id_seccion) REFERENCES seccion(id_seccion)
-        ON DELETE RESTRICT ON UPDATE CASCADE
-);`
+// const tipo_departamento_seccion = `CREATE TABLE tipo_departamento_seccion (
+//     id_tipo_departamento_seccion INT PRIMARY KEY AUTO_INCREMENT,
+//     id_tipo_departamento INT NOT NULL,
+//     id_seccion INT NOT NULL,
+//     FOREIGN KEY (id_tipo_departamento) REFERENCES tipo_departamento(id_tipo_departamento)
+//         ON DELETE RESTRICT ON UPDATE CASCADE,
+//     FOREIGN KEY (id_seccion) REFERENCES seccion(id_seccion)
+//         ON DELETE RESTRICT ON UPDATE CASCADE
+// );`
 
 const historial_usuario = `CREATE TABLE historial_usuario (
     id_historial_usuario INT AUTO_INCREMENT PRIMARY KEY,
@@ -495,7 +491,6 @@ const createTables = `
     ${estados_requerimientos}
     ${tipos_prioridad}
     ${estados}
-    ${seccion}
     ${tipos_departamento}
     ${especialidad}
     ${grado}
@@ -506,12 +501,11 @@ const createTables = `
     ${mesadepartes}
     ${peritos}
     ${usuario_especialidad}
+    ${usuario_tipo_departamento}
     ${usuario_grado}
     ${usuario_rol}
     ${usuario_turno}
     ${estado_usuario}
-    ${usuario_seccion}
-    ${tipo_departamento_seccion}
     ${historial_usuario}
 `
 
