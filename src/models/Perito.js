@@ -39,7 +39,7 @@ export class Perito {
   static async findAccordingToSpecialty(id_especialidad){
     try {
       const [rows] = await db.promise().query(
-        'SELECT u.nombre_completo FROM usuario AS u LEFT JOIN usuario_seccion AS us ON u.id_usuario = us.id_usuario LEFT JOIN tipo_departamento_seccion AS tds ON us.id_seccion = tds.id_seccion LEFT JOIN tipo_departamento AS td ON tds.id_tipo_departamento = td.id_tipo_departamento WHERE td.id_tipo_departamento = ?',
+        'SELECT u.nombre_completo, u.id_usuario FROM usuario AS u LEFT JOIN usuario_seccion AS us ON u.id_usuario = us.id_usuario LEFT JOIN tipo_departamento_seccion AS tds ON us.id_seccion = tds.id_seccion LEFT JOIN tipo_departamento AS td ON tds.id_tipo_departamento = td.id_tipo_departamento WHERE td.id_tipo_departamento = ?',
         [id_especialidad]
       );
       return rows[0] || null;
