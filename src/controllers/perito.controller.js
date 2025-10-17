@@ -44,7 +44,7 @@ export class PeritoController {
   // Obtener todos los peritos
   static async getAllPeritos(req, res) {
     try {
-      const { page = 1, limit = 50, search } = req.query;
+      const { page = 1, limit = 10, search } = req.query;
       const offset = (page - 1) * limit;
       
       let peritos;
@@ -74,6 +74,31 @@ export class PeritoController {
           pages: Math.ceil(total / limit)
         }
       });
+    } catch (error) {
+      console.error('Error obteniendo peritos:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+  static async getAllPeritoAccordingToSpecialty(req, res){
+     try {
+      const { id_especialidad } = req.query;
+      const peritos = await Perito.findAccordingToSpecialty(id_especialidad);
+      if (!peritos) {
+        return res.status(404).json({
+          success: false,
+          message: 'Peritos no encontrados'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: peritos
+      });
+
     } catch (error) {
       console.error('Error obteniendo peritos:', error);
       res.status(500).json({

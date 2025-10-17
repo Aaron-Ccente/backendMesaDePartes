@@ -36,6 +36,21 @@ export class Perito {
       return null;
     }
   }
+  static async findAccordingToSpecialty(id_especialidad){
+    try {
+      const [rows] = await db.promise().query(
+        `SELECT u.nombre_completo, u.id_usuario FROM usuario AS u 
+        LEFT JOIN usuario_tipo_departamento AS utp ON u.id_usuario = utp.id_usuario 
+        LEFT JOIN tipo_departamento AS td ON utp.id_tipo_departamento = td.id_tipo_departamento
+        WHERE utp.id_tipo_departamento = ?`,
+        [id_especialidad]
+      );
+      return rows || null;
+    } catch (error) {
+      console.error('Error buscando peritos:', error);
+      throw error;
+    }
+  }
 
   // Crear nuevo perito
   static async create(peritoData) {
@@ -44,14 +59,14 @@ export class Perito {
       CIP, nombre_completo, email, nombre_usuario, password_hash, dni,
       unidad, fecha_integracion_pnp, fecha_incorporacion, codigo_codofin, domicilio,
       telefono, cursos_institucionales, cursos_extranjero, ultimo_ascenso_pnp,
-      fotografia_url, id_especialidad, id_grado, id_seccion, id_turno
+      fotografia_url, id_especialidad, id_grado, id_turno, id_tipo_departamento
     } = peritoData;
 
-    if (!CIP || !nombre_completo || !nombre_usuario || !password_hash || !dni || !fecha_integracion_pnp || !fecha_incorporacion || !codigo_codofin || !domicilio || !telefono || !fotografia_url || !id_especialidad || !id_grado || !id_seccion || !id_turno) {
+    if (!CIP || !nombre_completo || !nombre_usuario || !password_hash || !dni || !fecha_integracion_pnp || !fecha_incorporacion || !codigo_codofin || !domicilio || !telefono || !fotografia_url || !id_especialidad || !id_tipo_departamento || !id_grado || !id_turno) {
       throw new Error('Hay campos no rellenados.');
     }
 
-    const existingUser = await this.findByCIPPerito(CIP);
+    const existingUser = await this.findByCipPerito(CIP);
     if (existingUser) {
       throw new Error('Ya existe un usuario con ese CIP');
     }
@@ -82,9 +97,9 @@ export class Perito {
     const queryRelationsPeritoEspecialidad = `INSERT INTO usuario_especialidad (id_usuario, id_especialidad) VALUES (?,?);`
     const queryRelationsPeritogrado = `INSERT INTO usuario_grado (id_usuario, id_grado) VALUES (?,?);`
     const queryRelationsPeritoTurno = `INSERT INTO usuario_turno (id_usuario, id_turno) VALUES (?,?);`
-    const queryRelationsPeritoSeccion = `INSERT INTO usuario_seccion (id_usuario, id_seccion) VALUES (?,?);`
     const queryRelationsPeritoEstado = `INSERT INTO estado_usuario (id_usuario, id_estado) VALUES (?,?);`
     const queryRelationsPeritoRol = `INSERT INTO usuario_rol (id_usuario, id_rol) VALUES (?,?);`
+    const queryRelationsPeritoTipoDepartamento = `INSERT INTO usuario_tipo_departamento (id_usuario, id_tipo_departamento) VALUES (?,?);`
 
     const connection = await db.promise().getConnection();
     try {
@@ -106,6 +121,7 @@ export class Perito {
       ]);
       await connection.query(queryRelationsPeritoEstado, [idUsuario, 1]);
       await connection.query(queryRelationsPeritoRol, [idUsuario, 2]);
+      await connection.query(queryRelationsPeritoTipoDepartamento, [idUsuario, id_tipo_departamento]);
 
       if (id_especialidad) {
         await connection.query(queryRelationsPeritoEspecialidad, [idUsuario, id_especialidad]);
@@ -115,9 +131,6 @@ export class Perito {
       }
       if (id_turno) {
         await connection.query(queryRelationsPeritoTurno, [idUsuario, id_turno]);
-      }
-      if (id_seccion) {
-        await connection.query(queryRelationsPeritoSeccion, [idUsuario, id_seccion]);
       }
 
       await connection.commit();
@@ -146,16 +159,14 @@ export class Perito {
   static async findByCIPPerito(cip){
     try {
       const [rows] = await db.promise().query(
-        `SELECT us.CIP, us.nombre_completo, us.nombre_usuario, us.password_hash, r.nombre_rol, se.nombre AS nombre_seccion, td.nombre_departamento, g.nombre AS nombre_grado
+        `SELECT us.CIP, us.nombre_completo, us.nombre_usuario, us.password_hash, r.nombre_rol, td.nombre_departamento, g.nombre AS nombre_grado
          FROM usuario AS us
          INNER JOIN usuario_grado as ug ON ug.id_usuario = us.id_usuario
          INNER JOIN grado as g ON g.id_grado = ug.id_grado
          INNER JOIN usuario_rol AS ur ON us.id_usuario = ur.id_usuario
          INNER JOIN rol AS r ON ur.id_rol = r.id_rol
-         INNER JOIN usuario_seccion AS u_se ON u_se.id_usuario = us.id_usuario
-         INNER JOIN seccion AS se ON se.id_seccion = u_se.id_seccion
-         INNER JOIN tipo_departamento_seccion AS tds ON tds.id_seccion = se.id_seccion
-         INNER JOIN tipo_departamento AS td ON td.id_tipo_departamento = tds.id_tipo_departamento
+         INNER JOIN usuario_tipo_departamento AS utp ON utp.id_usuario = us.id_usuario
+         INNER JOIN tipo_departamento AS td ON td.id_tipo_departamento = utp.id_tipo_departamento
          WHERE us.CIP = ? AND r.nombre_rol = 'PERITO'
          LIMIT 1
          `,
@@ -199,9 +210,7 @@ export class Perito {
       e.nombre AS nombre_especialidad,
 
       -- Sección y Tipo de Departamento
-      usec.id_seccion,
-      sec.nombre AS nombre_seccion,
-      tds.id_tipo_departamento,
+      td.id_tipo_departamento,
       td.nombre_departamento AS nombre_tipo_departamento,
 
       -- Grado
@@ -217,12 +226,8 @@ export class Perito {
 
     LEFT JOIN usuario_especialidad ue ON u.id_usuario = ue.id_usuario
     LEFT JOIN especialidad e ON ue.id_especialidad = e.id_especialidad
-
-    LEFT JOIN usuario_seccion usec ON u.id_usuario = usec.id_usuario
-    LEFT JOIN seccion sec ON usec.id_seccion = sec.id_seccion
-    LEFT JOIN tipo_departamento_seccion tds ON sec.id_seccion = tds.id_seccion
-    LEFT JOIN tipo_departamento td ON tds.id_tipo_departamento = td.id_tipo_departamento
-
+    LEFT JOIN usuario_tipo_departamento utp ON utp.id_usuario = u.id_usuario
+    LEFT JOIN tipo_departamento td ON utp.id_tipo_departamento = td.id_tipo_departamento
     LEFT JOIN usuario_grado ug ON u.id_usuario = ug.id_usuario
     LEFT JOIN grado g ON ug.id_grado = g.id_grado
 
@@ -306,22 +311,33 @@ export class Perito {
     }
   }
 
+  // Buscar perito por DNI
+  static async findByCipPerito(cip) {
+    try {
+      const [rows] = await db.promise().query(
+        'SELECT * FROM usuario WHERE cip = ?',
+        [cip]
+      );
+      return rows[0] || null;
+    } catch (error) {
+      console.error('Error buscando perito por CIP:', error);
+      throw error;
+    }
+  }
+
   // Obtener todos los peritos
   static async findAll(limit = 10, offset = 0) {
     try {
       const [rows] = await db.promise().query(
-        `SELECT *, se.nombre AS nombre_seccion 
-        FROM usuario AS a
+        `SELECT * 
+        FROM usuario AS us
         LEFT JOIN usuario_rol AS b
-        ON a.id_usuario = b.id_usuario 
-        LEFT JOIN perito AS pe ON a.id_usuario = pe.id_usuario
-        LEFT JOIN usuario_seccion AS us ON a.id_usuario = us.id_usuario
-        LEFT JOIN seccion as se ON se.id_seccion = us.id_seccion
-        LEFT JOIN tipo_departamento_seccion AS tds ON tds.id_seccion = se.id_seccion
-        LEFT JOIN tipo_departamento AS tdp ON tdp.id_tipo_departamento = tds.id_tipo_departamento
-
+        ON us.id_usuario = b.id_usuario 
+        LEFT JOIN perito AS pe ON us.id_usuario = pe.id_usuario
+        INNER JOIN usuario_tipo_departamento AS utp ON utp.id_usuario = us.id_usuario
+        INNER JOIN tipo_departamento AS td ON td.id_tipo_departamento = utp.id_tipo_departamento
         WHERE b.id_rol = 2
-        ORDER BY a.nombre_completo
+        ORDER BY us.nombre_completo
         LIMIT ? OFFSET ?`,
         [limit, offset]
       );
@@ -349,11 +365,11 @@ export class Perito {
       const searchPattern = `%${searchTerm}%`;
       const [rows] = await db.promise().query(
         `SELECT * 
-        FROM usuario AS a 
-        LEFT JOIN usuario_rol AS b ON a.id_usuario = b.id_usuario
-        WHERE (a.CIP LIKE ? OR a.nombre_completo LIKE ?) 
+        FROM usuario AS us 
+        LEFT JOIN usuario_rol AS b ON us.id_usuario = b.id_usuario
+        WHERE (us.CIP LIKE ? OR us.nombre_completo LIKE ?) 
           AND b.id_rol = 2
-        ORDER BY a.nombre_completo 
+        ORDER BY us.nombre_completo 
         LIMIT ? OFFSET ?`,
         [searchPattern, searchPattern, limit, offset]
       );
@@ -375,7 +391,7 @@ static async update(cip, updateData) {
       nombre_completo, email, nombre_usuario, password_hash, dni,
       unidad, fecha_integracion_pnp, fecha_incorporacion, codigo_codofin, domicilio,
       telefono, cursos_institucionales, cursos_extranjero, ultimo_ascenso_pnp,
-      fotografia_url, id_especialidad, id_grado, id_seccion, id_turno
+      fotografia_url, id_especialidad, id_grado, id_turno, id_tipo_departamento
     } = updateData;
 
     // Actualizar tabla usuario
@@ -505,12 +521,12 @@ static async update(cip, updateData) {
       `, [id_turno, cip]);
     }
     
-    if (id_seccion !== undefined) {
+    if (id_tipo_departamento !== undefined) {
       await connection.query(`
-        UPDATE usuario_seccion 
-        SET id_seccion = ? 
+        UPDATE usuario_tipo_departamento
+        SET id_tipo_departamento = ? 
         WHERE id_usuario = (SELECT id_usuario FROM usuario WHERE CIP = ?)
-      `, [id_seccion, cip]);
+      `, [id_tipo_departamento, cip]);
     }
 
     await connection.commit();
@@ -599,13 +615,13 @@ static async update(cip, updateData) {
   static async getStats() {
     try {
       const [totalPeritos] = await db.promise().query('SELECT COUNT(*) as total FROM perito');
-      // Peritos por Sección
+      // Peritos por departamento
       const [peritosPorSeccion] = await db.promise().query(`
-        SELECT s.nombre AS seccion, COUNT(p.id_perito) AS count
+        SELECT td.nombre_departamento AS seccion, COUNT(p.id_perito) AS count
         FROM perito p
-        INNER JOIN usuario_seccion us ON p.id_usuario = us.id_usuario
-        INNER JOIN seccion s ON us.id_seccion = s.id_seccion
-        GROUP BY s.id_seccion, s.nombre
+        INNER JOIN usuario_tipo_departamento AS utp ON p.id_usuario = utp.id_usuario
+        INNER JOIN tipo_departamento AS td ON utp.id_tipo_departamento = td.id_tipo_departamento
+        GROUP BY td.id_tipo_departamento, td.nombre_departamento
         ORDER BY count DESC
       `);
 
