@@ -1,18 +1,22 @@
 import { Router } from "express";
 import { TurnoController } from "../controllers/turno.controller.js";
-import { authenticateToken } from "../middleware/authMiddleware.js";
+import { authenticateToken, requireAdmin } from "../middleware/authMiddleware.js";
 
-const router = Router()
+const router = Router();
 
 // Se requiere el token de usuarios autentificados (mesa de partes, perito y admin)
 router.use(authenticateToken);
-// Ruta GET - Obtener todos los turnos disponibles
-router.get("/", TurnoController.getAllTurnos)
 
-// Ruta POST - Crear un nuevo turno
+// GET - Obtener todos los turnos disponibles (cualquiera autenticado)
+router.get("/", TurnoController.getAllTurnos);
 
-// Ruta PUT - Editar un turno
 
-// Ruta DELETE - Eliminar el turno
+// Rutas que requieren ser admin
+router.use(requireAdmin);
 
-export default router
+router.get("/:id", TurnoController.getTurnoById);
+router.post("/", TurnoController.createTurno);
+router.put("/:id", TurnoController.updateTurno);
+router.delete("/:id", TurnoController.deleteTurno);
+
+export default router;

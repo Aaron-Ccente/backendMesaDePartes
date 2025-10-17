@@ -42,9 +42,6 @@ router.use('/api/grados', gradosRoutes)
 // Rutas para los turnos
 router.use('/api/turnos', turnos)
 
-// Rutas para las secciones
-// router.use('/api/secciones', seccionesRoutes)
-
 // Rutas para mesa de partes
 router.use('/api/mesadepartes', mesadepartesRoutes)
 
