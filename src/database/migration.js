@@ -12,6 +12,7 @@ const deleteTables = `
         estado,
         tipo_departamento,
         especialidad,
+        tipo_de_examen,
         grado,
         turno,
         mesadepartes,
@@ -24,8 +25,9 @@ const deleteTables = `
         usuario_grado,
         usuario_rol,
         usuario_turno,
+        tipo_de_examen_departamento,
         estado_usuario,
-        historial_usuario,
+        historial_usuario;
     SET FOREIGN_KEY_CHECKS = 1;
 `
 
@@ -59,11 +61,6 @@ const tipos_departamento = `CREATE TABLE tipo_departamento (
     descripcion TEXT
 );`
 
-const seccion = `CREATE TABLE seccion (
-    id_seccion INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(50) NOT NULL,
-    descripcion TEXT
-);`
 
 const especialidad = `CREATE TABLE especialidad (
     id_especialidad INT PRIMARY KEY AUTO_INCREMENT,
@@ -78,6 +75,12 @@ const grado = `CREATE TABLE grado (
 const turno = `CREATE TABLE turno (
     id_turno INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(60) UNIQUE NOT NULL
+);`
+
+const tipo_de_examen = `CREATE TABLE tipo_de_examen (
+    id_tipo_de_examen INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT
 );`
 
 // -- BLOQUE 2: Gestión de perito
@@ -204,15 +207,15 @@ const usuario_tipo_departamento = `CREATE TABLE usuario_tipo_departamento (
         ON DELETE RESTRICT ON UPDATE CASCADE
 );`
 
-// const tipo_departamento_seccion = `CREATE TABLE tipo_departamento_seccion (
-//     id_tipo_departamento_seccion INT PRIMARY KEY AUTO_INCREMENT,
-//     id_tipo_departamento INT NOT NULL,
-//     id_seccion INT NOT NULL,
-//     FOREIGN KEY (id_tipo_departamento) REFERENCES tipo_departamento(id_tipo_departamento)
-//         ON DELETE RESTRICT ON UPDATE CASCADE,
-//     FOREIGN KEY (id_seccion) REFERENCES seccion(id_seccion)
-//         ON DELETE RESTRICT ON UPDATE CASCADE
-// );`
+const tipo_de_examen_departamento = `CREATE TABLE tipo_de_examen_departamento (
+    id_tipo_de_examen_departamento INT PRIMARY KEY AUTO_INCREMENT,
+    id_tipo_departamento INT NOT NULL,
+    id_tipo_de_examen INT NOT NULL,
+    FOREIGN KEY (id_tipo_departamento) REFERENCES tipo_departamento(id_tipo_departamento)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (id_tipo_de_examen) REFERENCES tipo_de_examen(id_tipo_de_examen)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);`
 
 const historial_usuario = `CREATE TABLE historial_usuario (
     id_historial_usuario INT AUTO_INCREMENT PRIMARY KEY,
@@ -494,6 +497,7 @@ const createTables = `
     ${tipos_departamento}
     ${especialidad}
     ${grado}
+    ${tipo_de_examen}
     ${turno}
     ${departamentos}
     ${usuarios}
@@ -505,6 +509,7 @@ const createTables = `
     ${usuario_grado}
     ${usuario_rol}
     ${usuario_turno}
+    ${tipo_de_examen_departamento}
     ${estado_usuario}
     ${historial_usuario}
 `

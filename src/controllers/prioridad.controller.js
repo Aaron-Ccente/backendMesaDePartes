@@ -17,6 +17,23 @@ export class PrioridadController {
         }
     }
 
+    static async getPrioridad(req, res) {
+      try {
+        const { id } = req.params;
+        const prioridad = await Prioridad.findById(id);
+        if (!prioridad) {
+          return res.status(404).json({ success: false, message: 'Prioridad no encontrada' });
+        }
+        res.status(200).json({ success: true, data: prioridad });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: 'Error interno del servidor',
+          error: error.message
+        });
+      }
+    }
+
     static async createPriority(req, res){
       try {
         const { nombre_prioridad } = req.body;
