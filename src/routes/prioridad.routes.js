@@ -11,6 +11,7 @@ router.get("/", PrioridadController.getAllTypesOfPriority);
 // Requiere ser logeado como administrador
 router.use(requireAdmin);
 
+router.get("/:id", PrioridadController.getPrioridad)
 router.post("/", PrioridadController.createPriority);
 router.put("/:id", PrioridadController.updatePriority);
 router.delete("/:id", PrioridadController.deletePriority);
