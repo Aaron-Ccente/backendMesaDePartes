@@ -59,10 +59,10 @@ export class Perito {
       CIP, nombre_completo, email, nombre_usuario, password_hash, dni,
       unidad, fecha_integracion_pnp, fecha_incorporacion, codigo_codofin, domicilio,
       telefono, cursos_institucionales, cursos_extranjero, ultimo_ascenso_pnp,
-      fotografia_url, id_especialidad, id_grado, id_turno, id_tipo_departamento
+      fotografia_url, id_grado, id_turno, id_tipo_departamento
     } = peritoData;
 
-    if (!CIP || !nombre_completo || !nombre_usuario || !password_hash || !dni || !fecha_integracion_pnp || !fecha_incorporacion || !codigo_codofin || !domicilio || !telefono || !fotografia_url || !id_especialidad || !id_tipo_departamento || !id_grado || !id_turno) {
+    if (!CIP || !nombre_completo || !nombre_usuario || !password_hash || !dni || !fecha_integracion_pnp || !fecha_incorporacion || !codigo_codofin || !domicilio || !telefono || !fotografia_url || !id_tipo_departamento || !id_grado || !id_turno) {
       throw new Error('Hay campos no rellenados.');
     }
 
@@ -94,7 +94,6 @@ export class Perito {
         cursos_extranjero, ultimo_ascenso_pnp, fotografia_url
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const queryRelationsPeritoEspecialidad = `INSERT INTO usuario_especialidad (id_usuario, id_especialidad) VALUES (?,?);`
     const queryRelationsPeritogrado = `INSERT INTO usuario_grado (id_usuario, id_grado) VALUES (?,?);`
     const queryRelationsPeritoTurno = `INSERT INTO usuario_turno (id_usuario, id_turno) VALUES (?,?);`
     const queryRelationsPeritoEstado = `INSERT INTO estado_usuario (id_usuario, id_estado) VALUES (?,?);`
@@ -123,9 +122,6 @@ export class Perito {
       await connection.query(queryRelationsPeritoRol, [idUsuario, 2]);
       await connection.query(queryRelationsPeritoTipoDepartamento, [idUsuario, id_tipo_departamento]);
 
-      if (id_especialidad) {
-        await connection.query(queryRelationsPeritoEspecialidad, [idUsuario, id_especialidad]);
-      }
       if (id_grado) {
         await connection.query(queryRelationsPeritogrado, [idUsuario, id_grado]);
       }
@@ -204,11 +200,7 @@ export class Perito {
       p.cursos_extranjero,
       p.ultimo_ascenso_pnp,
       p.fotografia_url,
-
-      -- Especialidad
-      ue.id_especialidad,
-      e.nombre AS nombre_especialidad,
-
+      
       -- Sección y Tipo de Departamento
       td.id_tipo_departamento,
       td.nombre_departamento AS nombre_tipo_departamento,
@@ -224,8 +216,6 @@ export class Perito {
     FROM usuario u
     INNER JOIN perito p ON u.id_usuario = p.id_usuario
 
-    LEFT JOIN usuario_especialidad ue ON u.id_usuario = ue.id_usuario
-    LEFT JOIN especialidad e ON ue.id_especialidad = e.id_especialidad
     LEFT JOIN usuario_tipo_departamento utp ON utp.id_usuario = u.id_usuario
     LEFT JOIN tipo_departamento td ON utp.id_tipo_departamento = td.id_tipo_departamento
     LEFT JOIN usuario_grado ug ON u.id_usuario = ug.id_usuario
@@ -391,7 +381,7 @@ static async update(cip, updateData) {
       nombre_completo, email, nombre_usuario, password_hash, dni,
       unidad, fecha_integracion_pnp, fecha_incorporacion, codigo_codofin, domicilio,
       telefono, cursos_institucionales, cursos_extranjero, ultimo_ascenso_pnp,
-      fotografia_url, id_especialidad, id_grado, id_turno, id_tipo_departamento
+      fotografia_url, id_grado, id_turno, id_tipo_departamento
     } = updateData;
 
     // Actualizar tabla usuario
@@ -496,15 +486,6 @@ static async update(cip, updateData) {
       await connection.query(queryPerito, peritoValues);
     }
 
-    // Actualizar relaciones
-    if (id_especialidad !== undefined) {
-      await connection.query(`
-        UPDATE usuario_especialidad 
-        SET id_especialidad = ? 
-        WHERE id_usuario = (SELECT id_usuario FROM usuario WHERE CIP = ?)
-      `, [id_especialidad, cip]);
-    }
-    
     if (id_grado !== undefined) {
       await connection.query(`
         UPDATE usuario_grado 
