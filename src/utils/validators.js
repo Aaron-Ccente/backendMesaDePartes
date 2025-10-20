@@ -28,10 +28,10 @@ export class Validators {
       return { isValid: false, message: 'Nombre de usuario debe tener entre 3 y 30 caracteres' };
     }
     
-    // Permitir solo letras, números, guiones y guiones bajos
-    const usernameRegex = /^[a-zA-Z0-9\-_]+$/;
+    // Permitir solo letras, números, guiones, puntos, espacios y guiones bajos
+    const usernameRegex = /^[a-zA-Z0-9\-_\. ]+$/;
     if (!usernameRegex.test(NombreUsuario)) {
-      return { isValid: false, message: 'Nombre de usuario solo puede contener letras, números, guiones y guiones bajos' };
+      return { isValid: false, message: 'Nombre de usuario solo puede contener letras, números, guiones, puntos, espacios y guiones bajos' };
     }
     
     return { isValid: true };
