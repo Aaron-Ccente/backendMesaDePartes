@@ -3,8 +3,9 @@ import db from './db.js'
 const deleteAll = `DELETE FROM rol;
                    DELETE FROM estado;
                    DELETE FROM tipo_departamento;
-                   DELETE FROM especialidad;
                    DELETE FROM grado;
+                   DELETE FROM tipo_de_examen;
+                   DELETE FROM tipo_de_examen_departamento;
                    DELETE FROM turno;
                    DELETE FROM usuario_rol;
                     `;
@@ -29,52 +30,6 @@ const tipos_departamento = `INSERT INTO tipo_departamento (id_tipo_departamento,
                 (9,'PSICOLOGÍA FORENSE','Psicología Forense - descripción'),
                 (10,'IDENTIFICACIÓN CRIMINALÍSTICA','Identificación Criminalísitica - descripción');`
 
-// const secciones = `INSERT INTO seccion (id_seccion, nombre, descripcion) VALUES
-//                 (1, 'Análisis', 'Seccion para los análisis'),
-//                 (2, 'Prueba', 'Seccion para los pruebas');`
-
-const especialidades = `INSERT INTO especialidad (id_especialidad, nombre) VALUES
-                (1,'Levantamiento de evidencias físicas'),
-                (2,'Fotografía forense'),
-                (3,'Planimetría forense'),
-                (4,'Preservación de la escena'),
-                (5,'Identificación de armas de fuego'),
-                (6,'Análisis de proyectiles y casquillos'),
-                (7,'Trayectoria balística'),
-                (8,'Balística comparativa'),
-                (9,'Análisis de ADN'),
-                (10,'Serología forense'),
-                (11,'Identificación genética'),
-                (12,'Botánica forense'),
-                (13,'Accidentología vial'),
-                (14,'Mecánica forense'),
-                (15,'Eléctrica y electrónica forense'),
-                (16,'Reconstrucción de hechos'),
-                (17,'Análisis de dispositivos electrónicos'),
-                (18,'Recuperación de datos'),
-                (19,'Ciberseguridad y rastreo digital'),
-                (20,'Análisis de redes'),
-                (21,'Análisis de drogas de abuso'),
-                (22,'Alcoholimetría'),
-                (23,'Envenenamientos y sustancias químicas'),
-                (24,'Toxicología ambiental'),
-                (25,'Pericia caligráfica'),
-                (26,'Documentoscopía'),
-                (27,'Análisis de firmas y rúbricas'),
-                (28,'Tinta y papel forense'),
-                (29,'Auditoría forense'),
-                (30,'Lavado de activos'),
-                (31,'Tasación de bienes'),
-                (32,'Fraudes contables'),
-                (33,'Perfilación criminal'),
-                (34,'Evaluación psicológica'),
-                (35,'Psicología del testimonio'),
-                (36,'Psicología penitenciaria'),
-                (37,'Dactiloscopía'),
-                (38,'Odontología forense'),
-                (39,'Antropología forense'),
-                (40,'Retrato hablado');`
-
 const grados = `INSERT INTO grado (id_grado, nombre) VALUES
                 (1,'Coronel'),
                 (2,'Comandante'),
@@ -91,15 +46,83 @@ const grados = `INSERT INTO grado (id_grado, nombre) VALUES
                 (13,'Suboficial de Segunda'),
                 (14,'Suboficial de Tercera');`
 
+const tipo_de_examen = `INSERT INTO tipo_de_examen (id_tipo_de_examen, nombre, descripcion) VALUES 
+                (1, 'Balistico en armas, Municiones - elementos balísticos o análogos', 'Balistico en armas - descripción'),
+                (2, 'Balístico en ropas', 'Balistico en armas - descripción'),
+                (3, 'Inspección Balística', 'Balistico en armas - descripción'),
+                (4, 'Identidad Balística, Marcas de herramientas, EMC estudio microscópico comparativo', 'Balistico en armas - descripción'),
+                (5, 'Informes Técnicos, Especializados - Recontrucciones judiciales/Fiscales', 'Balistico en armas - descripción'),
+                (6, 'Materiales, Insumos, Productos, Artefactos explosivos', 'Balistico en armas - descripción'),
+                (7, 'Inspección Explosivos', 'Balistico en armas - descripción'),
+                (8, 'TRICOLÓGICO (cabellos - vellos)', 'Balistico en armas - descripción'),
+                (9, 'HEMATOLÓGICO', 'Balistico en armas - descripción'),
+                (10, 'ESPERMATOLÓGICO', 'Balistico en armas - descripción'),
+                (11, 'SARRO UNGUEAL', 'Balistico en armas - descripción'),
+                (12, 'HOMOLOGACIÓN DE ADN', 'Balistico en armas - descripción'),
+                (13, 'FISICO - en armas blancas', 'Balistico en armas - descripción'),
+                (14, 'FISICO - en prendas de vestir', 'Balistico en armas - descripción'),
+                (15, 'FISICO - en objetos rígidos (contundentes)', 'Balistico en armas - descripción'),
+                (16, 'FISICO - en elementos constrictores', 'Balistico en armas - descripción'),
+                (17, 'FISICO - en sustancias terrosas', 'Balistico en armas - descripción'),
+                (18, 'FISICO - en artefactos incendiarios de fabricación casera', 'Balistico en armas - descripción'),
+                (19, 'FISICO - en placas vehiculares', 'Balistico en armas - descripción'),
+                (20, 'FISICO - en de homologación de pinturas en evidencias trazas', 'Balistico en armas - descripción'),
+                (21, 'Examen de sustancias químicas impregnadas en prendas de vestir', 'Balistico en armas - descripción'),
+                (22, 'Examen de hidrocarburos derivados de petróleo y/o aceites impregnados en prendas de vestir', 'Balistico en armas - descripción'),
+                (23, 'Revenido químico de números de serie en soportes metálicos', 'Balistico en armas - descripción'),
+                (24, 'Examen de homologación fisica en productos industriales', 'Balistico en armas - descripción'),
+                (25, 'Examen de absorción atómica para restos de disparo por arma de fuego', 'Balistico en armas - descripción'),
+                (26, 'Examen para detección de hidrocarburos derivados del petróleo', 'Balistico en armas - descripción'),
+                (27, 'Exámenes instrumentales de espectrometría de infrarrojo FTIR para la detección de sustancias desconocidas', 'Balistico en armas - descripción'),
+                (28, 'ANÁLISIS INFORMÁTICO FORENSE', 'Balistico en armas - descripción'),
+                (29, 'OPERATIVIDAD DE EQUIPO TERMINAL MÓVIL, TARJETA SIM', 'Balistico en armas - descripción'),
+                (30, 'ANÁLISIS DE ARCHIVOS DE VIDEOGRAMAS E IMAGEN', 'Balistico en armas - descripción'),
+                (31, 'HOMOLOGACIÓN DE IMÁGENES DE VIDEO', 'Balistico en armas - descripción'),
+                (32, 'OPERATIVIDAD DE DISPOSITIVOS ELECTRÓNICOS', 'Balistico en armas - descripción'),
+                (33, 'TOXICOLÓGICO EN MUESTRAS BIOLÓGICAS TOMADAS DIRECTAMENTE', 'Balistico en armas - descripción'),
+                (34, 'TOXICOLÓGICO EN MUESTRAS REMITIDAS', 'Balistico en armas - descripción'),
+                (35, 'DOSAJE ETÍLICO EN MUESTRAS BIOLÓGICAS TOMADAS DIRECTAMENTE', 'Balistico en armas - descripción'),
+                (36, 'ADHERENCIA DE DROGAS ILICITA EN MUESTRAS TRASLADADAS AL LABORATORIOY VEHICULOS MOTORIZADOS', 'Balistico en armas - descripción'),
+                (37, 'ANÁLISIS DE INSUMOS QUÍMICOS FISCALIZADOS EN MUESTRAS TRASLADADAS AL LABORATORIO', 'Balistico en armas - descripción'),
+                (38, 'Examen de determinación por adicción o supresión en documentos', 'Balistico en armas - descripción'),
+                (39, 'Examen de superposición o prelación de trazos, para determinar abuso de firmas en blanco', 'Balistico en armas - descripción'),
+                (40, 'Examen de entrecruzamiento de trazos, de tintas y dobleces', 'Balistico en armas - descripción'),
+                (41, 'Examen de procedencia de fotocopias', 'Balistico en armas - descripción'),
+                (42, 'Examen de determinación de fotomontaje o fotocomposiciones', 'Balistico en armas - descripción'),
+                (43, 'Examen de autenticidad o falsedad de documentos de identidad', 'Balistico en armas - descripción'),
+                (44, 'Examen de sistemas de impresión', 'Balistico en armas - descripción'),
+                (45, 'Examen de papel carbón y papel auto-copiativo', 'Balistico en armas - descripción'),
+                (46, 'Examen en sobres, embalajes y afines, a fin de establecer posible violación de correspondencia', 'Balistico en armas - descripción'),
+                (47, 'Anacronismo en el receptor, normativo y tecnológico', 'Balistico en armas - descripción'),
+                (48, 'Examen de autenticidad o falsedad de firmas', 'Balistico en armas - descripción'),
+                (49, 'Examen de procedencia - auditoría de manuscritos', 'Balistico en armas - descripción'),
+                (50, 'Examen de análisis de moneda nacional y/o extranjera', 'Balistico en armas - descripción'),
+                (51, 'Informe Pericial en Lavado de Activos', 'Balistico en armas - descripción'),
+                (52, 'Tasación de bienes muebles', 'Balistico en armas - descripción'),
+                (53, 'Tasaciones de predios urbanos', 'Balistico en armas - descripción'),
+                (54, 'Tasaciones de predios rústicos, predios erizados y otros bienes agropecuarios', 'Balistico en armas - descripción'),
+                (55, 'Tasación de propiedad empresarial', 'Balistico en armas - descripción'),
+                (56, 'Tasaciones en bienes inmuebles en los procesos de adquisición o expropiación', 'Balistico en armas - descripción'),
+                (57, 'Tasaciones de aeronaves, embarcaciones y yacimientos mineros', 'Balistico en armas - descripción'),
+                (58, 'Examen Psicológico en Personas', 'Balistico en armas - descripción'),
+                (59, 'Análisis Psicografológico de Manuscritos', 'Balistico en armas - descripción'),
+                (60, 'Pronunciamiento Psicológico en Material Diverso', 'Balistico en armas - descripción'),
+                (61, 'Perfiliación Criminal en la Escena del Crimen', 'Balistico en armas - descripción'),
+                (62, 'Entrevista Psicológica Retrospectiva (necropsia)', 'Balistico en armas - descripción'),
+                (63, 'Procesamiento de fragmentos de huellas papilares latentes, para identidad dactilar y/o personal', 'Balistico en armas - descripción'),
+                (64, 'Identidad dactilar y/o personal en documentos cuestionados', 'Balistico en armas - descripción'),
+                (65, 'Identidad plena en persona', 'Balistico en armas - descripción'),
+                (66, 'Enrolamiento biométrico en vivo', 'Balistico en armas - descripción'),
+                (67, 'Identificación de cadáveres NN', 'Balistico en armas - descripción'),
+                (68, 'Procesamiento de latentes faciales para identidad facial y/o personal', 'Balistico en armas - descripción'),
+                (69, 'Homologación facial o identificación facial', 'Balistico en armas - descripción'),
+                (70, 'Confección de IDENTIFAC', 'Balistico en armas - descripción');`
+
 const turnos = `INSERT INTO turno (id_turno, nombre) VALUES
                 (1,'Mañana'),
                 (2,'Tarde'),
                 (3,'Noche'),
                 (4,'Guardia 24 horas');`
-
-const tipo_departamento_seccion = `INSERT INTO tipo_departamento_seccion (id_tipo_departamento_seccion, id_tipo_departamento, id_seccion) VALUES
-                (1, 1, 1),
-                (2, 1, 2);`
 
 const tipos_prioridad_oficio = `INSERT INTO tipos_prioridad (id_prioridad, nombre_prioridad) VALUES (1, 'Flagrancia'), (2, 'Flagrancia con detenido'), (3, 'Alta'), (4, 'Media');`
 
@@ -118,9 +141,6 @@ const user_default_perito = `
                             INSERT INTO estado_usuario (id_estado_usuario, id_usuario, id_estado) VALUES 
                             (1, 2, 1);
                             INSERT INTO usuario_tipo_departamento (id_usuario_tipo_departamento, id_usuario, id_tipo_departamento) VALUES (1, 2, 1);
-                            INSERT INTO usuario_especialidad (id_usuario_especialidad, id_usuario, id_especialidad) VALUES 
-                            (1, 2, 1),
-                            (2, 2, 2);
                             INSERT INTO usuario_turno (id_usuario_turno, id_usuario, id_turno) VALUES 
                             (1, 2, 1);
                             `;
@@ -128,17 +148,90 @@ const user_default_mesadepartesa = `INSERT INTO usuario (id_usuario, CIP, nombre
                             INSERT INTO usuario_rol (id_usuario_rol, id_usuario, id_rol) VALUES (3,3,3);
                             `
 
+const tipo_examen_departamento = `INSERT INTO tipo_de_examen_departamento (id_tipo_departamento, id_tipo_de_examen) VALUES
+                            (2, 1),
+                            (2, 2),
+                            (2, 3),
+                            (2, 4),
+                            (2, 5),
+                            (2, 6),
+                            (2, 7),
+                            (3, 8),
+                            (3, 9),
+                            (3, 10),
+                            (3, 11),
+                            (3, 12),
+                            (4, 13),
+                            (4, 14),
+                            (4, 15),
+                            (4, 16),
+                            (4, 17),
+                            (4, 18),
+                            (4, 19),
+                            (4, 20),
+                            (4, 21),
+                            (4, 23),
+                            (4, 24),
+                            (4, 25),
+                            (4, 26),
+                            (4, 27),
+                            (5, 28),
+                            (5, 28),
+                            (5, 29),
+                            (5, 30),
+                            (5, 31),
+                            (5, 32),
+                            (6, 33),
+                            (6, 34),
+                            (6, 35),
+                            (6, 36),
+                            (6, 37),
+                            (7, 38),
+                            (7, 39),
+                            (7, 40),
+                            (7, 41),
+                            (7, 42),
+                            (7, 43),
+                            (7, 44),
+                            (7, 45),
+                            (7, 46),
+                            (7, 47),
+                            (7, 48),
+                            (7, 49),
+                            (7, 50),
+                            (8, 51),
+                            (8, 52),
+                            (8, 53),
+                            (8, 54),
+                            (8, 55),
+                            (8, 56),
+                            (8, 57),
+                            (9, 58),
+                            (9, 59),
+                            (9, 60),
+                            (9, 61),
+                            (9, 62),
+                            (10, 63),
+                            (10, 64),
+                            (10, 65),
+                            (10, 66),
+                            (10, 67),
+                            (10, 68),
+                            (10, 69),
+                            (10, 70);`
+
 const dbseed = `  
                 ${deleteAll}
                 ${roles}              
                 ${estados}                
                 ${tipos_departamento}                
-                ${tipos_prioridad_oficio}                
-                ${especialidades}                              
+                ${tipos_prioridad_oficio}                                            
                 ${grados}                
+                ${tipo_de_examen}                
                 ${turnos}                               
                 ${user_default_admin}                
                 ${user_default_perito}                
+                ${tipo_examen_departamento}                
                 ${user_default_mesadepartesa}                
 `;
 
