@@ -11,7 +11,6 @@ const deleteTables = `
         tipos_prioridad,
         estado,
         tipo_departamento,
-        especialidad,
         tipo_de_examen,
         grado,
         turno,
@@ -20,7 +19,6 @@ const deleteTables = `
         usuario,
         administrador,
         perito,
-        usuario_especialidad,
         usuario_tipo_departamento,
         usuario_grado,
         usuario_rol,
@@ -61,12 +59,6 @@ const tipos_departamento = `CREATE TABLE tipo_departamento (
     descripcion TEXT
 );`
 
-
-const especialidad = `CREATE TABLE especialidad (
-    id_especialidad INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(60) UNIQUE NOT NULL
-);`
-
 const grado = `CREATE TABLE grado (
     id_grado INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(60) UNIQUE NOT NULL
@@ -79,7 +71,7 @@ const turno = `CREATE TABLE turno (
 
 const tipo_de_examen = `CREATE TABLE tipo_de_examen (
     id_tipo_de_examen INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(100) NOT NULL,
+    nombre VARCHAR(300) NOT NULL,
     descripcion TEXT
 );`
 
@@ -140,18 +132,6 @@ const peritos = `CREATE TABLE perito (
     CONSTRAINT chk_dni_format CHECK (dni REGEXP '^[0-9]{8}$'),
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
         ON DELETE CASCADE ON UPDATE CASCADE
-);`
-
-// -- Tablas de relación
-const usuario_especialidad = `CREATE TABLE usuario_especialidad (
-    id_usuario_especialidad INT PRIMARY KEY AUTO_INCREMENT,
-    id_usuario INT NOT NULL,
-    id_especialidad INT NOT NULL,
-    fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
-        ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (id_especialidad) REFERENCES especialidad(id_especialidad)
-        ON DELETE RESTRICT ON UPDATE CASCADE
 );`
 
 const usuario_grado = `CREATE TABLE usuario_grado (
@@ -495,7 +475,6 @@ const createTables = `
     ${tipos_prioridad}
     ${estados}
     ${tipos_departamento}
-    ${especialidad}
     ${grado}
     ${tipo_de_examen}
     ${turno}
@@ -504,7 +483,6 @@ const createTables = `
     ${administradores}
     ${mesadepartes}
     ${peritos}
-    ${usuario_especialidad}
     ${usuario_tipo_departamento}
     ${usuario_grado}
     ${usuario_rol}
