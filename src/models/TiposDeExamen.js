@@ -18,7 +18,7 @@ export class TiposDeExamen {
          ORDER BY td.id_tipo_departamento`
       );
 
-    // Para cada departamento, obtener sus exámenes específicos
+    // Para cada departamento
     const departamentosConExamenes = await Promise.all(
       rows.map(async (departamento) => {
         const [examenes] = await db
