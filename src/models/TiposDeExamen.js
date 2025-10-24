@@ -2,28 +2,49 @@ import db from "../database/db.js";
 
 export class TiposDeExamen {
   static async findAll() {
-    try {
-      const [rows] = await db
-        .promise()
-        .query(
-          `SELECT 
-             t.id_tipo_de_examen, t.nombre, t.descripcion,
-             GROUP_CONCAT(td.id_tipo_departamento) AS departamento_ids,
-             GROUP_CONCAT(td.nombre_departamento) AS departamentos
-           FROM tipo_de_examen t
-           LEFT JOIN tipo_de_examen_departamento tx ON t.id_tipo_de_examen = tx.id_tipo_de_examen
-           LEFT JOIN tipo_departamento td ON tx.id_tipo_departamento = td.id_tipo_departamento
-           GROUP BY t.id_tipo_de_examen
-           ORDER BY t.id_tipo_de_examen`
-        );
+  try {
+    const [rows] = await db
+      .promise()
+      .query(
+        `SELECT 
+           td.id_tipo_departamento,
+           td.nombre_departamento,
+           td.descripcion AS descripcion_departamento,
+           COUNT(DISTINCT t.id_tipo_de_examen) AS total_examenes
+         FROM tipo_departamento td
+         LEFT JOIN tipo_de_examen_departamento tx ON td.id_tipo_departamento = tx.id_tipo_departamento
+         LEFT JOIN tipo_de_examen t ON tx.id_tipo_de_examen = t.id_tipo_de_examen
+         GROUP BY td.id_tipo_departamento
+         ORDER BY td.id_tipo_departamento`
+      );
 
-      return rows.map((r) => ({
-        id_tipo_de_examen: r.id_tipo_de_examen,
-        nombre: r.nombre,
-        descripcion: r.descripcion,
-        departamento_ids: r.departamento_ids ? r.departamento_ids.split(",").map((v) => Number(v)) : [],
-        departamentos: r.departamentos ? r.departamentos.split(",") : []
-      }));
+    // Para cada departamento
+    const departamentosConExamenes = await Promise.all(
+      rows.map(async (departamento) => {
+        const [examenes] = await db
+          .promise()
+          .query(
+            `SELECT 
+               t.id_tipo_de_examen,
+               t.nombre,
+               t.descripcion
+             FROM tipo_de_examen t
+             INNER JOIN tipo_de_examen_departamento tx ON t.id_tipo_de_examen = tx.id_tipo_de_examen
+             WHERE tx.id_tipo_departamento = ?
+             ORDER BY t.id_tipo_de_examen`,
+            [departamento.id_tipo_departamento]
+          );
+
+        return {
+          id_tipo_departamento: departamento.id_tipo_departamento,
+          nombre_departamento: departamento.nombre_departamento,
+          total_examenes: departamento.total_examenes,
+          examenes: examenes
+        };
+      })
+    );
+
+      return departamentosConExamenes;
     } catch (error) {
       throw error;
     }
