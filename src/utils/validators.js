@@ -309,4 +309,83 @@ export class Validators {
 
     return { isValid: true };
 }
+
+  // Validar datos del oficio
+  static validateOficioData(oficioData) {
+    const errors = [];
+
+    // Validar número de oficio
+    if (!oficioData.numero_oficio?.trim()) {
+        errors.push("Número de oficio es requerido");
+    } else if (oficioData.numero_oficio.length > 20) {
+        errors.push("Número de oficio no puede exceder 20 caracteres");
+    }
+
+    // Validar campos de texto requeridos
+    const requiredFields = {
+        'unidad_solicitante': 150,
+        'unidad_remitente': 150,
+        'region_fiscalia': 150,
+        'asunto': 400,
+        'fecha_hora_incidente': 50,
+        'especialidad_requerida': 200,
+        'tipo_examen': 300,
+        'muestra': 250,
+        'perito_asignado': 250
+    };
+
+    for (const [field, maxLength] of Object.entries(requiredFields)) {
+        if (!oficioData[field]?.trim()) {
+            errors.push(`${field.replace(/_/g, ' ')} es requerido`);
+        } else if (oficioData[field].length > maxLength) {
+            errors.push(`${field.replace(/_/g, ' ')} no puede exceder ${maxLength} caracteres`);
+        }
+    }
+
+    // Validar tipo de muestra
+    if (!oficioData.tipo_de_muestra) {
+        errors.push("Tipo de muestra es requerido");
+    } else if (!['MUESTRAS REMITIDAS', 'TOMA DE MUESTRAS'].includes(oficioData.tipo_de_muestra)) {
+        errors.push("Tipo de muestra debe ser 'MUESTRAS REMITIDAS' o 'TOMA DE MUESTRAS'");
+    }
+
+    // Validar campos condicionales según tipo de muestra
+    if (oficioData.tipo_de_muestra === 'TOMA DE MUESTRAS') {
+        if (!oficioData.examinado_incriminado?.trim()) {
+            errors.push("Examinado/Incriminado es requerido para toma de muestras");
+        }
+        if (!oficioData.dni_examinado_incriminado?.trim()) {
+            errors.push("DNI del examinado/incriminado es requerido para toma de muestras");
+        } else if (!/^\d{8}$/.test(oficioData.dni_examinado_incriminado)) {
+            errors.push("DNI debe contener exactamente 8 dígitos");
+        }
+    }
+
+    // Validar campos numéricos
+    const requiredNumericFields = [
+        'id_especialidad_requerida',
+        'id_tipo_examen',
+        'id_usuario_perito_asignado',
+        'id_prioridad'
+    ];
+
+    for (const field of requiredNumericFields) {
+        if (!oficioData[field] || isNaN(Number(oficioData[field]))) {
+            errors.push(`${field.replace(/_/g, ' ')} debe ser un número válido`);
+        }
+    }
+
+    // Validar CIP del perito
+    if (!oficioData.cip_perito_asignado?.trim()) {
+        errors.push("CIP del perito asignado es requerido");
+    } else if (oficioData.cip_perito_asignado.length > 20) {
+        errors.push("CIP del perito no puede exceder 20 caracteres");
+    }
+
+    if (errors.length > 0) {
+        return { isValid: false, errors };
+    }
+
+    return { isValid: true };
+}
 }
