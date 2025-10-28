@@ -7,7 +7,6 @@ const deleteTables = `
     SET FOREIGN_KEY_CHECKS = 0;
     DROP TABLE IF EXISTS 
         rol, 
-        estados_requerimiento,
         tipos_prioridad,
         estado,
         tipo_departamento,
@@ -25,7 +24,9 @@ const deleteTables = `
         usuario_turno,
         tipo_de_examen_departamento,
         estado_usuario,
-        historial_usuario;
+        historial_usuario,
+        oficio,
+        seguimiento_oficio;
     SET FOREIGN_KEY_CHECKS = 1;
 `
 
@@ -36,15 +37,9 @@ const roles = `CREATE TABLE rol (
     descripcion TEXT
 );`
 
-const estados_requerimientos = `CREATE TABLE estados_requerimiento (
-    id_estado TINYINT PRIMARY KEY AUTO_INCREMENT,
-    nombre_estado VARCHAR(20) NOT NULL UNIQUE,
-    descripcion TEXT
-);`
-
 const tipos_prioridad = `CREATE TABLE tipos_prioridad (
     id_prioridad TINYINT PRIMARY KEY AUTO_INCREMENT,
-    nombre_prioridad VARCHAR(40) NOT NULL UNIQUE
+    nombre_prioridad VARCHAR(100) NOT NULL UNIQUE
 );`
 
 const estados = `CREATE TABLE estado (
@@ -91,8 +86,8 @@ const departamentos = `CREATE TABLE departamentos (
 const usuarios = `CREATE TABLE usuario (
     id_usuario INT PRIMARY KEY AUTO_INCREMENT,
     CIP VARCHAR(20) UNIQUE NOT NULL,
-    nombre_completo VARCHAR(150) NOT NULL,
-    nombre_usuario VARCHAR(60) NOT NULL,
+    nombre_completo VARCHAR(200) NOT NULL,
+    nombre_usuario VARCHAR(150) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -202,6 +197,60 @@ const historial_usuario = `CREATE TABLE historial_usuario (
     id_usuario INT NOT NULL,
     tipo_historial ENUM('ENTRADA', 'SALIDA') NOT NULL,
     fecha_historial TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+);`
+
+const create_oficio = `CREATE TABLE oficio (
+    id_oficio INT AUTO_INCREMENT PRIMARY KEY,
+    numero_oficio VARCHAR(20) UNIQUE NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    unidad_solicitante VARCHAR(150) NOT NULL,
+    unidad_remitente VARCHAR(150) NOT NULL,
+    region_fiscalia VARCHAR(150) NOT NULL,
+    tipo_de_muestra ENUM('MUESTRAS REMITIDAS', 'TOMA DE MUESTRAS') NOT NULL,
+    asunto VARCHAR(400) NOT NULL,
+
+    examinado_incriminado VARCHAR(200),
+    dni_examinado_incriminado VARCHAR(15),
+    fecha_hora_incidente VARCHAR(50) NOT NULL,
+
+    especialidad_requerida VARCHAR(200) NOT NULL,
+    id_especialidad_requerida INT NOT NULL,
+    tipo_examen VARCHAR(300) NOT NULL,
+    id_tipo_examen INT NOT NULL,
+ 
+    muestra VARCHAR(250) NOT NULL,
+    perito_asignado VARCHAR(250) NOT NULL,
+    cip_perito_asignado VARCHAR(20) NOT NULL,
+    id_usuario_perito_asignado INT NOT NULL,
+
+    id_prioridad TINYINT NOT NULL,
+
+    creado_por INT NOT NULL,
+    actualizado_por INT NOT NULL,
+    
+    FOREIGN KEY (id_prioridad) REFERENCES tipos_prioridad(id_prioridad),
+    FOREIGN KEY (id_especialidad_requerida) REFERENCES tipo_departamento(id_tipo_departamento),
+    FOREIGN KEY (id_usuario_perito_asignado) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (creado_por) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (actualizado_por) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_tipo_examen) REFERENCES tipo_de_examen(id_tipo_de_examen)
+);`
+
+// estados del oficio - ('CREACION DEL OFICIO', 'OFICIO VISTO', 'OFICIO EN PROCESO', 'COMPLETADO')
+
+const seguimiento_oficio = `CREATE TABLE seguimiento_oficio (
+    id_seguimiento INT AUTO_INCREMENT PRIMARY KEY,
+    id_oficio INT NOT NULL,
+    id_usuario INT NOT NULL,
+    fecha_seguimiento TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    estado_anterior VARCHAR(150),
+    estado_nuevo VARCHAR(150),
+    
+    FOREIGN KEY (id_oficio) REFERENCES oficio(id_oficio),
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
 );`
 
@@ -471,7 +520,6 @@ const historial_usuario = `CREATE TABLE historial_usuario (
 const createTables = `
     ${deleteTables}
     ${roles}
-    ${estados_requerimientos}
     ${tipos_prioridad}
     ${estados}
     ${tipos_departamento}
@@ -490,6 +538,8 @@ const createTables = `
     ${tipo_de_examen_departamento}
     ${estado_usuario}
     ${historial_usuario}
+    ${create_oficio}
+    ${seguimiento_oficio}
 `
 
 db.query(createTables, (err, result)=>{
