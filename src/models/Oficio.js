@@ -260,4 +260,69 @@ export class Oficio {
       return { success: false, message: "Error al obtener el seguimiento" };
     }
   }
+
+  // Buscar oficios asignados al usuario (por id_usuario o por CIP)
+  static async findAssignedToUser({ id_usuario = null, CIP = null, excludeCompleted = true }) {
+    try {
+      const params = [];
+      let userCond = '';
+      if (id_usuario) {
+        userCond = 'o.id_usuario_perito_asignado = ?';
+        params.push(id_usuario);
+      }
+      if (CIP) {
+        if (userCond) userCond += ' OR ';
+        userCond += `o.id_usuario_perito_asignado = (SELECT id_usuario FROM usuario WHERE CIP = ?)`;
+        params.push(CIP);
+      }
+      if (!userCond) {
+        return { success: false, message: 'Se require id_usuario o CIP' };
+      }
+
+      // obtener último seguimiento por oficio
+      const query = `
+        SELECT o.*,
+               tp.nombre_prioridad,
+               td.nombre_departamento AS especialidad,
+               s.estado_nuevo AS ultimo_estado,
+               s.fecha_seguimiento AS ultimo_fecha
+        FROM oficio o
+        LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
+        LEFT JOIN tipo_departamento td ON o.id_especialidad_requerida = td.id_tipo_departamento
+        LEFT JOIN (
+          SELECT s1.id_oficio, s1.estado_nuevo, s1.fecha_seguimiento
+          FROM seguimiento_oficio s1
+          INNER JOIN (
+            SELECT id_oficio, MAX(fecha_seguimiento) AS max_fecha
+            FROM seguimiento_oficio
+            GROUP BY id_oficio
+          ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
+        ) s ON s.id_oficio = o.id_oficio
+        WHERE (${userCond})
+        ${excludeCompleted ? "AND (s.estado_nuevo IS NULL OR s.estado_nuevo != 'COMPLETADO')" : ""}
+        ORDER BY s.fecha_seguimiento DESC, o.fecha_creacion DESC
+      `;
+
+      const [rows] = await db.promise().query(query, params);
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error en findAssignedToUser:', error);
+      return { success: false, message: 'Error al obtener oficios asignados' };
+    }
+  }
+
+  // Agregar seguimiento
+  static async addSeguimiento({ id_oficio, id_usuario, estado_anterior = null, estado_nuevo = null }) {
+    try {
+      const [result] = await db.promise().query(
+        `INSERT INTO seguimiento_oficio (id_oficio, id_usuario, estado_anterior, estado_nuevo)
+         VALUES (?, ?, ?, ?)`,
+        [id_oficio, id_usuario, estado_anterior, estado_nuevo]
+      );
+      return { success: true, data: { id_seguimiento: result.insertId } };
+    } catch (error) {
+      console.error('Error en addSeguimiento:', error);
+      return { success: false, message: 'Error al agregar seguimiento' };
+    }
+  }
 }
