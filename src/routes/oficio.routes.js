@@ -8,20 +8,24 @@ const router = Router();
 router.use(authenticateToken);
 
 // Rutas GET
-
-// Obtener todos los oficios
 router.get('/', OficioController.getAllOficios);
 
 // Para validar que el numero de oficio no existe 
 router.get('/check/:numero', OficioController.checkNumero);
 
-// Obtener oficio segun id
-router.get('/:id', OficioController.getOficioById);
+// Obtener oficios asignados al usuario autenticado (ruta específica)
+router.get('/assigned', OficioController.getAssignedToUser);
 
-// Seguimiento
+// Obtener seguimiento
 router.get('/:id/seguimiento', OficioController.getSeguimientoOficio);
+
+// Obtener oficio segun id (ruta dinámica debe ir al final de las GET específicas)
+router.get('/:id', OficioController.getOficioById);
 
 // Ruta POST - crear
 router.post('/', OficioController.createOficio);
+
+// Responder/registrar seguimiento en un oficio (perito responde)
+router.post('/:id/respond', OficioController.respondToOficio);
 
 export default router;

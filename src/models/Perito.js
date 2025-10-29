@@ -155,7 +155,7 @@ export class Perito {
   static async findByCIPPerito(cip){
     try {
       const [rows] = await db.promise().query(
-        `SELECT us.CIP, us.nombre_completo, us.nombre_usuario, us.password_hash, r.nombre_rol, td.nombre_departamento, g.nombre AS nombre_grado
+        `SELECT us.id_usuario,us.CIP, us.nombre_completo, us.nombre_usuario, us.password_hash, r.nombre_rol, td.nombre_departamento, g.nombre AS nombre_grado
          FROM usuario AS us
          INNER JOIN usuario_grado as ug ON ug.id_usuario = us.id_usuario
          INNER JOIN grado as g ON g.id_grado = ug.id_grado
