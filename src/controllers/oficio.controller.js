@@ -132,4 +132,62 @@ export class OficioController {
       });
     }
   }
+
+  // Obtener oficios asignados al usuario
+  static async getAssignedToUser(req, res) {
+    try {
+      const userId = req.user?.id_usuario ?? null;
+      const userCIP = req.user?.CIP ?? null;
+
+      const result = await Oficio.findAssignedToUser({ id_usuario: userId, CIP: userCIP, excludeCompleted: true });
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+      return res.json({ success: true, data: result.data });
+    } catch (error) {
+      console.error('Error en getAssignedToUser:', error);
+      return res.status(500).json({ success: false, message: 'Error interno al obtener oficios asignados' });
+    }
+  }
+
+  // actualizar seguimiento de un oficio
+  static async respondToOficio(req, res) {
+    try {
+      const { id } = req.params;
+      const { estado_nuevo, estado_anterior = null, comentario = null } = req.body;
+
+      if (!id) {
+        return res.status(400).json({ success: false, message: 'ID de oficio requerido' });
+      }
+      if (!estado_nuevo || String(estado_nuevo).trim() === '') {
+        return res.status(400).json({ success: false, message: 'Estado nuevo es requerido' });
+      }
+
+      const id_usuario = req.user?.id_usuario;
+      if (!id_usuario) {
+        return res.status(400).json({ success: false, message: 'Usuario no identificado' });
+      }
+
+      // Insertar seguimiento
+      const seguimientoResult = await Oficio.addSeguimiento({
+        id_oficio: Number(id),
+        id_usuario,
+        estado_anterior,
+        estado_nuevo
+      });
+
+      if (!seguimientoResult.success) {
+        return res.status(500).json({ success: false, message: seguimientoResult.message || 'Error al guardar seguimiento' });
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: 'Seguimiento creado correctamente',
+        data: { id_seguimiento: seguimientoResult.data.id_seguimiento }
+      });
+    } catch (error) {
+      console.error('Error en respondToOficio:', error);
+      return res.status(500).json({ success: false, message: 'Error interno al responder oficio' });
+    }
+  }
 }
