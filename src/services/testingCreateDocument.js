@@ -39,16 +39,12 @@ const obtainRefreshToken = async (oAuth2Client) => {
     scope: SCOPES,
     prompt: 'consent'
   });
-
-  console.log('1) Abre esta URL en el navegador y concede acceso:\n', authUrl);
   const code = await prompt('2) Pega aquí el código que obtuviste y presiona Enter: ');
 
   const { tokens } = await oAuth2Client.getToken(code.trim());
   if (!tokens.refresh_token) {
     console.warn('No se obtuvo refresh_token. Repite con "prompt: consent" y asegúrate de usar una cuenta de usuario.');
   }
-  console.log('Tokens obtenidos:\n', tokens);
-  console.log('\nCopia el valor refresh_token en tu .env como GOOGLE_OAUTH_REFRESH_TOKEN y reinicia el script.');
   return tokens.refresh_token || tokens;
 };
 
@@ -93,9 +89,6 @@ const main = async () => {
     const name = 'test.txt';
     const mimeType = 'text/plain';
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || undefined;
-
-    console.log('Subiendo', filePath, 'a Google Drive (folderId:', folderId, ')');
-
     const result = await uploadFileToDrive({
       auth: oAuth2Client,
       filePath,
@@ -105,10 +98,8 @@ const main = async () => {
     });
 
     if (result.success) {
-      console.log('Archivo subido correctamente:', result.data);
       process.exit(0);
     } else {
-      console.error('Error al subir archivo:', result.message || result.error);
       process.exit(1);
     }
   } catch (err) {
