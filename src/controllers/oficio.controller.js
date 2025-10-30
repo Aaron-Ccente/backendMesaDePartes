@@ -150,6 +150,23 @@ export class OficioController {
     }
   }
 
+  // Obtener alertas de oficios con estado CREACION DEL OFICIO
+  static async getAlertas(req, res) {
+    try {
+      const userId = req.user?.id_usuario ?? null;
+      const userCIP = req.user?.CIP ?? null;
+
+      const result = await Oficio.getCountNewOficios({ id_usuario: userId, CIP: userCIP });
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+      return res.json({ success: true, data: result.data });
+    } catch (error) {
+      console.error('Error en getAlertas:', error);
+      return res.status(500).json({ success: false, message: 'Error interno al obtener alertas' });
+    }
+  }
+
   // actualizar seguimiento de un oficio
   static async respondToOficio(req, res) {
     try {

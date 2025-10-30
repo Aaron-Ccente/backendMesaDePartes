@@ -1,31 +1,30 @@
 import { Router } from 'express';
 import { OficioController } from '../controllers/oficio.controller.js';
-import { authenticateToken } from '../middleware/authMiddleware.js';
+import { authenticateToken, requireMesaDePartes, requirePerito } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
 // Todas las rutas requieren autenticación
 router.use(authenticateToken);
 
-// Rutas GET
-router.get('/', OficioController.getAllOficios);
+// ========== RUTAS ESPECÍFICAS ==========
 
-// Para validar que el numero de oficio no existe 
+// Rutas GET públicas (para usuarios autenticados)
+router.get('/', OficioController.getAllOficios);
 router.get('/check/:numero', OficioController.checkNumero);
 
-// Obtener oficios asignados al usuario autenticado (ruta específica)
-router.get('/assigned', OficioController.getAssignedToUser);
+// Solo para peritos
+router.get('/assigned', requirePerito, OficioController.getAssignedToUser);
+router.get('/alerts', requirePerito, OficioController.getAlertas);
 
-// Obtener seguimiento
-router.get('/:id/seguimiento', OficioController.getSeguimientoOficio);
+// Solo para mesa de partes
+router.post('/', requireMesaDePartes, OficioController.createOficio);
 
-// Obtener oficio segun id (ruta dinámica debe ir al final de las GET específicas)
+// ========== RUTAS CON PARÁMETROS ==========
+
+// Rutas con parámetros
 router.get('/:id', OficioController.getOficioById);
-
-// Ruta POST - crear
-router.post('/', OficioController.createOficio);
-
-// Responder/registrar seguimiento en un oficio (perito responde)
-router.post('/:id/respond', OficioController.respondToOficio);
+router.get('/:id/seguimiento', OficioController.getSeguimientoOficio);
+router.post('/:id/respond', requirePerito, OficioController.respondToOficio);
 
 export default router;

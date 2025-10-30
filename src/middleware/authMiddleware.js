@@ -44,6 +44,46 @@ export const requireAdmin = async (req, res, next) => {
   }
 };
 
+export const requireMesaDePartes = async (req, res, next) => {
+  try {
+    // Verificar que el usuario tenga rol de mesa de partes
+    if (!req.user || req.user.role !== 'mesadepartes') {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. Se requieren permisos de mesa de partes'
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('Error en requireMesaDePartes:', error);
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso denegado'
+    });
+  }
+};
+
+export const requirePerito = async (req, res, next) => {
+  try {
+    // Verificar que el usuario tenga rol de perito
+    if (!req.user || req.user.role !== 'perito') {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. Se requieren permisos de perito'
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('Error en requirePerito:', error);
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso denegado'
+    });
+  }
+};
+
 export const validateAdminExists = async (req, res, next) => {
   try {
     // Verificar que el administrador aún existe en la base de datos
