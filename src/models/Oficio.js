@@ -17,6 +17,43 @@ export class Oficio {
     }
   }
 
+  static async getCountNewOficios({ id_usuario = null, CIP = null }) {
+  try {
+    const params = [];
+    let userCond = '';
+    
+    if (id_usuario) {
+      userCond = 'o.id_usuario_perito_asignado = ?';
+      params.push(id_usuario);
+    }
+    if (CIP) {
+      if (userCond) userCond += ' OR ';
+      userCond += `o.id_usuario_perito_asignado = (SELECT id_usuario FROM usuario WHERE CIP = ?)`;
+      params.push(CIP);
+    }
+    if (!userCond) {
+      return { success: false, message: 'Se requiere id_usuario o CIP' };
+    }
+
+    const query = `
+      SELECT COUNT(*) AS count_new_oficios
+      FROM oficio o
+      WHERE (${userCond})
+      AND o.id_oficio NOT IN (
+        SELECT DISTINCT id_oficio 
+        FROM seguimiento_oficio 
+        WHERE estado_nuevo IN ('OFICIO VISTO', 'OFICIO EN PROCESO', 'COMPLETADO')
+      )
+    `;
+
+    const [rows] = await db.promise().query(query, params);
+    return { success: true, data: rows[0].count_new_oficios };
+  } catch (error) {
+    console.error('Error en getCountNewOficios:', error);
+    return { success: false, message: "Error al obtener el conteo de nuevos oficios" };
+  }
+}
+
   static async findById(id_oficio) {
     try {
       const [oficios] = await db.promise().query(
