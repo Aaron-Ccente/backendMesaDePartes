@@ -39,7 +39,7 @@ export class Perito {
   static async findAccordingToSpecialty(id_especialidad){
     try {
       const [rows] = await db.promise().query(
-        `SELECT u.nombre_completo, u.id_usuario FROM usuario AS u 
+        `SELECT u.nombre_completo, u.id_usuario, u.CIP, u.nombre_completo FROM usuario AS u 
         LEFT JOIN usuario_tipo_departamento AS utp ON u.id_usuario = utp.id_usuario 
         LEFT JOIN tipo_departamento AS td ON utp.id_tipo_departamento = td.id_tipo_departamento
         WHERE utp.id_tipo_departamento = ?`,
@@ -155,7 +155,7 @@ export class Perito {
   static async findByCIPPerito(cip){
     try {
       const [rows] = await db.promise().query(
-        `SELECT us.CIP, us.nombre_completo, us.nombre_usuario, us.password_hash, r.nombre_rol, td.nombre_departamento, g.nombre AS nombre_grado
+        `SELECT us.id_usuario,us.CIP, us.nombre_completo, us.nombre_usuario, us.password_hash, r.nombre_rol, td.nombre_departamento, g.nombre AS nombre_grado
          FROM usuario AS us
          INNER JOIN usuario_grado as ug ON ug.id_usuario = us.id_usuario
          INNER JOIN grado as g ON g.id_grado = ug.id_grado

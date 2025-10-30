@@ -307,6 +307,7 @@ export class PeritoController {
 
       // Generar JWT (24h)
       const payload = {
+        id_usuario: perito.id_usuario,
         CIP: perito.CIP,
         nombre_usuario: perito.nombre_usuario,
         nombre_completo: perito.nombre_completo,
