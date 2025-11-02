@@ -5,6 +5,7 @@ import { JWT_SECRET } from '../config/config.js';
 export class AuthService {
   static generateToken(adminData) {
     const payload = {
+      id_usuario: adminData.id_usuario,
       CIP: adminData.CIP,
       nombre_usuario: adminData.nombre_usuario,
       nombre_completo: adminData.nombre_completo,
@@ -35,6 +36,7 @@ export class AuthService {
         message: 'Login exitoso',
         token,
         admin: {
+          id_usuario: admin.id_usuario,
           CIP: admin.CIP,
           nombre_usuario: admin.nombre_usuario,
           nombre_completo: admin.nombre_completo
