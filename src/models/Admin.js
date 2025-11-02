@@ -64,11 +64,25 @@ export class Admin {
     }
   }
   
+  // Logout para administradores
+  static async logOutAdmin({id_usuario}){
+      try {
+      const [result] = await db.promise().query(
+        'INSERT INTO historial_usuario (id_usuario, tipo_historial) VALUES (?, ?)',
+        [id_usuario, 'SALIDA']
+      );
+      
+      return result.affectedRows > 0;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Buscar administrador por CIP
   static async findByCIP(CIP) {
     try {
       const [rows] = await db.promise().query(
-        'SELECT CIP, nombre_usuario, password_hash, nombre_completo FROM usuario AS us LEFT JOIN usuario_rol AS ur ON us.id_usuario = ur.id_usuario LEFT JOIN rol AS r ON ur.id_rol = r.id_rol WHERE CIP = ? AND r.nombre_rol = "ADMINISTRADOR"',
+        'SELECT us.id_usuario, CIP, nombre_usuario, password_hash, nombre_completo FROM usuario AS us LEFT JOIN usuario_rol AS ur ON us.id_usuario = ur.id_usuario LEFT JOIN rol AS r ON ur.id_rol = r.id_rol WHERE CIP = ? AND r.nombre_rol = "ADMINISTRADOR"',
         [CIP]
       );
       
@@ -107,7 +121,9 @@ export class Admin {
       if (!isPasswordValid) {
         return null;
       }
-      
+
+      // Insertar el timpo exacto de login del usuario para auditoria
+      await this.logLogin(admin.id_usuario);
       // Retornar datos del administrador sin la contraseña
       const { password_hash, ...adminData } = admin;
       return adminData;
@@ -150,6 +166,20 @@ export class Admin {
       const [result] = await db.promise().query(
         'DELETE FROM usuario WHERE CIP = ?',
         [CIP]
+      );
+      
+      return result.affectedRows > 0;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Agregar login para la auditoria del usuario
+  static async logLogin(id_usuario) {
+    try {
+      const [result] = await db.promise().query(
+        'INSERT INTO historial_usuario (id_usuario, tipo_historial) VALUES (?, ?)',
+        [id_usuario, 'ENTRADA']
       );
       
       return result.affectedRows > 0;

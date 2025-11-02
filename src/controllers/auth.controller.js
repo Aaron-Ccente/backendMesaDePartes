@@ -1,3 +1,4 @@
+import { Admin } from '../models/Admin.js';
 import { AuthService } from '../services/authService.js';
 import { Validators } from '../utils/validators.js';
 
@@ -18,6 +19,38 @@ export class AuthController {
         return res.status(401).json({ success: false, message: 'Credenciales inválidas' });
       }
       return res.status(500).json({ success: false, message: 'Error interno del servidor', error: error.message });
+    }
+  }
+
+ // LogOut de un usuario administrador
+  static async logoutAdmin(req, res){
+    try {
+      const userId = req.admin?.id_usuario || req.user?.id_usuario || null;
+      // procesar el logout pero sin operación en BD
+      if (!userId) {
+        console.warn('Logout sin ID de usuario - limpiando sesión del lado del cliente');
+        return res.json({ 
+          success: true, 
+          message: 'Sesión cerrada correctamente',
+          data: { logout_completed: true }
+        });
+      }
+
+      const result = await Admin.logOutAdmin({ id_usuario: userId });
+      if (!result) {
+        return res.status(500).json(result);
+      }
+      return res.json({ 
+        success: true, 
+        message: 'Sesión cerrada correctamente',
+      });
+    } catch (error) {
+      console.error('Error en logoutAdmin:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Error interno al realizar logout', 
+        error: error.message 
+      });
     }
   }
 
