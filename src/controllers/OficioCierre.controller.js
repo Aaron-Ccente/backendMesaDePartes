@@ -1,12 +1,10 @@
 // backend/src/controllers/OficioCierre.controller.js
 import { OficioArchivos } from '../models/OficioArchivos.js';
 import { Oficio } from '../models/Oficio.js';
-import db from '../database/db.js'; // Importamos la conexión para transacciones
-import { OficioArchivos } from '../models/OficioArchivos.js';
-import { Oficio } from '../models/Oficio.js';
 import db from '../database/db.js';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 /**
  * Controlador para gestionar el cierre de oficios y la subida de archivos locales.
  */
