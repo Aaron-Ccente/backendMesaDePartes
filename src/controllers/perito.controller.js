@@ -360,4 +360,39 @@ export class PeritoController {
       });
     }
   }
+  // Obtiene la carga de trabajo de los peritos por sección
+  static async getCargaTrabajoPorSeccion(req, res) {
+    try {
+      // 1. Obtener el ID de la sección desde los query params (ej: /api/peritos/carga?seccion=6)
+      const { seccion } = req.query;
+      if (!seccion || isNaN(Number(seccion))) {
+        return res.status(400).json({
+          success: false,
+          message: "Se requiere un ID de sección numérico (ej: ?seccion=6)",
+        });
+      }
+
+      // 2. Llamar a la nueva función del modelo
+      const result = await Perito.findCargaTrabajoPorSeccion(Number(seccion));
+
+      if (!result.success) {
+         // Esto es por si el modelo mismo devuelve un error de lógica (aunque el nuestro no lo hace)
+         return res.status(500).json(result);
+      }
+
+      // 3. Devolver los datos
+      return res.status(200).json({
+        success: true,
+        data: result.data,
+      });
+
+    } catch (error) {
+      console.error('Error en getCargaTrabajoPorSeccion:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor al obtener la carga de trabajo',
+        error: error.message,
+      });
+    }
+  }
 }
