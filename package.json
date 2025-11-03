@@ -5,12 +5,17 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon server.js"
+    "start": "nodemon server.js",
+    "migrate:make": "knex migrate:make --esm -x js",
+    "migrate:latest": "knex migrate:latest --knexfile ./knexfile.js",
+    "migrate:rollback": "knex migrate:rollback --knexfile ./knexfile.js",
+    "seed:make": "knex seed:make --esm -x js",
+    "seed:run": "knex seed:run --knexfile ./knexfile.js"
   },
   "keywords": [],
   "author": "Aaron Ccente Rojas",
   "license": "ISC",
-  "description": "Sistema de gestión documentaria de la OFICRI - Huancayo",
+  "description": "Sistema de gestion documentaria de la OFICRI - Huancayo",
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
@@ -19,6 +24,7 @@
     "fs": "^0.0.1-security",
     "googleapis": "^160.0.0",
     "jsonwebtoken": "^9.0.2",
+    "knex": "^3.1.0",
     "multer": "^2.0.2",
     "mysql2": "^3.14.3",
     "nodemon": "^3.1.10",
