@@ -349,17 +349,91 @@ export class Oficio {
   }
 
   // Agregar seguimiento
-  static async addSeguimiento({ id_oficio, id_usuario, estado_anterior = null, estado_nuevo = null }) {
+  // (MODIFICADO para aceptar transacciones)
+  static async addSeguimiento({ id_oficio, id_usuario, estado_anterior = null, estado_nuevo = null }, connection = null) {
+    // Si no se pasa una conexión, usa el pool por defecto. Si se pasa, usa la transacción.
+    const dbConn = connection || db.promise();
+    
     try {
-      const [result] = await db.promise().query(
+      const [result] = await dbConn.query(
         `INSERT INTO seguimiento_oficio (id_oficio, id_usuario, estado_anterior, estado_nuevo)
          VALUES (?, ?, ?, ?)`,
         [id_oficio, id_usuario, estado_anterior, estado_nuevo]
       );
+      
       return { success: true, data: { id_seguimiento: result.insertId } };
+
     } catch (error) {
       console.error('Error en addSeguimiento:', error);
+      // Si estamos en una transacción, solo propagamos el error sin lanzar
+      if (connection) throw error; 
+      
       return { success: false, message: 'Error al agregar seguimiento' };
+    }
+    // No liberamos la conexión si es una transacción externa
+  }
+  /**
+   * Reasigna un oficio a un nuevo perito y actualiza el estado de seguimiento.
+   * Se ejecuta como una transacción para asegurar la integridad de los datos.
+   * @param {number} id_oficio - ID del oficio a reasignar
+   * @param {number} id_nuevo_perito - ID del usuario (perito) que recibe el caso
+   * @param {number} id_perito_actual - ID del usuario (perito) que deriva el caso
+   * @param {string} nombre_seccion_destino - Nombre de la sección a la que se deriva
+   */
+  static async reasignarPerito(id_oficio, id_nuevo_perito, id_perito_actual, nombre_seccion_destino = 'OTRA SECCIÓN') {
+    const connection = await db.promise().getConnection(); // Obtener una conexión para la transacción
+    try {
+      await connection.beginTransaction(); // Iniciar transacción
+
+      // 1. Obtener los datos del nuevo perito
+      const [peritoInfo] = await connection.query(
+        'SELECT nombre_completo, CIP FROM usuario WHERE id_usuario = ?',
+        [id_nuevo_perito]
+      );
+
+      if (peritoInfo.length === 0) {
+        throw new Error('El perito de destino no existe (ID: ' + id_nuevo_perito + ')');
+      }
+
+      // 2. Actualizar el perito asignado en la tabla principal 'oficio'
+      await connection.query(
+        `UPDATE oficio SET 
+           id_usuario_perito_asignado = ?,
+           perito_asignado = ?,
+           cip_perito_asignado = ?
+         WHERE id_oficio = ?`,
+        [
+          id_nuevo_perito,
+          peritoInfo[0].nombre_completo,
+          peritoInfo[0].CIP,
+          id_oficio
+        ]
+      );
+
+      // 3. Añadir un registro en 'seguimiento_oficio'
+      const nuevo_estado = `DERIVADO A: ${String(nombre_seccion_destino).toUpperCase()}`;
+      
+      // Llamamos a addSeguimiento PASÁNDOLE la conexión de la transacción
+      await Oficio.addSeguimiento({
+        id_oficio: id_oficio,
+        id_usuario: id_perito_actual, // El perito que HACE la derivación
+        estado_nuevo: nuevo_estado,
+        estado_anterior: null // addSeguimiento manejará esto
+      }, connection); 
+
+      await connection.commit(); // Confirmar transacción
+      
+      return { 
+        success: true, 
+        message: 'Oficio reasignado y seguimiento actualizado.' 
+      };
+
+    } catch (error) {
+      await connection.rollback(); // Revertir en caso de error
+      console.error('Error en Oficio.reasignarPerito:', error);
+      throw error; // Propagar el error al controlador
+    } finally {
+      connection.release(); // Liberar la conexión al pool
     }
   }
 }

@@ -16,7 +16,8 @@ router.post('/logout', PeritoController.logoutPerito);
 
 // Obtener peritos segun la especialidad selecccionada
 router.get('/especialidad', PeritoController.getAllPeritoAccordingToSpecialty)
-
+// Obtiene la carga de trabajo de los peritos de una sección específica (requiere token)
+router.get('/carga_por_seccion', PeritoController.getCargaTrabajoPorSeccion);
 // RUTAS PROTEGIDAS (requieren autenticación de administrador)
 
 router.use(requireAdmin);
