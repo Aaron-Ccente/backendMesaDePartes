@@ -28,6 +28,8 @@ export class MesaDePartesController {
         });
       }
 
+      // Agregar estado de ENTRADA para su historial de sesiones
+      await MesaDePartes.addSessionHistory(mesadepartes.id_usuario, 'ENTRADA');
       // Verificar contraseña
       const isValidPassword = await bcrypt.compare(
         password_hash,
@@ -42,6 +44,7 @@ export class MesaDePartesController {
 
       // Generar JWT (24h)
       const payload = {
+        id_usuario: mesadepartes.id_usuario,
         CIP: mesadepartes.CIP,
         nombre_usuario: mesadepartes.nombre_usuario,
         nombre_completo: mesadepartes.nombre_completo,
@@ -70,6 +73,37 @@ export class MesaDePartesController {
           error: error.message,
         });
     }
+  }
+
+  static async logoutMesaDePartes(req, res){
+    try {
+          const userId = req.user?.id_usuario || null;
+          // procesar el logout pero sin operación en BD
+          if (!userId) {
+            console.warn('Logout sin ID de usuario - limpiando sesión del lado del cliente');
+            return res.json({ 
+              success: true, 
+              message: 'Sesión cerrada correctamente',
+              data: { logout_completed: true }
+            });
+          }
+    
+          const result = await MesaDePartes.logOutMesaDePartes({ id_usuario: userId });
+          if (!result) {
+            return res.status(500).json(result);
+          }
+          return res.json({ 
+            success: true, 
+            message: 'Sesión cerrada correctamente',
+          });
+        } catch (error) {
+          console.error('Error en logOutMesaDePartes:', error);
+          return res.status(500).json({ 
+            success: false, 
+            message: 'Error interno al realizar logout', 
+            error: error.message 
+          });
+        }
   }
 
   static async createMesaDePartes(req, res){
