@@ -19,6 +19,17 @@ export class MesaDePartes{
     }
   }
 
+  static async addSessionHistory(id_usuario, tipo_historial) {
+    try {
+      const [result] = await db.promise().query( 
+        'INSERT INTO historial_usuario (id_usuario, tipo_historial) VALUES (?, ?)',
+        [id_usuario, tipo_historial]
+      );
+      return result.affectedRows > 0;
+    } catch (error) {
+      throw error;
+    }
+  }
 
     static async create(data){
     const connection = await db.promise().getConnection();
@@ -76,6 +87,20 @@ export class MesaDePartes{
       throw new Error(`Error al crear usuario de mesa de partes: ${error.message}`);
     } finally {
       connection.release();
+    }
+  }
+
+    // Logout para administradores
+  static async logOutMesaDePartes({id_usuario}){
+      try {
+      const [result] = await db.promise().query(
+        'INSERT INTO historial_usuario (id_usuario, tipo_historial) VALUES (?, ?)',
+        [id_usuario, 'SALIDA']
+      );
+      
+      return result.affectedRows > 0;
+    } catch (error) {
+      throw error;
     }
   }
 
