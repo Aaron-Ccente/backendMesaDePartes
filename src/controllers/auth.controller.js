@@ -25,7 +25,7 @@ export class AuthController {
  // LogOut de un usuario administrador
   static async logoutAdmin(req, res){
     try {
-      const userId = req.admin?.id_usuario || req.user?.id_usuario || null;
+      const userId = req.user?.id_usuario || null;
       // procesar el logout pero sin operación en BD
       if (!userId) {
         console.warn('Logout sin ID de usuario - limpiando sesión del lado del cliente');
