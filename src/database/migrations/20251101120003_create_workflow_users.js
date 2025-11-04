@@ -1,7 +1,6 @@
 // backend/src/database/migrations/20251101120003_create_workflow_users.js
 import bcrypt from 'bcryptjs';
 
-// NOTA: Este archivo fue creado manualmente.
 // Contiene los usuarios de flujo de trabajo requeridos para las pruebas de Fase 2.
 
 // ID 6 = TOXICOLOGÍA FORENSE (según el seed 01_initial_data.js)
@@ -22,7 +21,6 @@ export async function up(knex) {
 
   // --- 1. Crear las Secciones ---
   // (Estas secciones pertenecen al departamento de Toxicología)
-  // Corrección para MySQL: .returning() no es confiable, capturamos el ID del array de inserción.
   const [seccionTomaMuestraId] = await knex('seccion')
     .insert({
       nombre: 'Toma de Muestra',
@@ -42,10 +40,6 @@ export async function up(knex) {
     });
 
   // --- 2. Crear Usuarios (en orden) ---
-
-  // --- 2.1 Usuario: Administrador (112) (TU USUARIO) ---
-  // (Este usuario ya existe en tu BD local, pero la migración debe incluirlo
-  // para futuras instalaciones en otras máquinas).
   // Usamos knex.raw para ignorar el error si ya existe.
   try {
     const [userAdminId] = await knex('usuario')
@@ -174,7 +168,6 @@ export async function up(knex) {
  */
 export async function down(knex) {
   // Elimina en orden inverso
-  // (No borramos el 112, ya que asumimos que es tu usuario permanente)
   await knex('usuario').whereIn('CIP', ['110', '111', '222', '333']).del();
   await knex('seccion').whereIn('nombre', [
     'Toma de Muestra',
