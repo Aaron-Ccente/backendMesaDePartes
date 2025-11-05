@@ -11,6 +11,9 @@ router.post('/login', PeritoController.loginPerito);
 // RUTAS PROTEGIDAS (requieren token de usuario autentificado)
 router.use(authenticateToken);
 
+// Marcar salida de usuarios de mesa de partes
+router.post('/logout', PeritoController.logoutPerito);
+
 // Obtener peritos segun la especialidad selecccionada
 router.get('/especialidad', PeritoController.getAllPeritoAccordingToSpecialty)
 
