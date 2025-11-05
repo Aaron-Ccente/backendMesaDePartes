@@ -787,7 +787,7 @@ export class Perito {
         prioridadOficios,
       };
     } catch (error) {
-      console.error('Error obteniendo estadísticas:', error);
+      console.error("Error obteniendo estadísticas:", error);
       throw error;
     }
   }
