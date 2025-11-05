@@ -23,7 +23,6 @@ export async function seed(knex) {
   await knex('perito').del();
   await knex('usuario_rol').del();
   await knex('usuario').del();
-  // NO BORRAMOS 'usuario' ni 'perito', 'administrador', 'mesadepartes'
   await knex.raw('ALTER TABLE usuario AUTO_INCREMENT = 1');
   await knex.raw('SET FOREIGN_KEY_CHECKS = 1');
 
@@ -234,7 +233,6 @@ export async function seed(knex) {
     { id_tipo_departamento: 10, id_tipo_de_examen: 69 },
     { id_tipo_departamento: 10, id_tipo_de_examen: 70 }
   ]);
-
   // --- 10. INSERTAR USUARIO DE MESA DE PARTES Y SU ROL---  (CUENTA POR DEFECTO PARA PRUEBAS USAR 2023 :) )
   await knex('usuario').insert([
     { id_usuario: 3, CIP: '2023', nombre_completo: 'mesa de partes', nombre_usuario: 'Ccente',password_hash: '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK' },
