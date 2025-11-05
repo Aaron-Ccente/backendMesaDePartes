@@ -1,42 +1,45 @@
-import { Perito } from '../models/Perito.js';
-import { Validators } from '../utils/validators.js';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '../config/config.js';
+import { Perito } from "../models/Perito.js";
+import { Validators } from "../utils/validators.js";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "../config/config.js";
 
 export class PeritoController {
   // Crear nuevo perito
   static async createPerito(req, res) {
     try {
       const peritoData = req.body;
-      
+
       // Validar datos del perito
       const validation = Validators.validatePeritoData(peritoData);
       if (!validation.isValid) {
         return res.status(400).json({
           success: false,
-          message: validation.message
+          message: validation.message,
         });
       }
 
       // Crear el perito
       const result = await Perito.create(peritoData);
-      
+
       res.status(201).json(result);
     } catch (error) {
-      console.error('Error creando perito:', error);
-      
-      if (error.message.includes('ya está registrado') || error.message.includes('ya está en uso')) {
+      console.error("Error creando perito:", error);
+
+      if (
+        error.message.includes("ya está registrado") ||
+        error.message.includes("ya está en uso")
+      ) {
         return res.status(409).json({
           success: false,
-          message: error.message
+          message: error.message,
         });
       }
-      
+
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: error.message
+        message: "Error interno del servidor",
+        error: error.message,
       });
     }
   }
@@ -46,10 +49,10 @@ export class PeritoController {
     try {
       const { page = 1, limit = 10, search } = req.query;
       const offset = (page - 1) * limit;
-      
+
       let peritos;
       let total;
-      
+
       if (search) {
         peritos = await Perito.search(search, parseInt(limit), offset);
         total = await Perito.count();
@@ -59,7 +62,7 @@ export class PeritoController {
       }
 
       // Remover contraseña
-      const peritosSinPassword = peritos.map(perito => {
+      const peritosSinPassword = peritos.map((perito) => {
         const { password_hash, ...peritoSinPassword } = perito;
         return peritoSinPassword;
       });
@@ -71,40 +74,39 @@ export class PeritoController {
           page: parseInt(page),
           limit: parseInt(limit),
           total,
-          pages: Math.ceil(total / limit)
-        }
+          pages: Math.ceil(total / limit),
+        },
       });
     } catch (error) {
-      console.error('Error obteniendo peritos:', error);
+      console.error("Error obteniendo peritos:", error);
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: error.message
+        message: "Error interno del servidor",
+        error: error.message,
       });
     }
   }
-  static async getAllPeritoAccordingToSpecialty(req, res){
-     try {
+  static async getAllPeritoAccordingToSpecialty(req, res) {
+    try {
       const { id_especialidad } = req.query;
       const peritos = await Perito.findAccordingToSpecialty(id_especialidad);
       if (!peritos) {
         return res.status(404).json({
           success: false,
-          message: 'Peritos no encontrados'
+          message: "Peritos no encontrados",
         });
       }
 
       res.status(200).json({
         success: true,
-        data: peritos
+        data: peritos,
       });
-
     } catch (error) {
-      console.error('Error obteniendo peritos:', error);
+      console.error("Error obteniendo peritos:", error);
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: error.message
+        message: "Error interno del servidor",
+        error: error.message,
       });
     }
   }
@@ -117,7 +119,7 @@ export class PeritoController {
       if (!perito) {
         return res.status(404).json({
           success: false,
-          message: 'Perito no encontrado'
+          message: "Perito no encontrado",
         });
       }
 
@@ -125,13 +127,13 @@ export class PeritoController {
       const { password_hash, ...peritoSinPassword } = perito;
       res.status(200).json({
         success: true,
-        data: peritoSinPassword
+        data: peritoSinPassword,
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: error.message
+        message: "Error interno del servidor",
+        error: error.message,
       });
     }
   }
@@ -146,7 +148,7 @@ export class PeritoController {
       if (!existingPerito) {
         return res.status(404).json({
           success: false,
-          message: 'Perito no encontrado'
+          message: "Perito no encontrado",
         });
       }
 
@@ -155,7 +157,7 @@ export class PeritoController {
       if (!validation.isValid) {
         return res.status(400).json({
           success: false,
-          message: validation.message
+          message: validation.message,
         });
       }
 
@@ -163,19 +165,19 @@ export class PeritoController {
       const result = await Perito.update(cip, updateData);
       res.status(200).json(result);
     } catch (error) {
-      console.error('Error actualizando perito:', error);
-      
-      if (error.message === 'Perito no encontrado') {
+      console.error("Error actualizando perito:", error);
+
+      if (error.message === "Perito no encontrado") {
         return res.status(404).json({
           success: false,
-          message: error.message
+          message: error.message,
         });
       }
-      
+
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: error.message
+        message: "Error interno del servidor",
+        error: error.message,
       });
     }
   }
@@ -184,34 +186,68 @@ export class PeritoController {
   static async deletePerito(req, res) {
     try {
       const { cip } = req.params;
-      
+
       // Validar que el perito existe
       const existingPerito = await Perito.findByCIP(cip);
       if (!existingPerito) {
         return res.status(404).json({
           success: false,
-          message: 'Perito no encontrado'
+          message: "Perito no encontrado",
         });
       }
 
       // Eliminar el perito
       const result = await Perito.delete(cip);
-      
+
       res.status(200).json(result);
     } catch (error) {
-      console.error('Error eliminando perito:', error);
-      
-      if (error.message === 'Perito no encontrado') {
+      console.error("Error eliminando perito:", error);
+
+      if (error.message === "Perito no encontrado") {
         return res.status(404).json({
           success: false,
-          message: error.message
+          message: error.message,
         });
       }
-      
+
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: error.message
+        message: "Error interno del servidor",
+        error: error.message,
+      });
+    }
+  }
+
+  // Logout de perito
+  static async logoutPerito(req, res) {
+    try {
+      const userId = req.user?.id_usuario || null;
+      // procesar el logout pero sin operación en BD
+      if (!userId) {
+        console.warn(
+          "Logout sin ID de usuario - limpiando sesión del lado del cliente"
+        );
+        return res.json({
+          success: true,
+          message: "Sesión cerrada correctamente",
+          data: { logout_completed: true },
+        });
+      }
+
+      const result = await Perito.logOutPerito({ id_usuario: userId });
+      if (!result) {
+        return res.status(500).json(result);
+      }
+      return res.json({
+        success: true,
+        message: "Sesión cerrada correctamente",
+      });
+    } catch (error) {
+      console.error("Error en logoutPerito:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Error interno al realizar logout",
+        error: error.message,
       });
     }
   }
@@ -221,11 +257,11 @@ export class PeritoController {
     try {
       const { cip } = req.params;
       const { newPassword } = req.body;
-      
+
       if (!newPassword || newPassword.length < 6) {
         return res.status(400).json({
           success: false,
-          message: 'La nueva contraseña debe tener al menos 6 caracteres'
+          message: "La nueva contraseña debe tener al menos 6 caracteres",
         });
       }
 
@@ -234,26 +270,26 @@ export class PeritoController {
       if (!existingPerito) {
         return res.status(404).json({
           success: false,
-          message: 'Perito no encontrado'
+          message: "Perito no encontrado",
         });
       }
 
       // Cambiar contraseña
       const result = await Perito.changePassword(cip, newPassword);
-      
+
       res.status(200).json(result);
     } catch (error) {
-      if (error.message === 'Perito no encontrado') {
+      if (error.message === "Perito no encontrado") {
         return res.status(404).json({
           success: false,
-          message: error.message
+          message: error.message,
         });
       }
-      
+
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: error.message
+        message: "Error interno del servidor",
+        error: error.message,
       });
     }
   }
@@ -264,13 +300,13 @@ export class PeritoController {
       const stats = await Perito.getStats();
       res.status(200).json({
         success: true,
-        data: stats
+        data: stats,
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: error.message
+        message: "Error interno del servidor",
+        error: error.message,
       });
     }
   }
@@ -282,7 +318,7 @@ export class PeritoController {
       if (!CIP || !password_hash) {
         return res.status(400).json({
           success: false,
-          message: 'CIP y contraseña son requeridos'
+          message: "CIP y contraseña son requeridos",
         });
       }
 
@@ -291,18 +327,24 @@ export class PeritoController {
       if (!perito) {
         return res.status(401).json({
           success: false,
-          message: 'Credenciales inválidas'
+          message: "Credenciales inválidas",
         });
       }
 
       // Verificar contraseña
-      const isValidPassword = await bcrypt.compare(password_hash, perito.password_hash);
+      const isValidPassword = await bcrypt.compare(
+        password_hash,
+        perito.password_hash
+      );
       if (!isValidPassword) {
         return res.status(401).json({
           success: false,
-          message: 'Credenciales inválidas'
+          message: "Credenciales inválidas",
         });
       }
+      // Agregar estado de ENTRADA para su historial de sesiones
+      await Perito.addSessionHistory(perito.id_usuario, "ENTRADA");
+
       const { password_hash: _, ...peritoSinPassword } = perito;
 
       // Generar JWT (24h)
@@ -311,52 +353,56 @@ export class PeritoController {
         CIP: perito.CIP,
         nombre_usuario: perito.nombre_usuario,
         nombre_completo: perito.nombre_completo,
-        role: 'perito'
+        role: "perito",
       };
-      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
 
       res.status(200).json({
         success: true,
-        message: 'Login exitoso',
+        message: "Login exitoso",
         token,
-        data: peritoSinPassword
+        data: peritoSinPassword,
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: error.message
+        message: "Error interno del servidor",
+        error: error.message,
       });
     }
   }
 
-  static async getAllRelations(req, res){
+  static async getAllRelations(req, res) {
     try {
-      const {cip} = req.params;
+      const { cip } = req.params;
       if (!cip) {
         return res.status(400).json({
           success: false,
-          message: 'cip es requerido requeridos'
+          message: "cip es requerido requeridos",
         });
       }
 
       // Buscar relaciones del perito por CIP
       const perito = await Perito.findAllRelations(cip);
-      
+
       if (!perito) {
         return res.status(200).json({
           success: false,
-          message: 'El perito no tiene especialidades, grados, secciones o un departamento'
+          message:
+            "El perito no tiene especialidades, grados, secciones o un departamento",
         });
-      }else{
-        return res.status(200).json({message: 'Datos de las relaciones del perito cargados correctamente', success: true, data: perito})
+      } else {
+        return res.status(200).json({
+          message: "Datos de las relaciones del perito cargados correctamente",
+          success: true,
+          data: perito,
+        });
       }
-
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: error.message
+        message: "Error interno del servidor",
+        error: error.message,
       });
     }
   }

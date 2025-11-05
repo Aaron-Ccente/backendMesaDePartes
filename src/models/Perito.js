@@ -1,13 +1,13 @@
-import db from '../database/db.js';
-import bcrypt from 'bcryptjs';
+import db from "../database/db.js";
+import bcrypt from "bcryptjs";
 
 export class Perito {
   // Función utilitaria para convertir BLOB a Base64
   static blobToBase64(blob) {
     if (!blob) return null;
-    if (typeof blob === 'string') return blob;
+    if (typeof blob === "string") return blob;
     if (Buffer.isBuffer(blob)) {
-      return blob.toString('base64');
+      return blob.toString("base64");
     }
     return null;
   }
@@ -15,15 +15,18 @@ export class Perito {
   // Función utilitaria para validar Base64 WebP
   static validateWebPBase64(base64String) {
     if (!base64String) return null;
-    
+
     try {
-      if (typeof base64String === 'string' && base64String.startsWith('data:image/webp;base64,')) {
-        const base64Data = base64String.split(',')[1];
+      if (
+        typeof base64String === "string" &&
+        base64String.startsWith("data:image/webp;base64,")
+      ) {
+        const base64Data = base64String.split(",")[1];
         if (!base64Data) {
           return null;
         }
         try {
-          Buffer.from(base64Data, 'base64');
+          Buffer.from(base64Data, "base64");
           return base64String;
         } catch (decodeError) {
           return null;
@@ -32,11 +35,24 @@ export class Perito {
         return null;
       }
     } catch (error) {
-      console.error('Error validando Base64 WebP:', error);
+      console.error("Error validando Base64 WebP:", error);
       return null;
     }
   }
-  static async findAccordingToSpecialty(id_especialidad){
+
+  static async addSessionHistory(id_usuario, tipo_historial) {
+    try {
+      const [result] = await db.promise().query( 
+        'INSERT INTO historial_usuario (id_usuario, tipo_historial) VALUES (?, ?)',
+        [id_usuario, tipo_historial]
+      );
+      return result.affectedRows > 0;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async findAccordingToSpecialty(id_especialidad) {
     try {
       const [rows] = await db.promise().query(
         `SELECT u.nombre_completo, u.id_usuario, u.CIP, u.nombre_completo FROM usuario AS u 
@@ -47,112 +63,165 @@ export class Perito {
       );
       return rows || null;
     } catch (error) {
-      console.error('Error buscando peritos:', error);
+      console.error("Error buscando peritos:", error);
       throw error;
     }
   }
 
   // Crear nuevo perito
   static async create(peritoData) {
-  try {
-    const {
-      CIP, nombre_completo, email, nombre_usuario, password_hash, dni,
-      unidad, fecha_integracion_pnp, fecha_incorporacion, codigo_codofin, domicilio,
-      telefono, cursos_institucionales, cursos_extranjero, ultimo_ascenso_pnp,
-      fotografia_url, id_grado, id_turno, id_tipo_departamento
-    } = peritoData;
+    try {
+      const {
+        CIP,
+        nombre_completo,
+        email,
+        nombre_usuario,
+        password_hash,
+        dni,
+        unidad,
+        fecha_integracion_pnp,
+        fecha_incorporacion,
+        codigo_codofin,
+        domicilio,
+        telefono,
+        cursos_institucionales,
+        cursos_extranjero,
+        ultimo_ascenso_pnp,
+        fotografia_url,
+        id_grado,
+        id_turno,
+        id_tipo_departamento,
+      } = peritoData;
 
-    if (!CIP || !nombre_completo || !nombre_usuario || !password_hash || !dni || !fecha_integracion_pnp || !fecha_incorporacion || !codigo_codofin || !domicilio || !telefono || !fotografia_url || !id_tipo_departamento || !id_grado || !id_turno) {
-      throw new Error('Hay campos no rellenados.');
-    }
+      if (
+        !CIP ||
+        !nombre_completo ||
+        !nombre_usuario ||
+        !password_hash ||
+        !dni ||
+        !fecha_integracion_pnp ||
+        !fecha_incorporacion ||
+        !codigo_codofin ||
+        !domicilio ||
+        !telefono ||
+        !fotografia_url ||
+        !id_tipo_departamento ||
+        !id_grado ||
+        !id_turno
+      ) {
+        throw new Error("Hay campos no rellenados.");
+      }
 
-    const existingUser = await this.findByCipPerito(CIP);
-    if (existingUser) {
-      throw new Error('Ya existe un usuario con ese CIP');
-    }
+      const existingUser = await this.findByCipPerito(CIP);
+      if (existingUser) {
+        throw new Error("Ya existe un usuario con ese CIP");
+      }
 
-    const existingDNI = await this.findByDNI(dni);
-    if (existingDNI) {
-      throw new Error('Ya existe un usuario con el DNI ingresado');
-    }
-    const hashedPassword = await bcrypt.hash(password_hash, 10);
+      const existingDNI = await this.findByDNI(dni);
+      if (existingDNI) {
+        throw new Error("Ya existe un usuario con el DNI ingresado");
+      }
+      const hashedPassword = await bcrypt.hash(password_hash, 10);
 
-    const validatedFotografia = fotografia_url ? this.validateWebPBase64(fotografia_url) : null;
-    if (fotografia_url && !validatedFotografia) {
-      throw new Error('Error validando fotografía, debe ser formato WebP Base64 válido');
-    }
+      const validatedFotografia = fotografia_url
+        ? this.validateWebPBase64(fotografia_url)
+        : null;
+      if (fotografia_url && !validatedFotografia) {
+        throw new Error(
+          "Error validando fotografía, debe ser formato WebP Base64 válido"
+        );
+      }
 
-    const queryUsuario = `
+      const queryUsuario = `
       INSERT INTO usuario (
         CIP, nombre_completo, nombre_usuario, password_hash
       ) VALUES (?, ?, ?, ?)
     `;
-    const queryPerito = `
+      const queryPerito = `
       INSERT INTO perito (
         id_usuario, dni, email, unidad, fecha_integracion_pnp, fecha_incorporacion,
         codigo_codofin, domicilio, telefono, cursos_institucionales,
         cursos_extranjero, ultimo_ascenso_pnp, fotografia_url
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const queryRelationsPeritogrado = `INSERT INTO usuario_grado (id_usuario, id_grado) VALUES (?,?);`
-    const queryRelationsPeritoTurno = `INSERT INTO usuario_turno (id_usuario, id_turno) VALUES (?,?);`
-    const queryRelationsPeritoEstado = `INSERT INTO estado_usuario (id_usuario, id_estado) VALUES (?,?);`
-    const queryRelationsPeritoRol = `INSERT INTO usuario_rol (id_usuario, id_rol) VALUES (?,?);`
-    const queryRelationsPeritoTipoDepartamento = `INSERT INTO usuario_tipo_departamento (id_usuario, id_tipo_departamento) VALUES (?,?);`
+      const queryRelationsPeritogrado = `INSERT INTO usuario_grado (id_usuario, id_grado) VALUES (?,?);`;
+      const queryRelationsPeritoTurno = `INSERT INTO usuario_turno (id_usuario, id_turno) VALUES (?,?);`;
+      const queryRelationsPeritoEstado = `INSERT INTO estado_usuario (id_usuario, id_estado) VALUES (?,?);`;
+      const queryRelationsPeritoRol = `INSERT INTO usuario_rol (id_usuario, id_rol) VALUES (?,?);`;
+      const queryRelationsPeritoTipoDepartamento = `INSERT INTO usuario_tipo_departamento (id_usuario, id_tipo_departamento) VALUES (?,?);`;
 
-    const connection = await db.promise().getConnection();
-    try {
-      await connection.beginTransaction();
+      const connection = await db.promise().getConnection();
+      try {
+        await connection.beginTransaction();
 
-      const [usuarioResult] = await connection.query(queryUsuario, [
-        CIP, nombre_completo, nombre_usuario, hashedPassword
-      ]);
-      const idUsuario = usuarioResult.insertId;
+        const [usuarioResult] = await connection.query(queryUsuario, [
+          CIP,
+          nombre_completo,
+          nombre_usuario,
+          hashedPassword,
+        ]);
+        const idUsuario = usuarioResult.insertId;
 
-      const [peritoResult] = await connection.query(queryPerito, [
-        idUsuario, dni, email || null, unidad || null,
-        fecha_integracion_pnp || null, fecha_incorporacion || null,
-        codigo_codofin || null, domicilio || null, telefono || null,
-        cursos_institucionales ? JSON.stringify(cursos_institucionales) : null,
-        cursos_extranjero ? JSON.stringify(cursos_extranjero) : null,
-        ultimo_ascenso_pnp || null,
-        validatedFotografia
-      ]);
-      await connection.query(queryRelationsPeritoEstado, [idUsuario, 1]);
-      await connection.query(queryRelationsPeritoRol, [idUsuario, 2]);
-      await connection.query(queryRelationsPeritoTipoDepartamento, [idUsuario, id_tipo_departamento]);
+        const [peritoResult] = await connection.query(queryPerito, [
+          idUsuario,
+          dni,
+          email || null,
+          unidad || null,
+          fecha_integracion_pnp || null,
+          fecha_incorporacion || null,
+          codigo_codofin || null,
+          domicilio || null,
+          telefono || null,
+          cursos_institucionales
+            ? JSON.stringify(cursos_institucionales)
+            : null,
+          cursos_extranjero ? JSON.stringify(cursos_extranjero) : null,
+          ultimo_ascenso_pnp || null,
+          validatedFotografia,
+        ]);
+        await connection.query(queryRelationsPeritoEstado, [idUsuario, 1]);
+        await connection.query(queryRelationsPeritoRol, [idUsuario, 2]);
+        await connection.query(queryRelationsPeritoTipoDepartamento, [
+          idUsuario,
+          id_tipo_departamento,
+        ]);
 
-      if (id_grado) {
-        await connection.query(queryRelationsPeritogrado, [idUsuario, id_grado]);
-      }
-      if (id_turno) {
-        await connection.query(queryRelationsPeritoTurno, [idUsuario, id_turno]);
-      }
-
-      await connection.commit();
-      connection.release();
-
-      return {
-        success: true,
-        message: 'Perito creado exitosamente',
-        data: {
-          id_usuario: idUsuario,
-          id_perito: peritoResult.insertId,
-          CIP
+        if (id_grado) {
+          await connection.query(queryRelationsPeritogrado, [
+            idUsuario,
+            id_grado,
+          ]);
         }
-      };
-    } catch (txError) {
-      await connection.rollback();
-      connection.release();
-      throw txError;
+        if (id_turno) {
+          await connection.query(queryRelationsPeritoTurno, [
+            idUsuario,
+            id_turno,
+          ]);
+        }
+
+        await connection.commit();
+        connection.release();
+
+        return {
+          success: true,
+          message: "Perito creado exitosamente",
+          data: {
+            id_usuario: idUsuario,
+            id_perito: peritoResult.insertId,
+            CIP,
+          },
+        };
+      } catch (txError) {
+        await connection.rollback();
+        connection.release();
+        throw txError;
+      }
+    } catch (error) {
+      throw error;
     }
-  } catch (error) {
-    throw error;
   }
-}
 
-
-  static async findByCIPPerito(cip){
+  static async findByCIPPerito(cip) {
     try {
       const [rows] = await db.promise().query(
         `SELECT us.id_usuario,us.CIP, us.nombre_completo, us.nombre_usuario, us.password_hash, r.nombre_rol, td.nombre_departamento, g.nombre AS nombre_grado
@@ -170,7 +239,7 @@ export class Perito {
       );
       return rows[0] || null;
     } catch (error) {
-      console.error('Error buscando perito por CIP:', error);
+      console.error("Error buscando perito por CIP:", error);
       throw error;
     }
   }
@@ -179,7 +248,7 @@ export class Perito {
   static async findByCIP(cip) {
     try {
       const [rows] = await db.promise().query(
-      `
+        `
       SELECT 
       u.id_usuario,
       u.CIP,
@@ -226,16 +295,19 @@ export class Perito {
 
     WHERE u.CIP = ?
       `,
-      [cip]
-    );
-      
+        [cip]
+      );
+
       if (rows[0]) {
         const perito = rows[0];
-        
+
         // Convertir BLOB a Base64 si es necesario
         if (perito.fotografia_url) {
           try {
-            if (typeof perito.fotografia_url === 'string' && perito.fotografia_url.startsWith('data:image/')) {
+            if (
+              typeof perito.fotografia_url === "string" &&
+              perito.fotografia_url.startsWith("data:image/")
+            ) {
               // Ya está en formato base64
             } else {
               const base64 = this.blobToBase64(perito.fotografia_url);
@@ -245,30 +317,53 @@ export class Perito {
             perito.fotografia_url = null;
           }
         }
-        
+
         // Parsear JSON si es necesario
-        if (perito.cursos_institucionales && typeof perito.cursos_institucionales === 'string') {
+        if (
+          perito.cursos_institucionales &&
+          typeof perito.cursos_institucionales === "string"
+        ) {
           try {
-            perito.cursos_institucionales = JSON.parse(perito.cursos_institucionales);
+            perito.cursos_institucionales = JSON.parse(
+              perito.cursos_institucionales
+            );
           } catch (error) {
             perito.cursos_institucionales = [];
           }
         }
-        
-        if (perito.cursos_extranjero && typeof perito.cursos_extranjero === 'string') {
+
+        if (
+          perito.cursos_extranjero &&
+          typeof perito.cursos_extranjero === "string"
+        ) {
           try {
             perito.cursos_extranjero = JSON.parse(perito.cursos_extranjero);
           } catch (error) {
             perito.cursos_extranjero = [];
           }
         }
-        
+
         return perito;
       }
-      
+
       return null;
     } catch (error) {
-      console.error('Error buscando perito por CIP:', error);
+      console.error("Error buscando perito por CIP:", error);
+      throw error;
+    }
+  }
+
+  static async logOutPerito({ id_usuario }) {
+    try {
+      const [result] = await db
+        .promise()
+        .query(
+          "INSERT INTO historial_usuario (id_usuario, tipo_historial) VALUES (?, ?)",
+          [id_usuario, "SALIDA"]
+        );
+
+      return result.affectedRows > 0;
+    } catch (error) {
       throw error;
     }
   }
@@ -276,13 +371,12 @@ export class Perito {
   // Buscar perito por email
   static async findByEmail(email) {
     try {
-      const [rows] = await db.promise().query(
-        'SELECT * FROM perito WHERE email = ?',
-        [email]
-      );
+      const [rows] = await db
+        .promise()
+        .query("SELECT * FROM perito WHERE email = ?", [email]);
       return rows[0] || null;
     } catch (error) {
-      console.error('Error buscando perito por email:', error);
+      console.error("Error buscando perito por email:", error);
       throw error;
     }
   }
@@ -290,13 +384,12 @@ export class Perito {
   // Buscar perito por DNI
   static async findByDNI(dni) {
     try {
-      const [rows] = await db.promise().query(
-        'SELECT * FROM perito WHERE dni = ?',
-        [dni]
-      );
+      const [rows] = await db
+        .promise()
+        .query("SELECT * FROM perito WHERE dni = ?", [dni]);
       return rows[0] || null;
     } catch (error) {
-      console.error('Error buscando perito por DNI:', error);
+      console.error("Error buscando perito por DNI:", error);
       throw error;
     }
   }
@@ -304,13 +397,12 @@ export class Perito {
   // Buscar perito por DNI
   static async findByCipPerito(cip) {
     try {
-      const [rows] = await db.promise().query(
-        'SELECT * FROM usuario WHERE cip = ?',
-        [cip]
-      );
+      const [rows] = await db
+        .promise()
+        .query("SELECT * FROM usuario WHERE cip = ?", [cip]);
       return rows[0] || null;
     } catch (error) {
-      console.error('Error buscando perito por CIP:', error);
+      console.error("Error buscando perito por CIP:", error);
       throw error;
     }
   }
@@ -333,7 +425,7 @@ export class Perito {
       );
       return rows;
     } catch (error) {
-      console.error('Error obteniendo peritos:', error);
+      console.error("Error obteniendo peritos:", error);
       throw error;
     }
   }
@@ -341,10 +433,12 @@ export class Perito {
   // Contar total de peritos
   static async count() {
     try {
-      const [rows] = await db.promise().query('SELECT COUNT(*) as total FROM perito');
+      const [rows] = await db
+        .promise()
+        .query("SELECT COUNT(*) as total FROM perito");
       return rows[0].total;
     } catch (error) {
-      console.error('Error contando peritos:', error);
+      console.error("Error contando peritos:", error);
       throw error;
     }
   }
@@ -364,186 +458,212 @@ export class Perito {
         [searchPattern, searchPattern, limit, offset]
       );
       return rows;
-
     } catch (error) {
-      console.error('Error buscando peritos:', error);
+      console.error("Error buscando peritos:", error);
       throw error;
     }
   }
 
   // Actualizar perito
-static async update(cip, updateData) {
-  const connection = await db.promise().getConnection();
-  try {
-    await connection.beginTransaction();
+  static async update(cip, updateData) {
+    const connection = await db.promise().getConnection();
+    try {
+      await connection.beginTransaction();
 
-    const {
-      nombre_completo, email, nombre_usuario, password_hash, dni,
-      unidad, fecha_integracion_pnp, fecha_incorporacion, codigo_codofin, domicilio,
-      telefono, cursos_institucionales, cursos_extranjero, ultimo_ascenso_pnp,
-      fotografia_url, id_grado, id_turno, id_tipo_departamento
-    } = updateData;
+      const {
+        nombre_completo,
+        email,
+        nombre_usuario,
+        password_hash,
+        dni,
+        unidad,
+        fecha_integracion_pnp,
+        fecha_incorporacion,
+        codigo_codofin,
+        domicilio,
+        telefono,
+        cursos_institucionales,
+        cursos_extranjero,
+        ultimo_ascenso_pnp,
+        fotografia_url,
+        id_grado,
+        id_turno,
+        id_tipo_departamento,
+      } = updateData;
 
-    // Actualizar tabla usuario
-    const usuarioFields = [];
-    const usuarioValues = [];
-    
-    if (nombre_completo !== undefined) {
-      usuarioFields.push('nombre_completo = ?');
-      usuarioValues.push(nombre_completo);
-    }
-    
-    if (nombre_usuario !== undefined) {
-      usuarioFields.push('nombre_usuario = ?');
-      usuarioValues.push(nombre_usuario);
-    }
-    
-    if (password_hash !== undefined) {
-      const hashedPassword = await bcrypt.hash(password_hash, 10);
-      usuarioFields.push('password_hash = ?');
-      usuarioValues.push(hashedPassword);
-    }
-    
-    if (usuarioFields.length > 0) {
-      usuarioValues.push(cip);
-      const queryUsuario = `UPDATE usuario SET ${usuarioFields.join(', ')} WHERE CIP = ?`;
-      await connection.query(queryUsuario, usuarioValues);
-    }
+      // Actualizar tabla usuario
+      const usuarioFields = [];
+      const usuarioValues = [];
 
-    // Actualizar tabla perito
-    const peritoFields = [];
-    const peritoValues = [];
-    
-    if (dni !== undefined) {
-      peritoFields.push('dni = ?');
-      peritoValues.push(dni);
-    }
-    
-    if (email !== undefined) {
-      peritoFields.push('email = ?');
-      peritoValues.push(email);
-    }
-    
-    if (unidad !== undefined) {
-      peritoFields.push('unidad = ?');
-      peritoValues.push(unidad);
-    }
-    
-    if (fecha_integracion_pnp !== undefined) {
-      peritoFields.push('fecha_integracion_pnp = ?');
-      peritoValues.push(fecha_integracion_pnp);
-    }
-    
-    if (fecha_incorporacion !== undefined) {
-      peritoFields.push('fecha_incorporacion = ?');
-      peritoValues.push(fecha_incorporacion);
-    }
-    
-    if (codigo_codofin !== undefined) {
-      peritoFields.push('codigo_codofin = ?');
-      peritoValues.push(codigo_codofin);
-    }
-    
-    if (domicilio !== undefined) {
-      peritoFields.push('domicilio = ?');
-      peritoValues.push(domicilio);
-    }
-    
-    if (telefono !== undefined) {
-      peritoFields.push('telefono = ?');
-      peritoValues.push(telefono);
-    }
-    
-    if (cursos_institucionales !== undefined) {
-      peritoFields.push('cursos_institucionales = ?');
-      peritoValues.push(JSON.stringify(cursos_institucionales));
-    }
-    
-    if (cursos_extranjero !== undefined) {
-      peritoFields.push('cursos_extranjero = ?');
-      peritoValues.push(JSON.stringify(cursos_extranjero));
-    }
-    
-    if (ultimo_ascenso_pnp !== undefined) {
-      peritoFields.push('ultimo_ascenso_pnp = ?');
-      peritoValues.push(ultimo_ascenso_pnp);
-    }
-    
-    if (fotografia_url !== undefined) {
-      const validatedFotografia = this.validateWebPBase64(fotografia_url);
-      peritoFields.push('fotografia_url = ?');
-      peritoValues.push(validatedFotografia);
-    }
-    
-    if (peritoFields.length > 0) {
-      peritoValues.push(cip);
-      const queryPerito = `
+      if (nombre_completo !== undefined) {
+        usuarioFields.push("nombre_completo = ?");
+        usuarioValues.push(nombre_completo);
+      }
+
+      if (nombre_usuario !== undefined) {
+        usuarioFields.push("nombre_usuario = ?");
+        usuarioValues.push(nombre_usuario);
+      }
+
+      if (password_hash !== undefined) {
+        const hashedPassword = await bcrypt.hash(password_hash, 10);
+        usuarioFields.push("password_hash = ?");
+        usuarioValues.push(hashedPassword);
+      }
+
+      if (usuarioFields.length > 0) {
+        usuarioValues.push(cip);
+        const queryUsuario = `UPDATE usuario SET ${usuarioFields.join(
+          ", "
+        )} WHERE CIP = ?`;
+        await connection.query(queryUsuario, usuarioValues);
+      }
+
+      // Actualizar tabla perito
+      const peritoFields = [];
+      const peritoValues = [];
+
+      if (dni !== undefined) {
+        peritoFields.push("dni = ?");
+        peritoValues.push(dni);
+      }
+
+      if (email !== undefined) {
+        peritoFields.push("email = ?");
+        peritoValues.push(email);
+      }
+
+      if (unidad !== undefined) {
+        peritoFields.push("unidad = ?");
+        peritoValues.push(unidad);
+      }
+
+      if (fecha_integracion_pnp !== undefined) {
+        peritoFields.push("fecha_integracion_pnp = ?");
+        peritoValues.push(fecha_integracion_pnp);
+      }
+
+      if (fecha_incorporacion !== undefined) {
+        peritoFields.push("fecha_incorporacion = ?");
+        peritoValues.push(fecha_incorporacion);
+      }
+
+      if (codigo_codofin !== undefined) {
+        peritoFields.push("codigo_codofin = ?");
+        peritoValues.push(codigo_codofin);
+      }
+
+      if (domicilio !== undefined) {
+        peritoFields.push("domicilio = ?");
+        peritoValues.push(domicilio);
+      }
+
+      if (telefono !== undefined) {
+        peritoFields.push("telefono = ?");
+        peritoValues.push(telefono);
+      }
+
+      if (cursos_institucionales !== undefined) {
+        peritoFields.push("cursos_institucionales = ?");
+        peritoValues.push(JSON.stringify(cursos_institucionales));
+      }
+
+      if (cursos_extranjero !== undefined) {
+        peritoFields.push("cursos_extranjero = ?");
+        peritoValues.push(JSON.stringify(cursos_extranjero));
+      }
+
+      if (ultimo_ascenso_pnp !== undefined) {
+        peritoFields.push("ultimo_ascenso_pnp = ?");
+        peritoValues.push(ultimo_ascenso_pnp);
+      }
+
+      if (fotografia_url !== undefined) {
+        const validatedFotografia = this.validateWebPBase64(fotografia_url);
+        peritoFields.push("fotografia_url = ?");
+        peritoValues.push(validatedFotografia);
+      }
+
+      if (peritoFields.length > 0) {
+        peritoValues.push(cip);
+        const queryPerito = `
         UPDATE perito p
         JOIN usuario u ON p.id_usuario = u.id_usuario
-        SET ${peritoFields.join(', ')}
+        SET ${peritoFields.join(", ")}
         WHERE u.CIP = ?
       `;
-      await connection.query(queryPerito, peritoValues);
-    }
+        await connection.query(queryPerito, peritoValues);
+      }
 
-    if (id_grado !== undefined) {
-      await connection.query(`
+      if (id_grado !== undefined) {
+        await connection.query(
+          `
         UPDATE usuario_grado 
         SET id_grado = ? 
         WHERE id_usuario = (SELECT id_usuario FROM usuario WHERE CIP = ?)
-      `, [id_grado, cip]);
-    }
-    
-    if (id_turno !== undefined) {
-      await connection.query(`
+      `,
+          [id_grado, cip]
+        );
+      }
+
+      if (id_turno !== undefined) {
+        await connection.query(
+          `
         UPDATE usuario_turno 
         SET id_turno = ? 
         WHERE id_usuario = (SELECT id_usuario FROM usuario WHERE CIP = ?)
-      `, [id_turno, cip]);
-    }
-    
-    if (id_tipo_departamento !== undefined) {
-      await connection.query(`
+      `,
+          [id_turno, cip]
+        );
+      }
+
+      if (id_tipo_departamento !== undefined) {
+        await connection.query(
+          `
         UPDATE usuario_tipo_departamento
         SET id_tipo_departamento = ? 
         WHERE id_usuario = (SELECT id_usuario FROM usuario WHERE CIP = ?)
-      `, [id_tipo_departamento, cip]);
+      `,
+          [id_tipo_departamento, cip]
+        );
+      }
+
+      await connection.commit();
+      connection.release();
+
+      return {
+        success: true,
+        message: "Perito actualizado exitosamente",
+      };
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
     }
-
-    await connection.commit();
-    connection.release();
-
-    return {
-      success: true,
-      message: 'Perito actualizado exitosamente'
-    };
-  } catch (error) {
-    await connection.rollback();
-    connection.release();
-    throw error;
   }
-}
 
   // Cambiar contraseña
   static async changePassword(cip, newPassword) {
     try {
       const hashedPassword = await bcrypt.hash(newPassword, 10);
-      
-      const [result] = await db.promise().query(
-        'UPDATE usuario SET Contrasena = ? WHERE CIP = ?',
-        [hashedPassword, cip]
-      );
+
+      const [result] = await db
+        .promise()
+        .query("UPDATE usuario SET Contrasena = ? WHERE CIP = ?", [
+          hashedPassword,
+          cip,
+        ]);
 
       if (result.affectedRows === 0) {
-        throw new Error('Perito no encontrado');
+        throw new Error("Perito no encontrado");
       }
 
       return {
         success: true,
-        message: 'Contraseña actualizada exitosamente'
+        message: "Contraseña actualizada exitosamente",
       };
     } catch (error) {
-      console.error('Error cambiando contraseña:', error);
+      console.error("Error cambiando contraseña:", error);
       throw error;
     }
   }
@@ -551,21 +671,20 @@ static async update(cip, updateData) {
   // Eliminar perito
   static async delete(cip) {
     try {
-      const [result] = await db.promise().query(
-        'DELETE FROM usuario WHERE CIP = ?',
-        [cip]
-      );
+      const [result] = await db
+        .promise()
+        .query("DELETE FROM usuario WHERE CIP = ?", [cip]);
 
       if (result.affectedRows === 0) {
-        throw new Error('Perito no encontrado');
+        throw new Error("Perito no encontrado");
       }
 
       return {
         success: true,
-        message: 'Perito eliminado exitosamente'
+        message: "Perito eliminado exitosamente",
       };
     } catch (error) {
-      console.error('Error eliminando perito:', error);
+      console.error("Error eliminando perito:", error);
       throw error;
     }
   }
@@ -587,7 +706,7 @@ static async update(cip, updateData) {
       const { Contrasena, ...peritoWithoutPassword } = perito;
       return peritoWithoutPassword;
     } catch (error) {
-      console.error('Error verificando credenciales:', error);
+      console.error("Error verificando credenciales:", error);
       throw error;
     }
   }
@@ -595,7 +714,9 @@ static async update(cip, updateData) {
   // Obtener estadísticas
   static async getStats() {
     try {
-      const [totalPeritos] = await db.promise().query('SELECT COUNT(*) as total FROM perito');
+      const [totalPeritos] = await db
+        .promise()
+        .query("SELECT COUNT(*) as total FROM perito");
       // Peritos por departamento
       const [peritosPorSeccion] = await db.promise().query(`
         SELECT td.nombre_departamento AS seccion, COUNT(p.id_perito) AS count
@@ -619,10 +740,10 @@ static async update(cip, updateData) {
       return {
         totalPeritos: totalPeritos[0].total,
         peritosPorSeccion,
-        peritosPorGrado
+        peritosPorGrado,
       };
     } catch (error) {
-      console.error('Error obteniendo estadísticas:', error);
+      console.error("Error obteniendo estadísticas:", error);
       throw error;
     }
   }

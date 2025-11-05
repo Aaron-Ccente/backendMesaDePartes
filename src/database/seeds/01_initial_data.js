@@ -16,9 +16,14 @@ export async function seed(knex) {
   await knex('tipo_departamento').del();
   await knex('estado').del();
   await knex('rol').del();
-
-  // NO BORRAMOS 'usuario' ni 'perito', 'administrador', 'mesadepartes'
-  
+  await knex('usuario_turno').del();
+  await knex('usuario_tipo_departamento').del();
+  await knex('estado_usuario').del();
+  await knex('usuario_grado').del();
+  await knex('perito').del();
+  await knex('usuario_rol').del();
+  await knex('usuario').del();
+  await knex.raw('ALTER TABLE usuario AUTO_INCREMENT = 1');
   await knex.raw('SET FOREIGN_KEY_CHECKS = 1');
 
   // --- 2. INSERTAR ROLES ---
@@ -185,7 +190,6 @@ export async function seed(knex) {
     { id_tipo_departamento: 4, id_tipo_de_examen: 26 },
     { id_tipo_departamento: 4, id_tipo_de_examen: 27 },
     { id_tipo_departamento: 5, id_tipo_de_examen: 28 },
-    // { id_tipo_departamento: 5, id_tipo_de_examen: 28 }, // Duplicado en seed.js - te webeaste papai xd
     { id_tipo_departamento: 5, id_tipo_de_examen: 29 },
     { id_tipo_departamento: 5, id_tipo_de_examen: 30 },
     { id_tipo_departamento: 5, id_tipo_de_examen: 31 },
@@ -229,4 +233,57 @@ export async function seed(knex) {
     { id_tipo_departamento: 10, id_tipo_de_examen: 69 },
     { id_tipo_departamento: 10, id_tipo_de_examen: 70 }
   ]);
-};
+  // --- 10. INSERTAR USUARIO DE MESA DE PARTES Y SU ROL---  (CUENTA POR DEFECTO PARA PRUEBAS USAR 2023 :) )
+  await knex('usuario').insert([
+    { id_usuario: 3, CIP: '2023', nombre_completo: 'mesa de partes', nombre_usuario: 'Ccente',password_hash: '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK' },
+    { id_usuario: 4, CIP: '2024', nombre_completo: 'mesa de partes 2', nombre_usuario: 'Ccente 2',password_hash: '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK' },
+    { id_usuario: 5, CIP: '2025', nombre_completo: 'mesa de partes 3', nombre_usuario: 'Ccente 3',password_hash: '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK' },
+    { id_usuario: 6, CIP: '2026', nombre_completo: 'mesa de partes 4', nombre_usuario: 'Ccente 4',password_hash: '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK' }
+  ]);
+  await knex('usuario_rol').insert([
+    { id_usuario: 3, id_rol: 3 },
+    { id_usuario: 4, id_rol: 3 },
+    { id_usuario: 5, id_rol: 3 },
+    { id_usuario: 6, id_rol: 3 }
+  ]);
+
+  // --- 11. INSERTAR USUARIO ADMINISTRADOR Y SU ROL---(CUENTA POR DEFECTO PARA PRUEBAS USAR 2021 :) )
+
+  await knex('usuario').insert([
+    { id_usuario: 1, CIP: '2021', nombre_completo: 'admin', nombre_usuario: 'admin', password_hash: '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK' }
+  ]);
+
+  await knex('usuario_rol').insert([
+    { id_usuario: 1, id_rol: 1 }
+  ]);
+
+  // --- 12. INSERTAR USUARIO PERITO Y SU ROL--- (CUENTA POR DEFECTO PARA PRUEBAS USAR 2022 :) )
+
+  await knex('usuario').insert([
+    { id_usuario: 2, CIP: '2022', nombre_completo: 'perito', nombre_usuario: 'perito', password_hash: '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK' }
+  ]);
+  // rol de perito
+  await knex('usuario_rol').insert([
+    { id_usuario: 2, id_rol: 2 }
+  ]);
+   // datos adicionales de perito
+    await knex('perito').insert([
+    { id_perito: 1, id_usuario: 2, dni: '74985252', email: 'aronccente@gmail.com', unidad: 'oficri', fecha_integracion_pnp: '2025-10-01',fecha_incorporacion: '2025-10-01', codigo_codofin: 'COD1234',domicilio: 'Av. Siempre Viva 123', telefono: '987654321',cursos_institucionales: 'Curso de Prueba',cursos_extranjero: 'Curso de Prueba',ultimo_ascenso_pnp: '2025-10-01',fotografia_url: 'http://example.com/foto.jpg'}
+  ]);
+  // Grado del perito
+  await knex('usuario_grado').insert([
+    { id_usuario_grado: 1, id_usuario: 2, id_grado: 3 }
+  ]);
+  // Estado del usuario (HABILITADO o DESHABILITADO)
+  await knex('estado_usuario').insert([
+    { id_estado_usuario: 1, id_usuario: 2, id_estado: 1 }
+  ]);
+  // Departamento del perito
+  await knex('usuario_tipo_departamento').insert([
+    { id_usuario_tipo_departamento: 1, id_usuario: 2, id_tipo_departamento: 6 }
+  ]);
+  // Turno del perito
+  await knex('usuario_turno').insert([
+    { id_usuario_turno: 1, id_usuario: 2, id_turno: 1 }
+  ]);
+}

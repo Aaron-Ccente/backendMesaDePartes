@@ -13,6 +13,9 @@ router.post('/admin/register', AuthController.registerAdmin);
 
 // A partir de aquí, rutas protegidas que requieren token y rol administrador
 router.use(authenticateToken);
+
+router.post('/admin/logout', AuthController.logoutAdmin);
+
 router.use(requireAdmin);
 
 // Obtener lista de administradores (paginado y búsqueda)

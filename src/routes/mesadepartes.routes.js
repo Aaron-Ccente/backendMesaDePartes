@@ -10,6 +10,10 @@ router.post("/login", MesaDePartesController.login)
 // Ruta para crear un usuario de mesa de partes
 // RUTAS PROTEGIDAS (requieren autenticación de administrador)
 router.use(authenticateToken);
+
+// Marcar salida de usuarios de mesa de partes
+router.post('/logout', MesaDePartesController.logoutMesaDePartes);
+
 router.use(requireAdmin);
 
 // Crear nuevo perito
