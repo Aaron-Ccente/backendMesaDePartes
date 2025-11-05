@@ -11,6 +11,7 @@ router.post("/login", MesaDePartesController.login)
 // RUTAS PROTEGIDAS (requieren autenticación de administrador)
 router.use(authenticateToken);
 
+// Marcar salida de usuarios de mesa de partes
 router.post('/logout', MesaDePartesController.logoutMesaDePartes);
 
 router.use(requireAdmin);
