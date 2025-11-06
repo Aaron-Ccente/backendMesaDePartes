@@ -29,7 +29,7 @@ export class Validators {
     }
     
     // Permitir solo letras, números, guiones, puntos, espacios y guiones bajos
-    const usernameRegex = /^[a-zA-Z0-9\-_\. ]+$/;
+    const usernameRegex = /^[a-zA-ZÀ-ÿñÑ\s\-']+$/;
     if (!usernameRegex.test(NombreUsuario)) {
       return { isValid: false, message: 'Nombre de usuario solo puede contener letras, números, guiones, puntos, espacios y guiones bajos' };
     }
@@ -65,9 +65,12 @@ export class Validators {
     }
     
     // Permitir solo letras, espacios, guiones y apóstrofes
-    const nameRegex = /^[a-zA-ZÀ-ÿ\s\-']+$/;
+    const nameRegex = /^[a-zA-ZÀ-ÿñÑ\s\-']+$/;
     if (!nameRegex.test(Nombre)) {
-      return { isValid: false, message: 'El nombre completo del usuario solo puede contener letras, espacios, guiones y apóstrofes' };
+      return { 
+        isValid: false, 
+        message: 'El nombre completo del usuario solo puede contener letras, espacios, guiones y apóstrofes' 
+      };
     }
     
     return { isValid: true };
