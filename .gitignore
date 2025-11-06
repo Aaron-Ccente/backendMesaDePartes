@@ -4,3 +4,6 @@ node_modules
 serviciosgoogledrive.json
 token.json
 oauth_client.json
+
+# Archivos subidos por los usuarios (PDFs firmados, etc.)
+/uploads/

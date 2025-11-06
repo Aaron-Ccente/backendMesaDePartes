@@ -207,4 +207,49 @@ export class OficioController {
       return res.status(500).json({ success: false, message: 'Error interno al responder oficio' });
     }
   }
+  /**
+   * Deriva (reasigna) un oficio a un nuevo perito.
+   */
+  static async derivarOficio(req, res) {
+    try {
+      // 1. Obtener IDs de la ruta y del usuario que deriva
+      const { id } = req.params; // ID del Oficio
+      const id_perito_actual = req.user.id_usuario; // ID del Perito que realiza la acción
+
+      // 2. Obtener datos del body
+      const { id_nuevo_perito, nombre_seccion_destino } = req.body;
+
+      // 3. Validar la entrada
+      if (!id_nuevo_perito || !nombre_seccion_destino) {
+        return res.status(400).json({
+          success: false,
+          message: 'Se requieren "id_nuevo_perito" y "nombre_seccion_destino" en el body.',
+        });
+      }
+
+      // 4. Llamar al modelo para ejecutar la transacción
+      const result = await Oficio.reasignarPerito(
+        Number(id),
+        Number(id_nuevo_perito),
+        Number(id_perito_actual),
+        nombre_seccion_destino
+      );
+
+      if (!result.success) {
+        // Si el modelo falla (sin tipo de error), devolver el error
+        return res.status(404).json(result);
+      }
+
+      // 5. Devolver éxito
+      return res.status(200).json(result);
+
+    } catch (error) {
+      console.error('Error en OficioController.derivarOficio:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor al derivar el oficio',
+        error: error.message,
+      });
+    }
+  }
 }
