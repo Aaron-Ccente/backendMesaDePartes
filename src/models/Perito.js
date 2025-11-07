@@ -718,13 +718,31 @@ export class Perito {
         .promise()
         .query("SELECT COUNT(*) as total FROM perito");
       // Peritos por departamento
-      const [peritosPorSeccion] = await db.promise().query(`
-        SELECT td.nombre_departamento AS seccion, COUNT(p.id_perito) AS count
-        FROM perito p
-        INNER JOIN usuario_tipo_departamento AS utp ON p.id_usuario = utp.id_usuario
-        INNER JOIN tipo_departamento AS td ON utp.id_tipo_departamento = td.id_tipo_departamento
-        GROUP BY td.id_tipo_departamento, td.nombre_departamento
-        ORDER BY count DESC
+      const [usuariosActivos] = await db.promise().query(`
+        SELECT 
+            hu.id_usuario,
+            MAX(hu.fecha_historial) as ultima_entrada,
+            COUNT(*) as total_entradas_hoy,
+            (SELECT COUNT(*) FROM usuario) as total_usuarios_sistema
+        FROM historial_usuario hu
+        WHERE hu.tipo_historial = 'ENTRADA' 
+        AND DATE(hu.fecha_historial) = CURDATE()
+        AND NOT EXISTS (
+            -- Verificar si existe una SALIDA después de la última ENTRADA
+            SELECT 1
+            FROM historial_usuario h2
+            WHERE h2.id_usuario = hu.id_usuario
+            AND h2.tipo_historial = 'SALIDA'
+            AND DATE(h2.fecha_historial) = CURDATE()
+            AND h2.fecha_historial > (
+                SELECT MAX(h3.fecha_historial)
+                FROM historial_usuario h3
+                WHERE h3.id_usuario = hu.id_usuario
+                AND h3.tipo_historial = 'ENTRADA'
+                AND DATE(h3.fecha_historial) = CURDATE()
+            )
+        )
+        GROUP BY hu.id_usuario;
       `);
 
       // Peritos por Grado
@@ -739,7 +757,7 @@ export class Perito {
 
       return {
         totalPeritos: totalPeritos[0].total,
-        peritosPorSeccion,
+        usuariosActivos,
         peritosPorGrado,
       };
     } catch (error) {
