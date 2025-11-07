@@ -744,13 +744,19 @@ export class Perito {
       const [usuariosActivos] = await db.promise().query(`
         SELECT 
             hu.id_usuario,
+<<<<<<< HEAD
             u.nombre_completo,
             u.CIP,
+=======
+>>>>>>> c1a3dfd (Consulta a la bd para que retorne los usuarios activos del dia)
             MAX(hu.fecha_historial) as ultima_entrada,
             COUNT(*) as total_entradas_hoy,
             (SELECT COUNT(*) FROM usuario) as total_usuarios_sistema
         FROM historial_usuario hu
+<<<<<<< HEAD
         INNER JOIN usuario u ON hu.id_usuario = u.id_usuario
+=======
+>>>>>>> c1a3dfd (Consulta a la bd para que retorne los usuarios activos del dia)
         WHERE hu.tipo_historial = 'ENTRADA' 
         AND DATE(hu.fecha_historial) = CURDATE()
         AND NOT EXISTS (
