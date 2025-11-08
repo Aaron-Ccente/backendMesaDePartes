@@ -745,20 +745,20 @@ export class Perito {
         GROUP BY hu.id_usuario;
       `);
 
-      // Peritos por Grado
-      const [peritosPorGrado] = await db.promise().query(`
-        SELECT g.nombre AS grado, COUNT(p.id_perito) AS count
-        FROM perito p
-        INNER JOIN usuario_grado ug ON p.id_usuario = ug.id_usuario
-        INNER JOIN grado g ON ug.id_grado = g.id_grado
-        GROUP BY g.id_grado, g.nombre
-        ORDER BY count DESC
+      // Prioridad de oficios
+      const [prioridadOficios] = await db.promise().query(`
+        SELECT 
+          tp.nombre_prioridad AS nombre,
+          COUNT(o.id_oficio) AS cantidad
+        FROM oficio AS o
+        INNER JOIN tipos_prioridad AS tp ON o.id_prioridad = tp.id_prioridad
+        GROUP BY tp.nombre_prioridad;
       `);
 
       return {
         totalPeritos: totalPeritos[0].total,
         usuariosActivos,
-        peritosPorGrado,
+        prioridadOficios,
       };
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
