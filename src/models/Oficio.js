@@ -82,185 +82,84 @@ export class Oficio {
     try {
       await connection.beginTransaction();
 
-      try {
-        // verificar si existe el número de oficio
-        const [existingOficio] = await connection.query(
-          'SELECT numero_oficio FROM oficio WHERE numero_oficio = ?',
-          [oficioData.numero_oficio]
-        );
+      // Extraer los tipos de examen del objeto principal
+      const { id_tipos_examen, tipos_examen, ...oficioPrincipalData } = oficioData;
 
-        if (existingOficio.length > 0) {
-          return {
-            success: false,
-            error: 'DUPLICATE_ENTRY',
-            message: `Ya existe un oficio registrado con el número: ${oficioData.numero_oficio}`
-          };
-        }
+      // --- VALIDACIONES ---
+      // (Se omiten las validaciones de FK que ya no existen en la tabla oficio, como id_tipo_examen)
+      const [perito] = await connection.query('SELECT id_usuario FROM usuario WHERE id_usuario = ?', [oficioPrincipalData.id_usuario_perito_asignado]);
+      if (perito.length === 0) throw new Error('El perito asignado no existe.');
 
-        // Verificar existencia del perito
-        const [perito] = await connection.query(
-          'SELECT id_usuario FROM usuario WHERE id_usuario = ?',
-          [oficioData.id_usuario_perito_asignado]
-        );
+      const [especialidad] = await connection.query('SELECT id_tipo_departamento FROM tipo_departamento WHERE id_tipo_departamento = ?', [oficioPrincipalData.id_especialidad_requerida]);
+      if (especialidad.length === 0) throw new Error('La especialidad requerida no existe.');
 
-        if (perito.length === 0) {
-          return {
-            success: false,
-            error: 'INVALID_PERITO',
-            message: 'El perito asignado no existe en el sistema'
-          };
-        }
+      // --- INSERCIÓN DEL OFICIO PRINCIPAL ---
+      // Se quitan id_tipo_examen y tipo_examen del INSERT
+      const [result] = await connection.query(
+        `INSERT INTO oficio (
+          numero_oficio, unidad_solicitante, unidad_remitente, region_fiscalia,
+          tipo_de_muestra, asunto, examinado_incriminado, dni_examinado_incriminado,
+          fecha_hora_incidente, especialidad_requerida, id_especialidad_requerida,
+          muestra, perito_asignado, cip_perito_asignado, id_usuario_perito_asignado, 
+          id_prioridad, creado_por, actualizado_por
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          oficioPrincipalData.numero_oficio,
+          oficioPrincipalData.unidad_solicitante,
+          oficioPrincipalData.unidad_remitente,
+          oficioPrincipalData.region_fiscalia,
+          oficioPrincipalData.tipo_de_muestra,
+          oficioPrincipalData.asunto,
+          oficioPrincipalData.examinado_incriminado,
+          oficioPrincipalData.dni_examinado_incriminado,
+          oficioPrincipalData.fecha_hora_incidente,
+          oficioPrincipalData.nombre_especialidad, // Se usa el nombre de la especialidad
+          oficioPrincipalData.id_especialidad_requerida,
+          oficioPrincipalData.muestra,
+          oficioPrincipalData.nombre_perito, // Se usa el nombre del perito
+          oficioPrincipalData.cip_perito, // Se usa el cip del perito
+          oficioPrincipalData.id_usuario_perito_asignado,
+          oficioPrincipalData.id_prioridad,
+          oficioPrincipalData.creado_por,
+          oficioPrincipalData.actualizado_por
+        ]
+      );
+      
+      const newOficioId = result.insertId;
 
-        // Verificar existencia de la especialidad
-        const [especialidad] = await connection.query(
-          'SELECT id_tipo_departamento FROM tipo_departamento WHERE id_tipo_departamento = ?',
-          [oficioData.id_especialidad_requerida]
-        );
-
-        if (especialidad.length === 0) {
-          return {
-            success: false,
-            error: 'INVALID_ESPECIALIDAD',
-            message: 'La especialidad requerida no existe en el sistema'
-          };
-        }
-
-        // Verificar existencia del tipo de examen
-        const [tipoExamen] = await connection.query(
-          'SELECT id_tipo_de_examen FROM tipo_de_examen WHERE id_tipo_de_examen = ?',
-          [oficioData.id_tipo_examen]
-        );
-
-        if (tipoExamen.length === 0) {
-          return {
-            success: false,
-            error: 'INVALID_TIPO_EXAMEN',
-            message: 'El tipo de examen seleccionado no existe en el sistema'
-          };
-        }
-
-        // Verificar existencia de la prioridad
-        const [prioridad] = await connection.query(
-          'SELECT id_prioridad FROM tipos_prioridad WHERE id_prioridad = ?',
-          [oficioData.id_prioridad]
-        );
-
-        if (prioridad.length === 0) {
-          return {
-            success: false,
-            error: 'INVALID_PRIORIDAD',
-            message: 'El tipo de prioridad seleccionado no existe en el sistema'
-          };
-        }
-
-        // Si todas las validaciones pasan, insertar oficio
-        const [result] = await connection.query(
-          `INSERT INTO oficio (
-            numero_oficio, unidad_solicitante, unidad_remitente, region_fiscalia,
-            tipo_de_muestra, asunto, examinado_incriminado, dni_examinado_incriminado,
-            fecha_hora_incidente, especialidad_requerida, id_especialidad_requerida,
-            tipo_examen, id_tipo_examen, muestra, perito_asignado,
-            cip_perito_asignado, id_usuario_perito_asignado, id_prioridad,
-            creado_por, actualizado_por
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            oficioData.numero_oficio,
-            oficioData.unidad_solicitante,
-            oficioData.unidad_remitente,
-            oficioData.region_fiscalia,
-            oficioData.tipo_de_muestra,
-            oficioData.asunto,
-            oficioData.examinado_incriminado,
-            oficioData.dni_examinado_incriminado,
-            oficioData.fecha_hora_incidente,
-            oficioData.especialidad_requerida,
-            oficioData.id_especialidad_requerida,
-            oficioData.tipo_examen,
-            oficioData.id_tipo_examen,
-            oficioData.muestra,
-            oficioData.perito_asignado,
-            oficioData.cip_perito_asignado,
-            oficioData.id_usuario_perito_asignado,
-            oficioData.id_prioridad,
-            oficioData.creado_por,
-            oficioData.creado_por
-          ]
-        );
-
-        // Crear primer seguimiento
+      // --- INSERCIÓN EN TABLA PIVOTE oficio_examen ---
+      if (Array.isArray(id_tipos_examen) && id_tipos_examen.length > 0) {
+        const examenValues = id_tipos_examen.map(id_examen => [newOficioId, id_examen]);
         await connection.query(
-          `INSERT INTO seguimiento_oficio (
-            id_oficio, id_usuario, estado_anterior, estado_nuevo
-          ) VALUES (?, ?, NULL, 'CREACION DEL OFICIO')`,
-          [result.insertId, oficioData.creado_por]
+          'INSERT INTO oficio_examen (id_oficio, id_tipo_de_examen) VALUES ?',
+          [examenValues]
         );
-
-        await connection.commit();
-        return { 
-          success: true, 
-          data: { 
-            id_oficio: result.insertId,
-            numero_oficio: oficioData.numero_oficio 
-          },
-          message: "Oficio creado exitosamente" 
-        };
-
-      } catch (error) {
-        // Manejar otros tipos de errores SQL
-        if (error.code === 'ER_DUP_ENTRY') {
-          if (error.message.includes('numero_oficio')) {
-            return {
-              success: false,
-              error: 'DUPLICATE_ENTRY',
-              message: `Ya existe un oficio registrado con el número: ${oficioData.numero_oficio}`
-            };
-          }
-        }
-        
-        if (error.code === 'ER_NO_REFERENCED_ROW_2') {
-          // Identificar qué foreign key falló
-          if (error.message.includes('id_usuario_perito_asignado')) {
-            return {
-              success: false,
-              error: 'INVALID_PERITO',
-              message: 'El perito asignado no existe en el sistema'
-            };
-          }
-          if (error.message.includes('id_especialidad_requerida')) {
-            return {
-              success: false,
-              error: 'INVALID_ESPECIALIDAD',
-              message: 'La especialidad requerida no existe en el sistema'
-            };
-          }
-          if (error.message.includes('id_tipo_examen')) {
-            return {
-              success: false,
-              error: 'INVALID_TIPO_EXAMEN',
-              message: 'El tipo de examen seleccionado no existe en el sistema'
-            };
-          }
-          if (error.message.includes('id_prioridad')) {
-            return {
-              success: false,
-              error: 'INVALID_PRIORIDAD',
-              message: 'El tipo de prioridad seleccionado no existe en el sistema'
-            };
-          }
-        }
-
-        throw error;
       }
+
+      // --- INSERCIÓN DEL PRIMER SEGUIMIENTO (CON CONDUCTOR) ---
+      await connection.query(
+        `INSERT INTO seguimiento_oficio (
+          id_oficio, id_usuario, estado_nuevo, id_conductor
+        ) VALUES (?, ?, 'CREACION DEL OFICIO', ?)`,
+        [newOficioId, oficioPrincipalData.creado_por, oficioPrincipalData.id_usuario_perito_asignado]
+      );
+
+      await connection.commit();
+      return { 
+        success: true, 
+        data: { 
+          id_oficio: newOficioId,
+          numero_oficio: oficioPrincipalData.numero_oficio 
+        },
+        message: "Oficio creado exitosamente" 
+      };
 
     } catch (error) {
       await connection.rollback();
-      console.error('Error en create:', error);
-      
+      console.error('Error en Oficio.create:', error);
       return { 
         success: false, 
-        error: error.error || 'UNKNOWN_ERROR',
         message: error.message || "Error desconocido al crear el oficio",
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       };
     } finally {
       connection.release();

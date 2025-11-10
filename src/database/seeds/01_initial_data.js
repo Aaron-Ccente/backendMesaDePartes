@@ -50,7 +50,10 @@ export async function seed(knex) {
     { id_tipo_departamento: 7, nombre_departamento: 'GRAFOTECNIA FORENSE', descripcion: 'GRAFOTÉCNIA - descripción' },
     { id_tipo_departamento: 8, nombre_departamento: 'CONTABILIDAD Y TASACIÓN FORENSE', descripcion: 'Contabilidad y Tasación Forense - descripción' },
     { id_tipo_departamento: 9, nombre_departamento: 'PSICOLOGÍA FORENSE', descripcion: 'Psicología Forense - descripción' },
-    { id_tipo_departamento: 10, nombre_departamento: 'IDENTIFICACIÓN CRIMINALÍSTICA', descripcion: 'Identificación Criminalísitica - descripción' }
+    { id_tipo_departamento: 10, nombre_departamento: 'IDENTIFICACIÓN CRIMINALÍSTICA', descripcion: 'Identificación Criminalísitica - descripción' },
+    { id_tipo_departamento: 11, nombre_departamento: 'Toma de Muestra', descripcion: 'Departamento para el Flujo 1 de Toxicología' },
+    { id_tipo_departamento: 12, nombre_departamento: 'Laboratorio', descripcion: 'Departamento para análisis y consolidación en Toxicología' },
+    { id_tipo_departamento: 13, nombre_departamento: 'Instrumentalización', descripcion: 'Departamento para Dosaje Etílico en Toxicología' }
   ]);
 
   // --- 5. INSERTAR GRADOS ---
@@ -231,7 +234,27 @@ export async function seed(knex) {
     { id_tipo_departamento: 10, id_tipo_de_examen: 67 },
     { id_tipo_departamento: 10, id_tipo_de_examen: 68 },
     { id_tipo_departamento: 10, id_tipo_de_examen: 69 },
-    { id_tipo_departamento: 10, id_tipo_de_examen: 70 }
+    { id_tipo_departamento: 10, id_tipo_de_examen: 70 },
+
+    // --- ASIGNACIONES FALTANTES ---
+    // ESCENA DEL CRIMEN (ID 1)
+    { id_tipo_departamento: 1, id_tipo_de_examen: 3 },  // Inspección Balística
+    { id_tipo_departamento: 1, id_tipo_de_examen: 7 },  // Inspección Explosivos
+    { id_tipo_departamento: 1, id_tipo_de_examen: 61 }, // Perfiliación Criminal en la Escena del Crimen
+    { id_tipo_departamento: 1, id_tipo_de_examen: 63 }, // Procesamiento de fragmentos de huellas papilares
+
+    // Toma de Muestra (ID 11)
+    { id_tipo_departamento: 11, id_tipo_de_examen: 33 }, // TOXICOLÓGICO EN MUESTRAS BIOLÓGICAS TOMADAS DIRECTAMENTE
+    { id_tipo_departamento: 11, id_tipo_de_examen: 35 }, // DOSAJE ETÍLICO EN MUESTRAS BIOLÓGICAS TOMADAS DIRECTAMENTE
+
+    // Laboratorio (ID 12)
+    { id_tipo_departamento: 12, id_tipo_de_examen: 34 }, // TOXICOLÓGICO EN MUESTRAS REMITIDAS
+    { id_tipo_departamento: 12, id_tipo_de_examen: 36 }, // ADHERENCIA DE DROGAS ILICITA
+    { id_tipo_departamento: 12, id_tipo_de_examen: 37 }, // ANÁLISIS DE INSUMOS QUÍMICOS FISCALIZADOS
+
+    // Instrumentalización (ID 13)
+    { id_tipo_departamento: 13, id_tipo_de_examen: 25 }, // Examen de absorción atómica
+    { id_tipo_departamento: 13, id_tipo_de_examen: 27 }  // Exámenes instrumentales de espectrometría
   ]);
   // --- 10. INSERTAR USUARIO DE MESA DE PARTES Y SU ROL---  (CUENTA POR DEFECTO PARA PRUEBAS USAR 2023 :) )
   await knex('usuario').insert([
@@ -285,5 +308,40 @@ export async function seed(knex) {
   // Turno del perito
   await knex('usuario_turno').insert([
     { id_usuario_turno: 1, id_usuario: 2, id_turno: 1 }
+  ]);
+
+  // --- 13. INSERTAR USUARIOS PERSONALIZADOS DEL CLIENTE ---
+  const customUserPassword = '$2b$10$JHXf44agcX8shOGDCGdtOujKn.1lpptSrUpqP1yAv6bJbdqw2XgWK'; // Corresponde a "123456"
+  await knex('usuario').insert([
+    { id_usuario: 110, CIP: '110', nombre_completo: 'Usuario Mesa de Partes', nombre_usuario: 'mesapartes110', password_hash: customUserPassword },
+    { id_usuario: 112, CIP: '112', nombre_completo: 'Usuario Administrador', nombre_usuario: 'admin112', password_hash: customUserPassword },
+    { id_usuario: 111, CIP: '111', nombre_completo: 'Perito Toma Muestra', nombre_usuario: 'perito111', password_hash: customUserPassword },
+    { id_usuario: 222, CIP: '222', nombre_completo: 'Perito Laboratorio', nombre_usuario: 'perito222', password_hash: customUserPassword },
+    { id_usuario: 333, CIP: '333', nombre_completo: 'Perito Instrumentalizacion', nombre_usuario: 'perito333', password_hash: customUserPassword },
+  ]);
+
+  // Asignar roles
+  await knex('usuario_rol').insert([
+    { id_usuario: 110, id_rol: 3 }, // Mesa de Partes
+    { id_usuario: 112, id_rol: 1 }, // Admin
+    { id_usuario: 111, id_rol: 2 }, // Perito
+    { id_usuario: 222, id_rol: 2 }, // Perito
+    { id_usuario: 333, id_rol: 2 }, // Perito
+  ]);
+
+  // Asignar a tablas de rol específicas
+  await knex('mesadepartes').insert([{id_usuario: 110}]);
+  await knex('administrador').insert([{id_usuario: 112}]);
+  await knex('perito').insert([
+      { id_usuario: 111, dni: '11111111' },
+      { id_usuario: 222, dni: '22222222' },
+      { id_usuario: 333, dni: '33333333' },
+  ]);
+
+  // Asignar peritos a sus departamentos
+  await knex('usuario_tipo_departamento').insert([
+      { id_usuario: 111, id_tipo_departamento: 11 }, // Perito 111 -> Toma de Muestra (ID 11)
+      { id_usuario: 222, id_tipo_departamento: 12 }, // Perito 222 -> Laboratorio (ID 12)
+      { id_usuario: 333, id_tipo_departamento: 13 }, // Perito 333 -> Instrumentalización (ID 13)
   ]);
 }
