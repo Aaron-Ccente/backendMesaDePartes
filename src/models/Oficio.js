@@ -221,7 +221,11 @@ export class Oficio {
                tp.nombre_prioridad,
                td.nombre_departamento AS especialidad,
                s.estado_nuevo AS ultimo_estado,
-               s.fecha_seguimiento AS ultimo_fecha
+               s.fecha_seguimiento AS ultimo_fecha,
+               (SELECT GROUP_CONCAT(te.nombre SEPARATOR ', ') 
+                FROM oficio_examen oe 
+                JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen 
+                WHERE oe.id_oficio = o.id_oficio) AS tipos_de_examen
         FROM oficio o
         LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
         LEFT JOIN tipo_departamento td ON o.id_especialidad_requerida = td.id_tipo_departamento
@@ -333,6 +337,85 @@ export class Oficio {
       throw error; // Propagar el error al controlador
     } finally {
       connection.release(); // Liberar la conexión al pool
+    }
+  }
+
+  /**
+   * Agrega el resultado de un examen de un perito a un oficio.
+   * @param {object} resultadoData - Datos del resultado.
+   * @param {number} resultadoData.id_oficio - ID del oficio.
+   * @param {number} resultadoData.id_perito_responsable - ID del perito que emite el resultado.
+   * @param {string} resultadoData.tipo_resultado - Ej: 'TOXICOLOGICO', 'DOSAJE_ETILICO'.
+   * @param {object} resultadoData.resultados - Objeto JSON con los hallazgos.
+   */
+  static async addResultado({ id_oficio, id_perito_responsable, tipo_resultado, resultados }) {
+    try {
+      // Validar que los datos necesarios están presentes
+      if (!id_oficio || !id_perito_responsable || !tipo_resultado || !resultados) {
+        throw new Error('Faltan datos requeridos para agregar el resultado.');
+      }
+
+      const [result] = await db.promise().query(
+        `INSERT INTO oficio_resultados_perito (id_oficio, id_perito_responsable, tipo_resultado, resultados)
+         VALUES (?, ?, ?, ?)`,
+        [id_oficio, id_perito_responsable, tipo_resultado, JSON.stringify(resultados)]
+      );
+
+      return { success: true, data: { id_resultado: result.insertId } };
+    } catch (error) {
+      console.error('Error en Oficio.addResultado:', error);
+      // Lanza el error para que el controlador lo maneje
+      throw error;
+    }
+  }
+
+  /**
+   * Busca todos los resultados asociados a un ID de oficio.
+   * @param {number} id_oficio - ID del oficio principal
+   */
+  static async getResultados(id_oficio) {
+    if (!id_oficio) {
+      throw new Error('El id_oficio es requerido');
+    }
+
+    try {
+      const query = `
+        SELECT 
+          r.id_resultado,
+          r.id_oficio,
+          r.id_perito_responsable,
+          u.nombre_completo as nombre_perito,
+          s.nombre as nombre_seccion,
+          r.tipo_resultado,
+          r.resultados,
+          r.fecha_creacion
+        FROM oficio_resultados_perito r
+        
+        JOIN usuario u ON r.id_perito_responsable = u.id_usuario
+        
+        LEFT JOIN usuario_seccion us ON u.id_usuario = us.id_usuario
+        LEFT JOIN seccion s ON us.id_seccion = s.id_seccion
+
+        WHERE r.id_oficio = ?
+        ORDER BY r.fecha_creacion ASC;
+      `;
+
+      const [rows] = await db.promise().query(query, [id_oficio]);
+
+      const resultados = rows.map(row => {
+        try {
+          row.resultados = JSON.parse(row.resultados);
+        } catch (e) {
+          row.resultados = { error: "Formato de resultado inválido en la BD." };
+        }
+        return row;
+      });
+
+      return { success: true, data: resultados };
+
+    } catch (error) {
+      console.error('Error en Oficio.getResultados:', error);
+      throw error;
     }
   }
 }
