@@ -52,13 +52,36 @@ export class Perito {
     }
   }
 
-  static async findAccordingToSpecialty(id_especialidad) {
-    try {
-      const [rows] = await db.promise().query(
-        `SELECT u.nombre_completo, u.id_usuario, u.CIP, u.nombre_completo FROM usuario AS u 
+ static async findAccordingToSpecialty(id_especialidad) {
+  try {
+    const [rows] = await db.promise().query(
+        `SELECT 
+          u.nombre_completo, 
+          u.id_usuario, 
+          u.CIP, 
+          u.nombre_completo,
+          COUNT(o.id_oficio) as oficios_pendientes
+        FROM usuario AS u 
         LEFT JOIN usuario_tipo_departamento AS utp ON u.id_usuario = utp.id_usuario 
         LEFT JOIN tipo_departamento AS td ON utp.id_tipo_departamento = td.id_tipo_departamento
-        WHERE utp.id_tipo_departamento = ?`,
+        LEFT JOIN oficio AS o ON u.id_usuario = o.id_usuario_perito_asignado
+        LEFT JOIN (
+          SELECT 
+            so1.id_oficio,
+            so1.estado_nuevo,
+            so1.fecha_seguimiento
+          FROM seguimiento_oficio so1
+          INNER JOIN (
+            SELECT 
+              id_oficio, 
+              MAX(fecha_seguimiento) as ultima_fecha
+            FROM seguimiento_oficio 
+            GROUP BY id_oficio
+          ) so2 ON so1.id_oficio = so2.id_oficio AND so1.fecha_seguimiento = so2.ultima_fecha
+        ) ultimo_estado ON o.id_oficio = ultimo_estado.id_oficio
+        WHERE utp.id_tipo_departamento = ?
+          AND (ultimo_estado.estado_nuevo IS NULL OR ultimo_estado.estado_nuevo != 'COMPLETADO')
+        GROUP BY u.id_usuario, u.nombre_completo, u.CIP`,
         [id_especialidad]
       );
       return rows || null;
