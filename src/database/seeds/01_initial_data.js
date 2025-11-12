@@ -74,6 +74,13 @@ export async function seed(knex) {
     { id_tipo_departamento: 10, nombre_departamento: 'IDENTIFICACIÓN CRIMINALÍSTICA' },
   ]);
 
+    // Secciones
+  await knex('seccion').insert([
+    { id_seccion: 1, nombre: 'Toma de Muestra', id_tipo_departamento: 6 },
+    { id_seccion: 2, nombre: 'Laboratorio', id_tipo_departamento: 6 },
+    { id_seccion: 3, nombre: 'Instrumentalización', id_tipo_departamento: 6 }
+  ]);
+  
   // Grados
   await knex('grado').insert([
     { id_grado: 1, nombre: 'Coronel' }, { id_grado: 2, nombre: 'Comandante' }, { id_grado: 3, nombre: 'Mayor' },
