@@ -839,4 +839,75 @@ export class Perito {
       throw error;
     }
   }
+  // Obtiene la carga de trabajo (oficios activos) y el turno de los peritos de una sección
+  static async findCargaTrabajoPorSeccion(id_seccion) {
+    if (!id_seccion) {
+      throw new Error('El ID de la sección es requerido');
+    }
+
+    try {
+      const query = `
+        SELECT 
+          u.id_usuario,
+          u.CIP,
+          u.nombre_completo,
+          t.nombre as nombre_turno,
+          COUNT(o.id_oficio) as casos_activos
+        FROM usuario u
+        
+        -- Unir con la sección del perito
+        JOIN usuario_seccion us ON u.id_usuario = us.id_usuario
+        
+        -- Unir con el turno del perito
+        LEFT JOIN usuario_turno ut ON u.id_usuario = ut.id_usuario
+        LEFT JOIN turno t ON ut.id_turno = t.id_turno
+        
+        -- Unir con los oficios (solo los activos)
+        LEFT JOIN oficio o ON u.id_usuario = o.id_usuario_perito_asignado
+          AND o.id_oficio NOT IN (
+            -- Excluir oficios que ya están 'COMPLETADO'
+            SELECT id_oficio FROM seguimiento_oficio WHERE estado_nuevo = 'COMPLETADO'
+          )
+
+        -- Filtrar por la sección requerida
+        WHERE us.id_seccion = ?
+
+        -- Agrupar para contar los oficios por perito
+        GROUP BY u.id_usuario, u.CIP, u.nombre_completo, t.nombre
+
+        -- Ordenar por el que tiene menos casos primero
+        ORDER BY casos_activos ASC, u.nombre_completo ASC;
+      `;
+      
+      const [rows] = await db.promise().query(query, [id_seccion]);
+      return { success: true, data: rows };
+
+    } catch (error) {
+      console.error('Error en findCargaTrabajoPorSeccion:', error);
+      throw error;
+    }
+  }
+
+  static async findNextAvailable(id_seccion) {
+    if (!id_seccion) {
+      throw new Error('El ID de la sección es requerido para encontrar un perito disponible.');
+    }
+    try {
+      // Lógica simple: devuelve el primer perito de la sección.
+      // Una versión más avanzada podría usar findCargaTrabajoPorSeccion y devolver el que tenga menos carga.
+      const [rows] = await db.promise().query(
+        `SELECT id_usuario FROM usuario_seccion WHERE id_seccion = ? LIMIT 1`,
+        [id_seccion]
+      );
+      
+      if (rows.length === 0) {
+        return null; // No se encontraron peritos
+      }
+      
+      return rows[0]; // Devuelve { id_usuario: X }
+    } catch (error) {
+      console.error('Error en findNextAvailable:', error);
+      throw error;
+    }
+  }
 }

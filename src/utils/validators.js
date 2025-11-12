@@ -318,21 +318,15 @@ export class Validators {
     const errors = [];
 
     // Validar número de oficio
-    if (!oficioData.numero_oficio?.trim()) {
-        errors.push("Número de oficio es requerido");
-    } else if (oficioData.numero_oficio.length > 20) {
+    if (oficioData.numero_oficio && oficioData.numero_oficio.length > 20) {
         errors.push("Número de oficio no puede exceder 20 caracteres");
     }
 
     // Validar campos de texto requeridos
     const requiredFields = {
         'unidad_solicitante': 150,
-        'unidad_remitente': 150,
-        'region_fiscalia': 150,
         'asunto': 400,
-        'fecha_hora_incidente': 50,
         'especialidad_requerida': 200,
-        'tipo_examen': 300,
         'muestra': 250,
         'perito_asignado': 250
     };
@@ -352,22 +346,19 @@ export class Validators {
         errors.push("Tipo de muestra debe ser 'MUESTRAS REMITIDAS' o 'TOMA DE MUESTRAS'");
     }
 
-    // Validar campos condicionales según tipo de muestra
-    if (oficioData.tipo_de_muestra === 'TOMA DE MUESTRAS') {
-        if (!oficioData.examinado_incriminado?.trim()) {
-            errors.push("Examinado/Incriminado es requerido para toma de muestras");
-        }
-        if (!oficioData.dni_examinado_incriminado?.trim()) {
-            errors.push("DNI del examinado/incriminado es requerido para toma de muestras");
-        } else if (!/^\d{8}$/.test(oficioData.dni_examinado_incriminado)) {
-            errors.push("DNI debe contener exactamente 8 dígitos");
-        }
+    // Validar campos condicionales
+    if (oficioData.examinado_incriminado && !/^\d{8}$/.test(oficioData.dni_examinado_incriminado)) {
+        errors.push("DNI debe contener exactamente 8 dígitos");
+    }
+
+    // Validar el array de tipos de examen
+    if (!Array.isArray(oficioData.id_tipos_examen) || oficioData.id_tipos_examen.length === 0) {
+        errors.push("Se debe seleccionar al menos un tipo de examen (id_tipos_examen debe ser un array no vacío)");
     }
 
     // Validar campos numéricos
     const requiredNumericFields = [
         'id_especialidad_requerida',
-        'id_tipo_examen',
         'id_usuario_perito_asignado',
         'id_prioridad'
     ];

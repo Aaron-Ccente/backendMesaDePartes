@@ -79,7 +79,9 @@ router.post('/', requireMesaDePartes, OficioController.createOficio);
 
 // Rutas con parámetros
 router.get('/:id', OficioController.getOficioById);
+router.get('/barcode/:id', OficioController.getOficioById);
 router.get('/:id/seguimiento', OficioController.getSeguimientoOficio);
+router.get('/:id/reporte', OficioController.generarReporte);
 router.post('/:id/respond', requirePerito, OficioController.respondToOficio);
 
 // --- Rutas de Hoja de Ruta (Resultados) ---

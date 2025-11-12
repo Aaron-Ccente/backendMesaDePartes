@@ -1,7 +1,10 @@
 import { Oficio } from '../models/Oficio.js';
 import { Validators } from '../utils/validators.js';
+import { WorkflowService } from '../services/workflowService.js';
+import { ReportService } from '../services/reportService.js';
 
 export class OficioController {
+
   static async getAllOficios(_, res) {
     try {
       const result = await Oficio.findAll();
@@ -41,22 +44,19 @@ export class OficioController {
     try {
       const { mesadepartesData, ...oficioData } = req.body;
 
-      // Validar datos de mesa de partes
-      if (!mesadepartesData?.id_usuario || !mesadepartesData?.CIP || !mesadepartesData?.nombre_completo) {
+      if (!mesadepartesData?.id_usuario) {
         return res.status(400).json({
           success: false,
           message: "Datos del usuario de mesa de partes incompletos"
         });
       }
 
-      // Preparar datos del oficio
       const oficioCompleto = {
         ...oficioData,
         creado_por: mesadepartesData.id_usuario,
         actualizado_por: mesadepartesData.id_usuario
       };
 
-      // Validar datos del oficio
       const validation = Validators.validateOficioData(oficioCompleto);
       if (!validation.isValid) {
         return res.status(400).json({
@@ -66,7 +66,6 @@ export class OficioController {
         });
       }
 
-      // Intentar crear el oficio
       const result = await Oficio.create(oficioCompleto);
       
       if (!result.success) {
@@ -95,7 +94,7 @@ export class OficioController {
     }
   }
 
-   static async checkNumero(req, res) {
+  static async checkNumero(req, res) {
     try {
       const { numero } = req.params;
       if (!numero || String(numero).trim() === "") {
@@ -133,7 +132,6 @@ export class OficioController {
     }
   }
 
-  // Obtener oficios asignados al usuario
   static async getAssignedToUser(req, res) {
     try {
       const userId = req.user?.id_usuario ?? null;
@@ -150,7 +148,6 @@ export class OficioController {
     }
   }
 
-  // Obtener alertas de oficios con estado CREACION DEL OFICIO
   static async getAlertas(req, res) {
     try {
       const userId = req.user?.id_usuario ?? null;
@@ -167,17 +164,13 @@ export class OficioController {
     }
   }
 
-  // actualizar seguimiento de un oficio
   static async respondToOficio(req, res) {
     try {
       const { id } = req.params;
-      const { estado_nuevo, estado_anterior = null, comentario = null } = req.body;
+      const { estado_nuevo, estado_anterior = null } = req.body;
 
-      if (!id) {
-        return res.status(400).json({ success: false, message: 'ID de oficio requerido' });
-      }
-      if (!estado_nuevo || String(estado_nuevo).trim() === '') {
-        return res.status(400).json({ success: false, message: 'Estado nuevo es requerido' });
+      if (!id || !estado_nuevo) {
+        return res.status(400).json({ success: false, message: 'ID de oficio y estado nuevo son requeridos' });
       }
 
       const id_usuario = req.user?.id_usuario;
@@ -185,7 +178,6 @@ export class OficioController {
         return res.status(400).json({ success: false, message: 'Usuario no identificado' });
       }
 
-      // Insertar seguimiento
       const seguimientoResult = await Oficio.addSeguimiento({
         id_oficio: Number(id),
         id_usuario,
@@ -194,17 +186,95 @@ export class OficioController {
       });
 
       if (!seguimientoResult.success) {
-        return res.status(500).json({ success: false, message: seguimientoResult.message || 'Error al guardar seguimiento' });
+        return res.status(500).json({ success: false, message: 'Error al guardar seguimiento' });
       }
 
-      return res.status(201).json({
-        success: true,
-        message: 'Seguimiento creado correctamente',
-        data: { id_seguimiento: seguimientoResult.data.id_seguimiento }
-      });
+      return res.status(201).json({ success: true, message: 'Seguimiento creado correctamente' });
     } catch (error) {
       console.error('Error en respondToOficio:', error);
       return res.status(500).json({ success: false, message: 'Error interno al responder oficio' });
+    }
+  }
+
+  static async derivarOficio(req, res) {
+    try {
+      const { id } = req.params;
+      const id_perito_actual = req.user.id_usuario;
+      const { id_nuevo_perito, nombre_seccion_destino } = req.body;
+
+      if (!id_nuevo_perito || !nombre_seccion_destino) {
+        return res.status(400).json({
+          success: false,
+          message: 'Se requieren "id_nuevo_perito" y "nombre_seccion_destino".',
+        });
+      }
+
+      const result = await Oficio.reasignarPerito(Number(id), Number(id_nuevo_perito), id_perito_actual, nombre_seccion_destino);
+
+      if (!result.success) {
+        return res.status(404).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('Error en OficioController.derivarOficio:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor al derivar el oficio',
+      });
+    }
+  }
+
+  static async addResultadoOficio(req, res) {
+    try {
+      const { id } = req.params;
+      const id_perito_responsable = req.user.id_usuario;
+      const { tipo_resultado, resultados } = req.body;
+
+      if (!tipo_resultado || !resultados) {
+        return res.status(400).json({
+          success: false,
+          message: 'Se requieren "tipo_resultado" y "resultados".',
+        });
+      }
+
+      await Oficio.addResultado({
+        id_oficio: Number(id),
+        id_perito_responsable,
+        tipo_resultado,
+        resultados,
+      });
+
+      const nextStep = await WorkflowService.getNextStep(Number(id));
+
+      return res.status(201).json({
+        success: true,
+        message: 'Resultado agregado exitosamente.',
+        next_step_info: nextStep
+      });
+    } catch (error) {
+      console.error('Error en addResultadoOficio:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno al agregar el resultado.',
+      });
+    }
+  }
+
+  static async generarReporte(req, res) {
+    try {
+      const { id } = req.params;
+      const pdfBuffer = await ReportService.generateReport(Number(id));
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=reporte_oficio_${id}.pdf`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('Error en generarReporte:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno al generar el reporte.',
+      });
     }
   }
   /**
