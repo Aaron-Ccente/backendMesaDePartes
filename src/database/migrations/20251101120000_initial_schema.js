@@ -170,6 +170,7 @@ export async function up(knex) {
         .references('id_estado').inTable('estado')
         .onDelete('RESTRICT').onUpdate('CASCADE');
       table.timestamp('fecha_actualizacion').defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.string('motivo', 300).notNullable().defaultTo('Usuario habilitado hasta dar motivo de inhabilitación.');
     })
 
     // Tabla: usuario_tipo_departamento (Relación Perito <-> Departamento)
