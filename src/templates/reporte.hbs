@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe Pericial - Oficio {{oficio.numero_oficio}}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1, h2 { color: #333; }
+        .section { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .label { font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>Informe Pericial de Toxicología</h1>
+    <h2>Oficio N°: {{oficio.numero_oficio}}</h2>
+
+    <div class="section">
+        <h2>Datos Generales</h2>
+        <p><span class="label">Unidad Solicitante:</span> {{oficio.unidad_solicitante}}</p>
+        <p><span class="label">Asunto:</span> {{oficio.asunto}}</p>
+        <p><span class="label">Perito Asignado Actualmente:</span> {{oficio.perito_asignado}}</p>
+        <p><span class="label">Fecha de Incidente:</span> {{oficio.fecha_hora_incidente}}</p>
+    </div>
+
+    <div class="section">
+        <h2>Resultados de Exámenes</h2>
+        {{#if resultados}}
+            {{#each resultados}}
+                <h3>Resultados para: {{this.tipo_resultado}}</h3>
+                <p><span class="label">Registrado por:</span> {{this.nombre_perito}}</p>
+                <p><span class="label">Fecha:</span> {{this.fecha_creacion}}</p>
+                <div>
+                    <pre>{{json this.resultados}}</pre>
+                </div>
+            {{/each}}
+        {{else}}
+            <p>No hay resultados registrados para este oficio.</p>
+        {{/if}}
+    </div>
+
+    <div class="section">
+        <h2>Historial de Seguimiento</h2>
+        {{#if seguimiento}}
+            <ul>
+            {{#each seguimiento}}
+                <li>{{this.fecha_seguimiento}} - {{this.estado_nuevo}} (Registrado por: {{this.nombre_usuario}})</li>
+            {{/each}}
+            </ul>
+        {{else}}
+            <p>No hay historial de seguimiento para este oficio.</p>
+        {{/if}}
+    </div>
+
+</body>
+</html>

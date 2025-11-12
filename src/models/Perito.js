@@ -52,13 +52,36 @@ export class Perito {
     }
   }
 
-  static async findAccordingToSpecialty(id_especialidad) {
-    try {
-      const [rows] = await db.promise().query(
-        `SELECT u.nombre_completo, u.id_usuario, u.CIP, u.nombre_completo FROM usuario AS u 
+ static async findAccordingToSpecialty(id_especialidad) {
+  try {
+    const [rows] = await db.promise().query(
+        `SELECT 
+          u.nombre_completo, 
+          u.id_usuario, 
+          u.CIP, 
+          u.nombre_completo,
+          COUNT(o.id_oficio) as oficios_pendientes
+        FROM usuario AS u 
         LEFT JOIN usuario_tipo_departamento AS utp ON u.id_usuario = utp.id_usuario 
         LEFT JOIN tipo_departamento AS td ON utp.id_tipo_departamento = td.id_tipo_departamento
-        WHERE utp.id_tipo_departamento = ?`,
+        LEFT JOIN oficio AS o ON u.id_usuario = o.id_usuario_perito_asignado
+        LEFT JOIN (
+          SELECT 
+            so1.id_oficio,
+            so1.estado_nuevo,
+            so1.fecha_seguimiento
+          FROM seguimiento_oficio so1
+          INNER JOIN (
+            SELECT 
+              id_oficio, 
+              MAX(fecha_seguimiento) as ultima_fecha
+            FROM seguimiento_oficio 
+            GROUP BY id_oficio
+          ) so2 ON so1.id_oficio = so2.id_oficio AND so1.fecha_seguimiento = so2.ultima_fecha
+        ) ultimo_estado ON o.id_oficio = ultimo_estado.id_oficio
+        WHERE utp.id_tipo_departamento = ?
+          AND (ultimo_estado.estado_nuevo IS NULL OR ultimo_estado.estado_nuevo != 'COMPLETADO')
+        GROUP BY u.id_usuario, u.nombre_completo, u.CIP`,
         [id_especialidad]
       );
       return rows || null;
@@ -718,32 +741,53 @@ export class Perito {
         .promise()
         .query("SELECT COUNT(*) as total FROM perito");
       // Peritos por departamento
-      const [peritosPorSeccion] = await db.promise().query(`
-        SELECT td.nombre_departamento AS seccion, COUNT(p.id_perito) AS count
-        FROM perito p
-        INNER JOIN usuario_tipo_departamento AS utp ON p.id_usuario = utp.id_usuario
-        INNER JOIN tipo_departamento AS td ON utp.id_tipo_departamento = td.id_tipo_departamento
-        GROUP BY td.id_tipo_departamento, td.nombre_departamento
-        ORDER BY count DESC
+      const [usuariosActivos] = await db.promise().query(`
+        SELECT 
+            hu.id_usuario,
+            u.nombre_completo,
+            u.CIP,
+            MAX(hu.fecha_historial) as ultima_entrada,
+            COUNT(*) as total_entradas_hoy,
+            (SELECT COUNT(*) FROM usuario) as total_usuarios_sistema
+        FROM historial_usuario hu
+        INNER JOIN usuario u ON hu.id_usuario = u.id_usuario
+        WHERE hu.tipo_historial = 'ENTRADA' 
+        AND DATE(hu.fecha_historial) = CURDATE()
+        AND NOT EXISTS (
+            -- Verificar si existe una SALIDA después de la última ENTRADA
+            SELECT 1
+            FROM historial_usuario h2
+            WHERE h2.id_usuario = hu.id_usuario
+            AND h2.tipo_historial = 'SALIDA'
+            AND DATE(h2.fecha_historial) = CURDATE()
+            AND h2.fecha_historial > (
+                SELECT MAX(h3.fecha_historial)
+                FROM historial_usuario h3
+                WHERE h3.id_usuario = hu.id_usuario
+                AND h3.tipo_historial = 'ENTRADA'
+                AND DATE(h3.fecha_historial) = CURDATE()
+            )
+        )
+        GROUP BY hu.id_usuario;
       `);
 
-      // Peritos por Grado
-      const [peritosPorGrado] = await db.promise().query(`
-        SELECT g.nombre AS grado, COUNT(p.id_perito) AS count
-        FROM perito p
-        INNER JOIN usuario_grado ug ON p.id_usuario = ug.id_usuario
-        INNER JOIN grado g ON ug.id_grado = g.id_grado
-        GROUP BY g.id_grado, g.nombre
-        ORDER BY count DESC
+      // Prioridad de oficios
+      const [prioridadOficios] = await db.promise().query(`
+        SELECT 
+          tp.nombre_prioridad AS nombre,
+          COUNT(o.id_oficio) AS cantidad
+        FROM oficio AS o
+        INNER JOIN tipos_prioridad AS tp ON o.id_prioridad = tp.id_prioridad
+        GROUP BY tp.nombre_prioridad;
       `);
 
       return {
         totalPeritos: totalPeritos[0].total,
-        peritosPorSeccion,
-        peritosPorGrado,
+        usuariosActivos,
+        prioridadOficios,
       };
     } catch (error) {
-      console.error("Error obteniendo estadísticas:", error);
+      console.error('Error obteniendo estadísticas:', error);
       throw error;
     }
   }
@@ -792,6 +836,77 @@ export class Perito {
 
     } catch (error) {
       console.error('Error en findCargaTrabajoPorSeccion:', error);
+      throw error;
+    }
+  }
+  // Obtiene la carga de trabajo (oficios activos) y el turno de los peritos de una sección
+  static async findCargaTrabajoPorSeccion(id_seccion) {
+    if (!id_seccion) {
+      throw new Error('El ID de la sección es requerido');
+    }
+
+    try {
+      const query = `
+        SELECT 
+          u.id_usuario,
+          u.CIP,
+          u.nombre_completo,
+          t.nombre as nombre_turno,
+          COUNT(o.id_oficio) as casos_activos
+        FROM usuario u
+        
+        -- Unir con la sección del perito
+        JOIN usuario_seccion us ON u.id_usuario = us.id_usuario
+        
+        -- Unir con el turno del perito
+        LEFT JOIN usuario_turno ut ON u.id_usuario = ut.id_usuario
+        LEFT JOIN turno t ON ut.id_turno = t.id_turno
+        
+        -- Unir con los oficios (solo los activos)
+        LEFT JOIN oficio o ON u.id_usuario = o.id_usuario_perito_asignado
+          AND o.id_oficio NOT IN (
+            -- Excluir oficios que ya están 'COMPLETADO'
+            SELECT id_oficio FROM seguimiento_oficio WHERE estado_nuevo = 'COMPLETADO'
+          )
+
+        -- Filtrar por la sección requerida
+        WHERE us.id_seccion = ?
+
+        -- Agrupar para contar los oficios por perito
+        GROUP BY u.id_usuario, u.CIP, u.nombre_completo, t.nombre
+
+        -- Ordenar por el que tiene menos casos primero
+        ORDER BY casos_activos ASC, u.nombre_completo ASC;
+      `;
+      
+      const [rows] = await db.promise().query(query, [id_seccion]);
+      return { success: true, data: rows };
+
+    } catch (error) {
+      console.error('Error en findCargaTrabajoPorSeccion:', error);
+      throw error;
+    }
+  }
+
+  static async findNextAvailable(id_seccion) {
+    if (!id_seccion) {
+      throw new Error('El ID de la sección es requerido para encontrar un perito disponible.');
+    }
+    try {
+      // Lógica simple: devuelve el primer perito de la sección.
+      // Una versión más avanzada podría usar findCargaTrabajoPorSeccion y devolver el que tenga menos carga.
+      const [rows] = await db.promise().query(
+        `SELECT id_usuario FROM usuario_seccion WHERE id_seccion = ? LIMIT 1`,
+        [id_seccion]
+      );
+      
+      if (rows.length === 0) {
+        return null; // No se encontraron peritos
+      }
+      
+      return rows[0]; // Devuelve { id_usuario: X }
+    } catch (error) {
+      console.error('Error en findNextAvailable:', error);
       throw error;
     }
   }
