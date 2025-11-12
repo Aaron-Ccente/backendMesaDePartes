@@ -82,7 +82,7 @@ export class Admin {
   static async findByCIP(CIP) {
     try {
       const [rows] = await db.promise().query(
-        'SELECT us.id_usuario, CIP, nombre_usuario, password_hash, nombre_completo FROM usuario AS us LEFT JOIN usuario_rol AS ur ON us.id_usuario = ur.id_usuario LEFT JOIN rol AS r ON ur.id_rol = r.id_rol WHERE CIP = ? AND r.nombre_rol = "ADMINISTRADOR"',
+        'SELECT us.id_usuario, us.CIP, us.nombre_usuario, us.password_hash, us.nombre_completo FROM usuario AS us LEFT JOIN usuario_rol AS ur ON us.id_usuario = ur.id_usuario LEFT JOIN rol AS r ON ur.id_rol = r.id_rol WHERE CIP = ? AND r.nombre_rol = "ADMINISTRADOR"',
         [CIP]
       );
       
