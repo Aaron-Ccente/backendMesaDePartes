@@ -204,4 +204,17 @@ export class AuthController {
       return res.status(401).json({ success: false, message: error.message });
     }
   }
+
+  // Habilitar o deshabilitar usuarios
+  static async enableDisableUser(req, res) {
+    try {
+      const { id_estado, id_usuario, motivo } = req.body;
+      const result = await AuthService.enableDisableUser({ id_estado, id_usuario, motivo });
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('Error enableDisableUser:', error);
+      return res.status(500).json({ success: false, message: 'Error interno del servidor', error: error.message });
+    }
+  }
+
 }
