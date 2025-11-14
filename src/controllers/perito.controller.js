@@ -114,36 +114,55 @@ export class PeritoController {
   // Controlador "inteligente" para obtener peritos disponibles
   static async getPeritosDisponibles(req, res) {
     try {
-      const { idEspecialidad, idTipoExamen } = req.query;
+      // Ahora recibe un array de idTiposExamen
+      const { idEspecialidad, idTiposExamen } = req.query;
       let peritos = [];
 
-      if (idTipoExamen) {
-        // Lógica de negocio: Mapear tipo de examen a sección
-        // IDs asumidos: Examen(1:Tox, 2:Dos, 3:Sarro), Seccion(1:TM, 2:Lab, 3:Inst)
-        const examenToSeccionMap = {
-          '1': 2, // Toxicologico -> Laboratorio
-          '2': 3, // Dosaje etilico -> Instrumentalizacion
-          '3': 1, // Sarro Ungueal -> Toma de Muestra
-        };
-        
-        const idSeccion = examenToSeccionMap[idTipoExamen];
+      if (idTiposExamen && idTiposExamen.length > 0) {
+        // Asegurarse de que idTiposExamen sea siempre un array
+        const examenesIds = Array.isArray(idTiposExamen) ? idTiposExamen : [idTiposExamen];
 
-        if (idSeccion) {
-          const result = await Perito.findCargaTrabajoPorSeccion(idSeccion);
+        // Mapa de Examen a Sección
+        const examenToSeccionMap = {
+          '1': 2, // Toxicologico -> LAB
+          '2': 3, // Dosaje etilico -> INST
+          '3': 1, // Sarro Ungueal -> TM
+        };
+
+        // Prioridad de Secciones: TM > LAB > INST
+        const SECCIONES = { TOMA_MUESTRA: 1, LABORATORIO: 2, INSTRUMENTALIZACION: 3 };
+        const prioridadSecciones = [SECCIONES.TOMA_MUESTRA, SECCIONES.LABORATORIO, SECCIONES.INSTRUMENTALIZACION];
+
+        // Mapear los IDs de examen a un Set de IDs de sección para tener valores únicos
+        const seccionesRequeridas = new Set(
+          examenesIds.map(id => examenToSeccionMap[id]).filter(Boolean) // .filter(Boolean) para eliminar nulos/undefined
+        );
+
+        let idSeccionDestino = null;
+        // Encontrar la sección de mayor prioridad que esté en el Set de requeridas
+        for (const idSeccion of prioridadSecciones) {
+          if (seccionesRequeridas.has(idSeccion)) {
+            idSeccionDestino = idSeccion;
+            break; // Encontramos la de mayor prioridad, salimos del bucle
+          }
+        }
+        
+        // Si se encontró una sección de destino, buscar los peritos
+        if (idSeccionDestino) {
+          const result = await Perito.findCargaTrabajoPorSeccion(idSeccionDestino);
           if (result.success) {
             peritos = result.data;
           }
-        } else {
-          // Si el tipo de examen no mapea a una sección específica, usar la especialidad general
-          if (idEspecialidad) {
-            peritos = await Perito.findAccordingToSpecialty(idEspecialidad);
-          }
+        } else if (idEspecialidad) {
+          // Fallback a la especialidad si ningún examen mapea a una sección conocida
+          peritos = await Perito.findAccordingToSpecialty(idEspecialidad);
         }
+
       } else if (idEspecialidad) {
         // Comportamiento original si solo se provee la especialidad
         peritos = await Perito.findAccordingToSpecialty(idEspecialidad);
       } else {
-        return res.status(400).json({ success: false, message: 'Se requiere idEspecialidad o idTipoExamen' });
+        return res.status(400).json({ success: false, message: 'Se requiere idEspecialidad o un arreglo de idTiposExamen' });
       }
 
       res.status(200).json({ success: true, data: peritos });

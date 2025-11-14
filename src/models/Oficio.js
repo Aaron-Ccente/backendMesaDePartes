@@ -96,6 +96,72 @@ export class Oficio {
     }
   }
 
+  static async getRecentCasosPorCreador(id_creador, limit = 5) {
+    try {
+      const query = `
+        SELECT 
+          o.id_oficio,
+          o.numero_oficio,
+          o.asunto,
+          s.estado_nuevo AS estado_actual
+        FROM oficio o
+        LEFT JOIN (
+          SELECT s1.id_oficio, s1.estado_nuevo
+          FROM seguimiento_oficio s1
+          INNER JOIN (
+            SELECT id_oficio, MAX(fecha_seguimiento) AS max_fecha
+            FROM seguimiento_oficio
+            GROUP BY id_oficio
+          ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
+        ) s ON s.id_oficio = o.id_oficio
+        WHERE o.creado_por = ?
+        ORDER BY o.fecha_creacion DESC
+        LIMIT ?
+      `;
+
+      const [rows] = await db.promise().query(query, [id_creador, limit]);
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error en getRecentCasosPorCreador:', error);
+      return { success: false, message: 'Error al obtener los casos recientes por creador' };
+    }
+  }
+
+  static async getStatsForMesaDePartes(id_creador) {
+    try {
+      const statsQuery = `
+        SELECT 
+          SUM(CASE WHEN DATE(o.fecha_creacion) = CURDATE() THEN 1 ELSE 0 END) as creados_hoy,
+          SUM(CASE WHEN s.estado_nuevo NOT IN ('COMPLETADO', 'CERRADO') OR s.estado_nuevo IS NULL THEN 1 ELSE 0 END) as pendientes,
+          SUM(CASE WHEN s.estado_nuevo IN ('COMPLETADO', 'CERRADO') THEN 1 ELSE 0 END) as finalizados
+        FROM oficio o
+        LEFT JOIN (
+          SELECT s1.id_oficio, s1.estado_nuevo
+          FROM seguimiento_oficio s1
+          INNER JOIN (
+            SELECT id_oficio, MAX(fecha_seguimiento) AS max_fecha
+            FROM seguimiento_oficio
+            GROUP BY id_oficio
+          ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
+        ) s ON s.id_oficio = o.id_oficio
+        WHERE o.creado_por = ?
+      `;
+      
+      const [rows] = await db.promise().query(statsQuery, [id_creador]);
+      // Los resultados de SUM pueden ser null si no hay filas, así que los convertimos a 0
+      const stats = {
+        creados_hoy: Number(rows[0].creados_hoy) || 0,
+        pendientes: Number(rows[0].pendientes) || 0,
+        finalizados: Number(rows[0].finalizados) || 0,
+      };
+
+      return { success: true, data: stats };
+    } catch (error) {
+      console.error('Error en getStatsForMesaDePartes:', error);
+      return { success: false, message: 'Error al obtener las estadísticas' };
+    }
+  }
+
 
   static async getCountNewOficios({ id_usuario = null, CIP = null }) {
   try {
@@ -166,7 +232,6 @@ export class Oficio {
       const { id_tipos_examen, tipos_examen, ...oficioPrincipalData } = oficioData;
 
       // --- VALIDACIONES ---
-      // (Se omiten las validaciones de FK que ya no existen en la tabla oficio, como id_tipo_examen)
       const [perito] = await connection.query('SELECT id_usuario FROM usuario WHERE id_usuario = ?', [oficioPrincipalData.id_usuario_perito_asignado]);
       if (perito.length === 0) throw new Error('El perito asignado no existe.');
 
@@ -174,15 +239,15 @@ export class Oficio {
       if (especialidad.length === 0) throw new Error('La especialidad requerida no existe.');
 
       // --- INSERCIÓN DEL OFICIO PRINCIPAL ---
-      // Se quitan id_tipo_examen y tipo_examen del INSERT
       const [result] = await connection.query(
         `INSERT INTO oficio (
           numero_oficio, unidad_solicitante, unidad_remitente, region_fiscalia,
           tipo_de_muestra, asunto, examinado_incriminado, dni_examinado_incriminado,
+          delito, direccion_implicado, celular_implicado,
           fecha_hora_incidente, especialidad_requerida, id_especialidad_requerida,
           muestra, perito_asignado, cip_perito_asignado, id_usuario_perito_asignado, 
           id_prioridad, creado_por, actualizado_por
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           oficioPrincipalData.numero_oficio,
           oficioPrincipalData.unidad_solicitante,
@@ -192,6 +257,9 @@ export class Oficio {
           oficioPrincipalData.asunto,
           oficioPrincipalData.examinado_incriminado,
           oficioPrincipalData.dni_examinado_incriminado,
+          oficioPrincipalData.delito,
+          oficioPrincipalData.direccion_implicado,
+          oficioPrincipalData.celular_implicado,
           oficioPrincipalData.fecha_hora_incidente,
           oficioPrincipalData.especialidad_requerida,
           oficioPrincipalData.id_especialidad_requerida,
@@ -303,9 +371,16 @@ export class Oficio {
 
       // Promesa 2: Obtener el historial de seguimiento completo
       const seguimientoPromise = connection.query(
-        `SELECT s.*, u.nombre_completo as nombre_usuario
+        `SELECT 
+          s.*, 
+          u.nombre_completo as nombre_usuario, 
+          c.nombre_completo as nombre_conductor,
+          sec.nombre as nombre_seccion_usuario
          FROM seguimiento_oficio s
          LEFT JOIN usuario u ON s.id_usuario = u.id_usuario
+         LEFT JOIN usuario c ON s.id_conductor = c.id_usuario
+         LEFT JOIN usuario_seccion us ON u.id_usuario = us.id_usuario
+         LEFT JOIN seccion sec ON us.id_seccion = sec.id_seccion
          WHERE s.id_oficio = ?
          ORDER BY s.fecha_seguimiento ASC`,
         [id_oficio]
@@ -619,13 +694,13 @@ export class Oficio {
 
       let idSeccionDestino;
       if (seccionesPendientes.size > 0) {
-        // Si hay varias secciones pendientes, derivar a la primera del flujo (TM > INST > LAB)
+        // Si hay varias secciones pendientes, derivar a la primera del flujo (TM > LAB > INST)
         if (seccionesPendientes.has(SECCIONES.TOMA_MUESTRA)) {
           idSeccionDestino = SECCIONES.TOMA_MUESTRA;
-        } else if (seccionesPendientes.has(SECCIONES.INSTRUMENTALIZACION)) {
-          idSeccionDestino = SECCIONES.INSTRUMENTALIZACION;
-        } else {
+        } else if (seccionesPendientes.has(SECCIONES.LABORATORIO)) {
           idSeccionDestino = SECCIONES.LABORATORIO;
+        } else {
+          idSeccionDestino = SECCIONES.INSTRUMENTALIZACION;
         }
       } else {
         // Si no hay exámenes pendientes, todo debe ir a Laboratorio para consolidación final

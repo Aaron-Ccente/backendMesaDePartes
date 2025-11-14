@@ -10,6 +10,8 @@ import prioridadesRoutes from './prioridad.routes.js'
 import oficioRoutes from './oficio.routes.js'
 import googleRoutes from './googleapi.routes.js'
 import seguimientoRoutes from './seguimiento.routes.js'
+import mesaDePartesDashboardRoutes from './mesadepartes.dashboard.routes.js';
+
 const router = express.Router();
 
 // Ruta raíz de la API
@@ -45,6 +47,9 @@ router.use('/api/turnos', turnos)
 
 // Rutas para mesa de partes
 router.use('/api/mesadepartes', mesadepartesRoutes)
+
+// Rutas para el dashboard de mesa de partes
+router.use('/api/mesadepartes-dashboard', mesaDePartesDashboardRoutes);
 
 // Rutas para los tipos de prioridades de los oficios
 router.use('/api/prioridades', prioridadesRoutes)
