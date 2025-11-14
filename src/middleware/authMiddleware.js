@@ -108,3 +108,12 @@ export const validateAdminExists = async (req, res, next) => {
     });
   }
 };
+
+// Export default para permitir ambos tipos de importación
+export default {
+  authenticateToken,
+  requireAdmin,
+  requireMesaDePartes,
+  requirePerito,
+  validateAdminExists
+};

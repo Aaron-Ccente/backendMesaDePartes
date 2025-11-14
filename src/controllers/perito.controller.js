@@ -111,6 +111,53 @@ export class PeritoController {
     }
   }
 
+  // Controlador "inteligente" para obtener peritos disponibles
+  static async getPeritosDisponibles(req, res) {
+    try {
+      const { idEspecialidad, idTipoExamen } = req.query;
+      let peritos = [];
+
+      if (idTipoExamen) {
+        // Lógica de negocio: Mapear tipo de examen a sección
+        // IDs asumidos: Examen(1:Tox, 2:Dos, 3:Sarro), Seccion(1:TM, 2:Lab, 3:Inst)
+        const examenToSeccionMap = {
+          '1': 2, // Toxicologico -> Laboratorio
+          '2': 3, // Dosaje etilico -> Instrumentalizacion
+          '3': 1, // Sarro Ungueal -> Toma de Muestra
+        };
+        
+        const idSeccion = examenToSeccionMap[idTipoExamen];
+
+        if (idSeccion) {
+          const result = await Perito.findCargaTrabajoPorSeccion(idSeccion);
+          if (result.success) {
+            peritos = result.data;
+          }
+        } else {
+          // Si el tipo de examen no mapea a una sección específica, usar la especialidad general
+          if (idEspecialidad) {
+            peritos = await Perito.findAccordingToSpecialty(idEspecialidad);
+          }
+        }
+      } else if (idEspecialidad) {
+        // Comportamiento original si solo se provee la especialidad
+        peritos = await Perito.findAccordingToSpecialty(idEspecialidad);
+      } else {
+        return res.status(400).json({ success: false, message: 'Se requiere idEspecialidad o idTipoExamen' });
+      }
+
+      res.status(200).json({ success: true, data: peritos });
+
+    } catch (error) {
+      console.error("Error en getPeritosDisponibles:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error interno del servidor",
+        error: error.message,
+      });
+    }
+  }
+
   // Obtener perito por CIP
   static async getPeritoByCIP(req, res) {
     try {
@@ -354,6 +401,7 @@ export class PeritoController {
         nombre_usuario: perito.nombre_usuario,
         nombre_completo: perito.nombre_completo,
         role: "perito",
+        id_seccion: perito.id_seccion, // <-- Añadir la sección al payload
       };
       const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
 

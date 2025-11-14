@@ -9,6 +9,7 @@ import mesadepartesRoutes from './mesadepartes.routes.js'
 import prioridadesRoutes from './prioridad.routes.js'
 import oficioRoutes from './oficio.routes.js'
 import googleRoutes from './googleapi.routes.js'
+import seguimientoRoutes from './seguimiento.routes.js'
 const router = express.Router();
 
 // Ruta raíz de la API
@@ -53,4 +54,8 @@ router.use('/api/oficios', oficioRoutes);
 
 // Rutas para la api de google drive
 router.use('/api/google', googleRoutes)
+
+// Rutas para el seguimiento de casos
+router.use('/api/seguimiento', seguimientoRoutes)
+
 export default router;
