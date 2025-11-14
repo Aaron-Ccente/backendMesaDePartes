@@ -51,13 +51,34 @@ export class OficioController {
         });
       }
 
-      const oficioCompleto = {
-        ...oficioData,
+      // --- MAPEO DE CAMPOS FRONTEND -> BACKEND ---
+      const oficioMapeado = {
+        numero_oficio: oficioData.numeroOficio,
+        unidad_solicitante: oficioData.fiscalia,
+        unidad_remitente: oficioData.fiscal_remitente,
+        region_fiscalia: oficioData.regionSolicitante,
+        tipo_de_muestra: oficioData.tipo_de_muestra,
+        asunto: oficioData.asunto,
+        examinado_incriminado: oficioData.implicado,
+        dni_examinado_incriminado: oficioData.dniImplicado,
+        delito: oficioData.delito,
+        direccion_implicado: oficioData.direccionImplicado,
+        celular_implicado: oficioData.celular,
+        fecha_hora_incidente: `${oficioData.fechaIncidente} ${oficioData.horaIncidente}`,
+        especialidad_requerida: oficioData.especialidad_requerida,
+        id_especialidad_requerida: oficioData.id_especialidad_requerida,
+        muestra: oficioData.muestra,
+        perito_asignado: oficioData.perito_asignado,
+        cip_perito_asignado: oficioData.cip_perito_asignado,
+        id_usuario_perito_asignado: oficioData.id_usuario_perito_asignado,
+        id_prioridad: oficioData.id_prioridad,
+        id_tipos_examen: oficioData.id_tipos_examen, // Pasar para la tabla pivote
         creado_por: mesadepartesData.id_usuario,
         actualizado_por: mesadepartesData.id_usuario
       };
+      // --- FIN DEL MAPEO ---
 
-      const validation = Validators.validateOficioData(oficioCompleto);
+      const validation = Validators.validateOficioData(oficioMapeado);
       if (!validation.isValid) {
         return res.status(400).json({
           success: false,
@@ -66,7 +87,7 @@ export class OficioController {
         });
       }
 
-      const result = await Oficio.create(oficioCompleto);
+      const result = await Oficio.create(oficioMapeado);
       
       if (!result.success) {
         return res.status(400).json({
@@ -81,7 +102,7 @@ export class OficioController {
         message: "Oficio creado exitosamente",
         data: {
           id_oficio: result.data.id_oficio,
-          numero_oficio: oficioCompleto.numero_oficio
+          numero_oficio: oficioMapeado.numero_oficio
         }
       });
 
@@ -274,7 +295,8 @@ export class OficioController {
       return res.status(500).json({
         success: false,
         message: 'Error interno al generar el reporte.',
-      });
-    }
-  }
-}
+            });
+          }
+        }
+      }
+      
