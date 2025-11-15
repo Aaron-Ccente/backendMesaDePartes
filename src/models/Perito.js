@@ -304,7 +304,12 @@ export class Perito {
   static async findByCIPPerito(cip) {
     try {
       const [rows] = await db.promise().query(
-        `SELECT us.id_usuario,us.CIP, us.nombre_completo, us.nombre_usuario, us.password_hash, r.nombre_rol, td.nombre_departamento, g.nombre AS nombre_grado
+        `SELECT 
+          us.id_usuario, us.CIP, us.nombre_completo, us.nombre_usuario, us.password_hash, 
+          r.nombre_rol, 
+          td.nombre_departamento, 
+          g.nombre AS nombre_grado,
+          usec.id_seccion
          FROM usuario AS us
          INNER JOIN usuario_grado as ug ON ug.id_usuario = us.id_usuario
          INNER JOIN grado as g ON g.id_grado = ug.id_grado
@@ -312,6 +317,7 @@ export class Perito {
          INNER JOIN rol AS r ON ur.id_rol = r.id_rol
          INNER JOIN usuario_tipo_departamento AS utp ON utp.id_usuario = us.id_usuario
          INNER JOIN tipo_departamento AS td ON td.id_tipo_departamento = utp.id_tipo_departamento
+         LEFT JOIN usuario_seccion as usec ON us.id_usuario = usec.id_usuario
          WHERE us.CIP = ? AND r.nombre_rol = 'PERITO'
          LIMIT 1
          `,
@@ -879,102 +885,6 @@ export class Perito {
       };
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
-      throw error;
-    }
-  }
-  // Obtiene la carga de trabajo (oficios activos) y el turno de los peritos de una sección
-  static async findCargaTrabajoPorSeccion(id_seccion) {
-    if (!id_seccion) {
-      throw new Error('El ID de la sección es requerido');
-    }
-
-    try {
-      const query = `
-        SELECT 
-          u.id_usuario,
-          u.CIP,
-          u.nombre_completo,
-          t.nombre as nombre_turno,
-          COUNT(o.id_oficio) as casos_activos
-        FROM usuario u
-        
-        -- Unir con la sección del perito
-        JOIN usuario_seccion us ON u.id_usuario = us.id_usuario
-        
-        -- Unir con el turno del perito
-        LEFT JOIN usuario_turno ut ON u.id_usuario = ut.id_usuario
-        LEFT JOIN turno t ON ut.id_turno = t.id_turno
-        
-        -- Unir con los oficios (solo los activos)
-        LEFT JOIN oficio o ON u.id_usuario = o.id_usuario_perito_asignado
-          AND o.id_oficio NOT IN (
-            -- Excluir oficios que ya están 'COMPLETADO'
-            SELECT id_oficio FROM seguimiento_oficio WHERE estado_nuevo = 'COMPLETADO'
-          )
-
-        -- Filtrar por la sección requerida
-        WHERE us.id_seccion = ?
-
-        -- Agrupar para contar los oficios por perito
-        GROUP BY u.id_usuario, u.CIP, u.nombre_completo, t.nombre
-
-        -- Ordenar por el que tiene menos casos primero
-        ORDER BY casos_activos ASC, u.nombre_completo ASC;
-      `;
-      
-      const [rows] = await db.promise().query(query, [id_seccion]);
-      return { success: true, data: rows };
-
-    } catch (error) {
-      console.error('Error en findCargaTrabajoPorSeccion:', error);
-      throw error;
-    }
-  }
-  // Obtiene la carga de trabajo (oficios activos) y el turno de los peritos de una sección
-  static async findCargaTrabajoPorSeccion(id_seccion) {
-    if (!id_seccion) {
-      throw new Error('El ID de la sección es requerido');
-    }
-
-    try {
-      const query = `
-        SELECT 
-          u.id_usuario,
-          u.CIP,
-          u.nombre_completo,
-          t.nombre as nombre_turno,
-          COUNT(o.id_oficio) as casos_activos
-        FROM usuario u
-        
-        -- Unir con la sección del perito
-        JOIN usuario_seccion us ON u.id_usuario = us.id_usuario
-        
-        -- Unir con el turno del perito
-        LEFT JOIN usuario_turno ut ON u.id_usuario = ut.id_usuario
-        LEFT JOIN turno t ON ut.id_turno = t.id_turno
-        
-        -- Unir con los oficios (solo los activos)
-        LEFT JOIN oficio o ON u.id_usuario = o.id_usuario_perito_asignado
-          AND o.id_oficio NOT IN (
-            -- Excluir oficios que ya están 'COMPLETADO'
-            SELECT id_oficio FROM seguimiento_oficio WHERE estado_nuevo = 'COMPLETADO'
-          )
-
-        -- Filtrar por la sección requerida
-        WHERE us.id_seccion = ?
-
-        -- Agrupar para contar los oficios por perito
-        GROUP BY u.id_usuario, u.CIP, u.nombre_completo, t.nombre
-
-        -- Ordenar por el que tiene menos casos primero
-        ORDER BY casos_activos ASC, u.nombre_completo ASC;
-      `;
-      
-      const [rows] = await db.promise().query(query, [id_seccion]);
-      return { success: true, data: rows };
-
-    } catch (error) {
-      console.error('Error en findCargaTrabajoPorSeccion:', error);
       throw error;
     }
   }
