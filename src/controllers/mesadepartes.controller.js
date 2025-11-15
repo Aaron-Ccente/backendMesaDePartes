@@ -8,41 +8,54 @@ export class MesaDePartesController {
   static async login(req, res) {
     try {
       const { CIP, password_hash } = req.body;
+
       const validation = Validators.validateLoginCredentials({
         CIP,
         password_hash,
       });
+
       if (!validation.isValid) {
-        return res
-          .status(400)
-          .json({ success: false, message: validation.message });
+        return res.status(400).json({
+          success: false,
+          message: validation.message
+        });
       }
 
-      // Buscar perito por CIP
+      // Buscar usuario por el CIP
       const mesadepartes = await MesaDePartes.findByCIP(CIP);
 
       if (!mesadepartes) {
         return res.status(401).json({
           success: false,
-          message: "Credenciales inválidas",
+          message: "Credenciales inválidas"
         });
       }
 
-      // Agregar estado de ENTRADA para su historial de sesiones
-      await MesaDePartes.addSessionHistory(mesadepartes.id_usuario, 'ENTRADA');
-      // Verificar contraseña
+      // Si el usuario esta suspendido 
+      if (mesadepartes.suspended) {
+        return res.status(403).json({
+          success: false,
+          message: mesadepartes.message
+        });
+      }
+
+      // Verifica contraseña
       const isValidPassword = await bcrypt.compare(
         password_hash,
         mesadepartes.password_hash
       );
+
       if (!isValidPassword) {
         return res.status(401).json({
           success: false,
-          message: "Credenciales inválidas",
+          message: "Credenciales inválidas"
         });
       }
 
-      // Generar JWT (24h)
+      // Registrar ENTRADA si es un usuario habilitado
+      await MesaDePartes.addSessionHistory(mesadepartes.id_usuario, 'ENTRADA');
+
+      // Generar JWT
       const payload = {
         id_usuario: mesadepartes.id_usuario,
         CIP: mesadepartes.CIP,
@@ -50,30 +63,27 @@ export class MesaDePartesController {
         nombre_completo: mesadepartes.nombre_completo,
         role: "mesadepartes",
       };
+
       const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
-      const { password_hash: _, ...mesadepartesSinPassword } = mesadepartes;
+
+      const { password_hash: _, ...userData } = mesadepartes;
 
       res.status(200).json({
         success: true,
         message: "Login exitoso",
         token,
-        data: mesadepartesSinPassword,
+        data: userData,
       });
+
     } catch (error) {
-      if (error.message === "Credenciales inválidas") {
-        return res
-          .status(401)
-          .json({ success: false, message: "Credenciales inválidas" });
-      }
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message: "Error interno del servidor",
-          error: error.message,
-        });
+      return res.status(500).json({
+        success: false,
+        message: "Error interno del servidor",
+        error: error.message,
+      });
     }
   }
+
 
   static async logoutMesaDePartes(req, res){
     try {

@@ -4,20 +4,69 @@ import db from "../database/db.js";
 export class MesaDePartes{
     static async findByCIP(cip) {
     try {
-      const [rows] = await db.promise().query(
-        `SELECT us.id_usuario, us.CIP, us.nombre_completo, us.nombre_usuario, us.password_hash, r.nombre_rol, r.descripcion
+      const [rows] = await db.promise().query(`
+        SELECT 
+          us.id_usuario,
+          us.CIP,
+          us.nombre_completo,
+          us.nombre_usuario,
+          us.password_hash,
+          r.nombre_rol,
+          r.descripcion,
+          eu.id_estado,
+          eu.motivo,
+          eu.fecha_actualizacion
         FROM usuario AS us
         INNER JOIN usuario_rol AS ur ON us.id_usuario = ur.id_usuario
         INNER JOIN rol AS r ON ur.id_rol = r.id_rol
-        WHERE us.CIP = ? AND r.nombre_rol = "CENTRAL"`,
-        [cip]
-      );
-      return rows[0] || null;
+        LEFT JOIN (
+          SELECT id_usuario, id_estado, motivo, fecha_actualizacion
+          FROM estado_usuario AS e1
+          WHERE fecha_actualizacion = (
+            SELECT MAX(fecha_actualizacion)
+            FROM estado_usuario AS e2
+            WHERE e2.id_usuario = e1.id_usuario
+          )
+        ) AS eu ON eu.id_usuario = us.id_usuario
+        WHERE us.CIP = ? AND r.nombre_rol = "CENTRAL"
+        LIMIT 1;
+      `, [cip]);
+
+      const user = rows[0];
+      if (!user) return null;
+
+      // Si el usuario está suspendido (id_estado = 2)
+      if (user.id_estado === 2) {
+
+        // Formato de la fecha
+        const fecha = new Date(user.fecha_actualizacion);
+        const fechaFormateada = fecha.toLocaleString('es-PE', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+
+        return {
+          suspended: true,
+          message: `El usuario ha sido suspendido.\nMotivo: ${user.motivo}.\nFecha: ${fechaFormateada}`,
+        };
+      }
+
+      // Usuario habilitado
+      return {
+        ...user,
+        suspended: false
+      };
+
     } catch (error) {
-      console.error('Error buscando perito por CIP:', error);
+      console.error('Error buscando usuario por CIP:', error);
       throw error;
     }
   }
+
 
   static async addSessionHistory(id_usuario, tipo_historial) {
     try {
@@ -107,19 +156,29 @@ export class MesaDePartes{
   static async search(searchTerm, limit = 10, offset = 0){
      try {
       const searchPattern = `%${searchTerm}%`;
-      const [rows] = await db.promise().query(
-        `SELECT * 
-        FROM usuario AS a 
-        LEFT JOIN usuario_rol AS b ON a.id_usuario = b.id_usuario
-        WHERE (a.CIP LIKE ? OR a.nombre_completo LIKE ?) 
-          AND b.id_rol = 3
-        ORDER BY a.nombre_completo 
-        LIMIT ? OFFSET ?`,
-        [searchPattern, searchPattern, limit, offset]
-      );
-
+     const [rows] = await db.promise().query(`
+      SELECT 
+        a.*,
+        b.id_rol,
+        eu.id_estado,
+        eu.fecha_actualizacion AS fecha_actualizacion_estado
+      FROM usuario AS a
+      LEFT JOIN usuario_rol AS b ON a.id_usuario = b.id_usuario
+      INNER JOIN (
+        SELECT id_usuario, id_estado, fecha_actualizacion
+        FROM estado_usuario AS e1
+        WHERE fecha_actualizacion = (
+          SELECT MAX(fecha_actualizacion)
+          FROM estado_usuario AS e2
+          WHERE e2.id_usuario = e1.id_usuario
+        )
+      ) AS eu ON eu.id_usuario = a.id_usuario
+      WHERE (a.CIP LIKE ? OR a.nombre_completo LIKE ?)
+        AND b.id_rol = 3
+      ORDER BY a.nombre_completo
+      LIMIT ? OFFSET ?;
+    `, [searchPattern, searchPattern, limit, offset]);
       return rows;
-
     } catch (error) {
       console.error('Error buscando peritos:', error);
       throw error;
@@ -138,16 +197,29 @@ export class MesaDePartes{
 
   static async findAll(limit = 10, offset = 0){
      try {
-      const [rows] = await db.promise().query(
-        `SELECT * 
+      const [rows] = await db.promise().query(`
+        SELECT 
+          a.*,
+          b.id_rol,
+          eu.id_estado,
+          eu.fecha_actualizacion AS fecha_actualizacion_estado,
+          eu.motivo
         FROM usuario AS a
-        LEFT JOIN usuario_rol AS b
-        ON a.id_usuario = b.id_usuario 
+        LEFT JOIN usuario_rol AS b ON a.id_usuario = b.id_usuario
+        INNER JOIN (
+          SELECT id_usuario, id_estado, fecha_actualizacion, motivo
+          FROM estado_usuario AS e1
+          WHERE fecha_actualizacion = (
+            SELECT MAX(fecha_actualizacion)
+            FROM estado_usuario AS e2
+            WHERE e2.id_usuario = e1.id_usuario
+          )
+        ) AS eu ON eu.id_usuario = a.id_usuario
         WHERE b.id_rol = 3
         ORDER BY a.nombre_completo
-        LIMIT ? OFFSET ?`,
-        [limit, offset]
-      );
+        LIMIT ? OFFSET ?;
+      `, [limit, offset]);
+
       return rows;
     } catch (error) {
       console.error('Error obteniendo peritos:', error);
