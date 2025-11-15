@@ -33,6 +33,9 @@ router.put('/admins/:cip', AuthController.updateAdmin);
 // Eliminar admin
 router.delete('/admins/:cip', AuthController.deleteAdmin);
 
+// Habilitar o deshabilitar usuarios
+router.post('/enable-disable-user', AuthController.enableDisableUser);
+
 // Ruta para verificar token (protegida)
 router.get('/admin/verify', AuthController.verifyToken);
 
