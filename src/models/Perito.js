@@ -169,6 +169,7 @@ export class Perito {
         ultimo_ascenso_pnp,
         fotografia_url,
         id_grado,
+        id_seccion,
         id_turno,
         id_tipo_departamento,
       } = peritoData;
@@ -229,6 +230,7 @@ export class Perito {
       const queryRelationsPeritoEstado = `INSERT INTO estado_usuario (id_usuario, id_estado) VALUES (?,?);`;
       const queryRelationsPeritoRol = `INSERT INTO usuario_rol (id_usuario, id_rol) VALUES (?,?);`;
       const queryRelationsPeritoTipoDepartamento = `INSERT INTO usuario_tipo_departamento (id_usuario, id_tipo_departamento) VALUES (?,?);`;
+      const queryRelationsPeritoSeccion = `INSERT INTO usuario_seccion (id_usuario, id_seccion) VALUES (?,?);`;
 
       const connection = await db.promise().getConnection();
       try {
@@ -278,6 +280,13 @@ export class Perito {
             id_turno,
           ]);
         }
+        if (id_seccion) {
+          await connection.query(queryRelationsPeritoSeccion, [
+            idUsuario,
+            id_seccion,
+          ]);
+        }
+        
 
         await connection.commit();
         connection.release();
