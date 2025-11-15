@@ -29,7 +29,8 @@ export class AuthService {
 
       const admin = await Admin.verifyCredentials(CIP, password_hash);
       if (!admin) throw new Error('Credenciales inválidas');
-
+      if (admin.suspended) throw new Error(admin.message);
+      
       const token = this.generateToken(admin);
       return {
         success: true,
@@ -113,7 +114,7 @@ export class AuthService {
       if (!cip) throw new Error('CIP requerido');
       if (typeof Admin.findByCIP !== 'function') throw new Error('Admin.findByCIP no implementado');
 
-      const admin = await Admin.findByCIP(cip);
+      const admin = await Admin.findbyCIP(cip);
       if (!admin) return null;
       return {
         CIP: admin.CIP,
@@ -146,6 +147,18 @@ export class AuthService {
       return deleted;
     } catch (error) {
       throw new Error('Error en deleteAdmin: ' + error.message);
+    }
+  }
+
+  static async enableDisableUser({ id_estado, id_usuario, motivo }) {
+    try {
+      if (!id_usuario) throw new Error('ID de usuario requerido');
+      if (typeof Admin.enableDisable !== 'function') throw new Error('Admin.enableDisable no implementado');
+
+      const result = await Admin.enableDisable({ id_estado, id_usuario, motivo });
+      return result;
+    } catch (error) {
+      throw new Error('Error en enableDisableUser: ' + error.message);
     }
   }
 
