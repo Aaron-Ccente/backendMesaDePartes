@@ -17,6 +17,152 @@ export class Oficio {
     }
   }
 
+  static async getTodosLosCasos({ estado = 'pendiente' }) {
+    try {
+      let estadoFilter = '';
+      // Por defecto, se muestran los pendientes. Si estado es 'todos', no se aplica filtro.
+      if (estado === 'pendiente') {
+        estadoFilter = "AND (s.estado_nuevo IS NULL OR s.estado_nuevo NOT IN ('COMPLETADO', 'CERRADO'))";
+      }
+
+      const query = `
+        SELECT 
+          o.id_oficio,
+          o.numero_oficio,
+          o.fecha_creacion,
+          o.asunto,
+          o.examinado_incriminado as administrado,
+          s.estado_nuevo AS estado_actual,
+          u.nombre_completo AS perito_asignado
+        FROM oficio o
+        LEFT JOIN (
+          SELECT s1.id_oficio, s1.estado_nuevo, s1.fecha_seguimiento, s1.id_usuario
+          FROM seguimiento_oficio s1
+          INNER JOIN (
+            SELECT id_oficio, MAX(fecha_seguimiento) AS max_fecha
+            FROM seguimiento_oficio
+            GROUP BY id_oficio
+          ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
+        ) s ON s.id_oficio = o.id_oficio
+        LEFT JOIN usuario u ON o.id_usuario_perito_asignado = u.id_usuario
+        WHERE 1=1 ${estadoFilter}
+        ORDER BY o.fecha_creacion DESC
+      `;
+
+      const [rows] = await db.promise().query(query);
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error en getTodosLosCasos:', error);
+      return { success: false, message: 'Error al obtener todos los casos' };
+    }
+  }
+
+  static async getCasosPorCreador(id_creador, { estado = 'pendiente' }) {
+    try {
+      let estadoFilter = '';
+      if (estado === 'pendiente') {
+        estadoFilter = "AND (s.estado_nuevo IS NULL OR s.estado_nuevo NOT IN ('COMPLETADO', 'CERRADO'))";
+      }
+
+      const query = `
+        SELECT 
+          o.id_oficio,
+          o.numero_oficio,
+          o.fecha_creacion,
+          o.asunto,
+          o.examinado_incriminado as administrado,
+          s.estado_nuevo AS estado_actual,
+          u.nombre_completo AS perito_asignado
+        FROM oficio o
+        LEFT JOIN (
+          SELECT s1.id_oficio, s1.estado_nuevo, s1.fecha_seguimiento, s1.id_usuario
+          FROM seguimiento_oficio s1
+          INNER JOIN (
+            SELECT id_oficio, MAX(fecha_seguimiento) AS max_fecha
+            FROM seguimiento_oficio
+            GROUP BY id_oficio
+          ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
+        ) s ON s.id_oficio = o.id_oficio
+        LEFT JOIN usuario u ON o.id_usuario_perito_asignado = u.id_usuario
+        WHERE o.creado_por = ? ${estadoFilter}
+        ORDER BY o.fecha_creacion DESC
+      `;
+
+      const [rows] = await db.promise().query(query, [id_creador]);
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error en getCasosPorCreador:', error);
+      return { success: false, message: 'Error al obtener los casos por creador' };
+    }
+  }
+
+  static async getRecentCasosPorCreador(id_creador, limit = 5) {
+    try {
+      const query = `
+        SELECT 
+          o.id_oficio,
+          o.numero_oficio,
+          o.asunto,
+          s.estado_nuevo AS estado_actual
+        FROM oficio o
+        LEFT JOIN (
+          SELECT s1.id_oficio, s1.estado_nuevo
+          FROM seguimiento_oficio s1
+          INNER JOIN (
+            SELECT id_oficio, MAX(fecha_seguimiento) AS max_fecha
+            FROM seguimiento_oficio
+            GROUP BY id_oficio
+          ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
+        ) s ON s.id_oficio = o.id_oficio
+        WHERE o.creado_por = ?
+        ORDER BY o.fecha_creacion DESC
+        LIMIT ?
+      `;
+
+      const [rows] = await db.promise().query(query, [id_creador, limit]);
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error en getRecentCasosPorCreador:', error);
+      return { success: false, message: 'Error al obtener los casos recientes por creador' };
+    }
+  }
+
+  static async getStatsForMesaDePartes(id_creador) {
+    try {
+      const statsQuery = `
+        SELECT 
+          SUM(CASE WHEN DATE(o.fecha_creacion) = CURDATE() THEN 1 ELSE 0 END) as creados_hoy,
+          SUM(CASE WHEN s.estado_nuevo NOT IN ('COMPLETADO', 'CERRADO') OR s.estado_nuevo IS NULL THEN 1 ELSE 0 END) as pendientes,
+          SUM(CASE WHEN s.estado_nuevo IN ('COMPLETADO', 'CERRADO') THEN 1 ELSE 0 END) as finalizados
+        FROM oficio o
+        LEFT JOIN (
+          SELECT s1.id_oficio, s1.estado_nuevo
+          FROM seguimiento_oficio s1
+          INNER JOIN (
+            SELECT id_oficio, MAX(fecha_seguimiento) AS max_fecha
+            FROM seguimiento_oficio
+            GROUP BY id_oficio
+          ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
+        ) s ON s.id_oficio = o.id_oficio
+        WHERE o.creado_por = ?
+      `;
+      
+      const [rows] = await db.promise().query(statsQuery, [id_creador]);
+      // Los resultados de SUM pueden ser null si no hay filas, así que los convertimos a 0
+      const stats = {
+        creados_hoy: Number(rows[0].creados_hoy) || 0,
+        pendientes: Number(rows[0].pendientes) || 0,
+        finalizados: Number(rows[0].finalizados) || 0,
+      };
+
+      return { success: true, data: stats };
+    } catch (error) {
+      console.error('Error en getStatsForMesaDePartes:', error);
+      return { success: false, message: 'Error al obtener las estadísticas' };
+    }
+  }
+
+
   static async getCountNewOficios({ id_usuario = null, CIP = null }) {
   try {
     const params = [];
@@ -86,7 +232,6 @@ export class Oficio {
       const { id_tipos_examen, tipos_examen, ...oficioPrincipalData } = oficioData;
 
       // --- VALIDACIONES ---
-      // (Se omiten las validaciones de FK que ya no existen en la tabla oficio, como id_tipo_examen)
       const [perito] = await connection.query('SELECT id_usuario FROM usuario WHERE id_usuario = ?', [oficioPrincipalData.id_usuario_perito_asignado]);
       if (perito.length === 0) throw new Error('El perito asignado no existe.');
 
@@ -94,15 +239,15 @@ export class Oficio {
       if (especialidad.length === 0) throw new Error('La especialidad requerida no existe.');
 
       // --- INSERCIÓN DEL OFICIO PRINCIPAL ---
-      // Se quitan id_tipo_examen y tipo_examen del INSERT
       const [result] = await connection.query(
         `INSERT INTO oficio (
           numero_oficio, unidad_solicitante, unidad_remitente, region_fiscalia,
           tipo_de_muestra, asunto, examinado_incriminado, dni_examinado_incriminado,
+          delito, direccion_implicado, celular_implicado,
           fecha_hora_incidente, especialidad_requerida, id_especialidad_requerida,
           muestra, perito_asignado, cip_perito_asignado, id_usuario_perito_asignado, 
           id_prioridad, creado_por, actualizado_por
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           oficioPrincipalData.numero_oficio,
           oficioPrincipalData.unidad_solicitante,
@@ -112,12 +257,15 @@ export class Oficio {
           oficioPrincipalData.asunto,
           oficioPrincipalData.examinado_incriminado,
           oficioPrincipalData.dni_examinado_incriminado,
+          oficioPrincipalData.delito,
+          oficioPrincipalData.direccion_implicado,
+          oficioPrincipalData.celular_implicado,
           oficioPrincipalData.fecha_hora_incidente,
-          oficioPrincipalData.nombre_especialidad, // Se usa el nombre de la especialidad
+          oficioPrincipalData.especialidad_requerida,
           oficioPrincipalData.id_especialidad_requerida,
           oficioPrincipalData.muestra,
-          oficioPrincipalData.nombre_perito, // Se usa el nombre del perito
-          oficioPrincipalData.cip_perito, // Se usa el cip del perito
+          oficioPrincipalData.perito_asignado,
+          oficioPrincipalData.cip_perito_asignado,
           oficioPrincipalData.id_usuario_perito_asignado,
           oficioPrincipalData.id_prioridad,
           oficioPrincipalData.creado_por,
@@ -156,7 +304,7 @@ export class Oficio {
 
     } catch (error) {
       await connection.rollback();
-      console.error('Error en Oficio.create:', error);
+      console.error('ERROR DETALLADO EN Oficio.create:', error); // <-- LOG DE DEBUG
       return { 
         success: false, 
         message: error.message || "Error desconocido al crear el oficio",
@@ -194,6 +342,79 @@ export class Oficio {
     } catch (error) {
       console.error('Error en getSeguimiento:', error);
       return { success: false, message: "Error al obtener el seguimiento" };
+    }
+  }
+
+  static async findDetalleById(id_oficio) {
+    const connection = await db.promise().getConnection();
+    try {
+      // Iniciar un array de promesas
+      const promises = [];
+
+      // Promesa 1: Obtener los datos principales del oficio
+      const oficioPromise = connection.query(
+        `SELECT 
+          o.*, 
+          tp.nombre_prioridad, 
+          td.nombre_departamento as especialidad,
+          u_creador.nombre_completo as nombre_creador,
+          u_perito.nombre_completo as nombre_perito_actual
+         FROM oficio o
+         LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
+         LEFT JOIN tipo_departamento td ON o.id_especialidad_requerida = td.id_tipo_departamento
+         LEFT JOIN usuario u_creador ON o.creado_por = u_creador.id_usuario
+         LEFT JOIN usuario u_perito ON o.id_usuario_perito_asignado = u_perito.id_usuario
+         WHERE o.id_oficio = ?`,
+        [id_oficio]
+      );
+      promises.push(oficioPromise);
+
+      // Promesa 2: Obtener el historial de seguimiento completo
+      const seguimientoPromise = connection.query(
+        `SELECT 
+          s.*, 
+          u.nombre_completo as nombre_usuario, 
+          c.nombre_completo as nombre_conductor,
+          sec.nombre as nombre_seccion_usuario
+         FROM seguimiento_oficio s
+         LEFT JOIN usuario u ON s.id_usuario = u.id_usuario
+         LEFT JOIN usuario c ON s.id_conductor = c.id_usuario
+         LEFT JOIN usuario_seccion us ON u.id_usuario = us.id_usuario
+         LEFT JOIN seccion sec ON us.id_seccion = sec.id_seccion
+         WHERE s.id_oficio = ?
+         ORDER BY s.fecha_seguimiento ASC`,
+        [id_oficio]
+      );
+      promises.push(seguimientoPromise);
+
+      // Promesa 3: Obtener los tipos de examen asociados
+      const examenesPromise = connection.query(
+        `SELECT te.nombre 
+         FROM oficio_examen oe
+         JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen
+         WHERE oe.id_oficio = ?`,
+        [id_oficio]
+      );
+      promises.push(examenesPromise);
+
+      // Ejecutar todas las promesas en paralelo
+      const [[oficioRows], [seguimientoRows], [examenesRows]] = await Promise.all(promises);
+
+      if (oficioRows.length === 0) {
+        return { success: false, message: "Oficio no encontrado" };
+      }
+
+      const oficio = oficioRows[0];
+      oficio.seguimiento_historial = seguimientoRows;
+      oficio.tipos_de_examen = examenesRows.map(e => e.nombre);
+
+      return { success: true, data: oficio };
+
+    } catch (error) {
+      console.error('Error en findDetalleById:', error);
+      return { success: false, message: "Error al obtener el detalle del oficio" };
+    } finally {
+      connection.release();
     }
   }
 
@@ -418,4 +639,84 @@ export class Oficio {
       throw error;
     }
   }
-}
+
+  /**
+   * Encuentra peritos elegibles para la derivación basados en la lógica de negocio del flujo de trabajo.
+   * @param {number} id_oficio - El ID del oficio actual.
+   */
+  static async findPeritosParaDerivacion(id_oficio) {
+    const connection = await db.promise().getConnection();
+    try {
+      // Definir IDs de Secciones y Exámenes para claridad
+      const SECCIONES = { TOMA_MUESTRA: 1, LABORATORIO: 2, INSTRUMENTALIZACION: 3 };
+      const EXAMENES = { TOXICOLOGICO: 1, DOSAJE_ETILICO: 2, SARRO_UNGUEAL: 3 };
+
+      // Mapa de qué sección se encarga de qué examen
+      const examenToSeccionMap = {
+        [EXAMENES.TOXICOLOGICO]: SECCIONES.LABORATORIO,
+        [EXAMENES.DOSAJE_ETILICO]: SECCIONES.INSTRUMENTALIZACION,
+        [EXAMENES.SARRO_UNGUEAL]: SECCIONES.TOMA_MUESTRA, 
+      };
+
+      // Paso 1: Obtener los exámenes requeridos para el oficio
+      const [examenesReqRows] = await connection.query(
+        'SELECT id_tipo_de_examen FROM oficio_examen WHERE id_oficio = ?',
+        [id_oficio]
+      );
+      const examenesRequeridosIds = examenesReqRows.map(r => r.id_tipo_de_examen);
+
+      if (examenesRequeridosIds.length === 0) {
+        return { success: false, message: 'El caso no tiene exámenes requeridos.' };
+      }
+
+      // Paso 2: Obtener los resultados parciales ya registrados para saber qué falta
+      const [resultadosParcialesRows] = await connection.query(
+        'SELECT tipo_resultado FROM oficio_resultados_perito WHERE id_oficio = ?',
+        [id_oficio]
+      );
+      // Asumimos que 'tipo_resultado' corresponde al nombre del examen, ej. 'SARRO UNGUEAL'
+      const examenesCompletadosNombres = resultadosParcialesRows.map(r => r.tipo_resultado.toUpperCase());
+
+      // Paso 3: Determinar las secciones de los exámenes pendientes
+      const seccionesPendientes = new Set();
+      for (const idExamen of examenesRequeridosIds) {
+        // Necesitamos el nombre del examen para compararlo con los resultados
+        const [examenRows] = await connection.query('SELECT nombre FROM tipo_de_examen WHERE id_tipo_de_examen = ?', [idExamen]);
+        const nombreExamen = examenRows[0]?.nombre.toUpperCase();
+
+        if (nombreExamen && !examenesCompletadosNombres.includes(nombreExamen)) {
+          const idSeccionRequerida = examenToSeccionMap[idExamen];
+          if (idSeccionRequerida) {
+            seccionesPendientes.add(idSeccionRequerida);
+          }
+        }
+      }
+
+      let idSeccionDestino;
+      if (seccionesPendientes.size > 0) {
+        // Si hay varias secciones pendientes, derivar a la primera del flujo (TM > LAB > INST)
+        if (seccionesPendientes.has(SECCIONES.TOMA_MUESTRA)) {
+          idSeccionDestino = SECCIONES.TOMA_MUESTRA;
+        } else if (seccionesPendientes.has(SECCIONES.LABORATORIO)) {
+          idSeccionDestino = SECCIONES.LABORATORIO;
+        } else {
+          idSeccionDestino = SECCIONES.INSTRUMENTALIZACION;
+        }
+      } else {
+        // Si no hay exámenes pendientes, todo debe ir a Laboratorio para consolidación final
+        idSeccionDestino = SECCIONES.LABORATORIO;
+      }
+
+      // Paso 4: Encontrar todos los peritos de la sección destino
+      const result = await Perito.findCargaTrabajoPorSeccion(idSeccionDestino);
+      return result;
+
+    } catch (error) {
+      console.error('Error en findPeritosParaDerivacion:', error);
+      return { success: false, message: 'Error al buscar peritos para derivación.' };
+    } finally {
+            connection.release();
+          }
+        }
+      }
+      

@@ -80,6 +80,7 @@ export async function seed(knex) {
     { id_seccion: 2, nombre: 'Laboratorio', id_tipo_departamento: 6 },
     { id_seccion: 3, nombre: 'Instrumentalización', id_tipo_departamento: 6 }
   ]);
+
   // Grados
   await knex('grado').insert([
     { id_grado: 1, nombre: 'Coronel' }, { id_grado: 2, nombre: 'Comandante' }, { id_grado: 3, nombre: 'Mayor' },
@@ -102,7 +103,7 @@ export async function seed(knex) {
     { id_prioridad: 3, nombre_prioridad: 'Alta' }, { id_prioridad: 4, nombre_prioridad: 'Media' }
   ]);
 
-  // Tipos de Examen (lista completa)
+  // Tipos de Examen (lista para pruebas)
   await knex('tipo_de_examen').insert([
     // { id_tipo_de_examen: 1, nombre: 'Toxicológico' },
     // { id_tipo_de_examen: 2, nombre: 'Dosaje Etílico' },
