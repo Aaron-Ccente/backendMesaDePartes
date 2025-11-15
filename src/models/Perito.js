@@ -12,6 +12,63 @@ export class Perito {
     return null;
   }
 
+  static async checkIfSuspended(CIP) {
+    try {
+      const [rows] = await db.promise().query(`
+        SELECT 
+          us.id_usuario,
+          eu.id_estado,
+          eu.motivo,
+          eu.fecha_actualizacion
+        FROM usuario AS us
+        LEFT JOIN (
+          SELECT id_usuario, id_estado, motivo, fecha_actualizacion
+          FROM estado_usuario AS e1
+          WHERE fecha_actualizacion = (
+            SELECT MAX(fecha_actualizacion)
+            FROM estado_usuario AS e2
+            WHERE e2.id_usuario = e1.id_usuario
+          )
+        ) AS eu ON eu.id_usuario = us.id_usuario
+        WHERE us.CIP = ?
+        LIMIT 1;
+      `, [CIP]);
+
+      const perito = rows[0];
+      if (!perito) {
+        return { suspended: false, message: "" };
+      }
+
+      // Si está suspendido (id_estado = 2)
+      if (perito.id_estado === 2) {
+
+        // Formato moderno
+        const fecha = new Date(perito.fecha_actualizacion);
+        const fechaFormateada = fecha.toLocaleString("es-PE", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        });
+
+        return {
+          suspended: true,
+          message: `El usuario ha sido suspendido.\nMotivo: ${perito.motivo}.\nFecha: ${fechaFormateada}`
+        };
+      }
+
+      // No suspendido
+      return { suspended: false, message: "" };
+
+    } catch (error) {
+      console.error("Error checking suspension status (perito):", error);
+      throw error;
+    }
+  }
+
+
   // Función utilitaria para validar Base64 WebP
   static validateWebPBase64(base64String) {
     if (!base64String) return null;
@@ -434,16 +491,31 @@ export class Perito {
   static async findAll(limit = 10, offset = 0) {
     try {
       const [rows] = await db.promise().query(
-        `SELECT * 
+        `SELECT 
+          us.*,
+          b.id_rol,
+          pe.*,
+          td.*,
+          eu.id_estado,
+          eu.motivo,
+          eu.fecha_actualizacion AS fecha_actualizacion_estado
         FROM usuario AS us
-        LEFT JOIN usuario_rol AS b
-        ON us.id_usuario = b.id_usuario 
+        LEFT JOIN usuario_rol AS b ON us.id_usuario = b.id_usuario 
         LEFT JOIN perito AS pe ON us.id_usuario = pe.id_usuario
         INNER JOIN usuario_tipo_departamento AS utp ON utp.id_usuario = us.id_usuario
         INNER JOIN tipo_departamento AS td ON td.id_tipo_departamento = utp.id_tipo_departamento
+        INNER JOIN (
+          SELECT id_usuario, id_estado, fecha_actualizacion, motivo
+          FROM estado_usuario AS e1
+          WHERE fecha_actualizacion = (
+            SELECT MAX(fecha_actualizacion)
+            FROM estado_usuario AS e2
+            WHERE e2.id_usuario = e1.id_usuario
+          )
+        ) AS eu ON eu.id_usuario = us.id_usuario
         WHERE b.id_rol = 2
         ORDER BY us.nombre_completo
-        LIMIT ? OFFSET ?`,
+        LIMIT ? OFFSET ?;`,
         [limit, offset]
       );
       return rows;
@@ -470,16 +542,35 @@ export class Perito {
   static async search(searchTerm, limit = 10, offset = 0) {
     try {
       const searchPattern = `%${searchTerm}%`;
-      const [rows] = await db.promise().query(
-        `SELECT * 
-        FROM usuario AS us 
-        LEFT JOIN usuario_rol AS b ON us.id_usuario = b.id_usuario
-        WHERE (us.CIP LIKE ? OR us.nombre_completo LIKE ?) 
+      const [rows] = await db.promise().query(`
+        SELECT 
+          us.*,
+          b.id_rol,
+          pe.*,
+          td.*,
+          eu.id_estado,
+          eu.motivo,
+          eu.fecha_actualizacion AS fecha_actualizacion_estado
+        FROM usuario AS us
+        LEFT JOIN usuario_rol AS b ON us.id_usuario = b.id_usuario 
+        LEFT JOIN perito AS pe ON us.id_usuario = pe.id_usuario
+        INNER JOIN usuario_tipo_departamento AS utp ON utp.id_usuario = us.id_usuario
+        INNER JOIN tipo_departamento AS td ON td.id_tipo_departamento = utp.id_tipo_departamento
+        INNER JOIN (
+          SELECT id_usuario, id_estado, fecha_actualizacion, motivo
+          FROM estado_usuario AS e1
+          WHERE fecha_actualizacion = (
+            SELECT MAX(fecha_actualizacion)
+            FROM estado_usuario AS e2
+            WHERE e2.id_usuario = e1.id_usuario
+          )
+        ) AS eu ON eu.id_usuario = us.id_usuario
+        WHERE (us.CIP LIKE ? OR us.nombre_completo LIKE ?)
           AND b.id_rol = 2
-        ORDER BY us.nombre_completo 
-        LIMIT ? OFFSET ?`,
-        [searchPattern, searchPattern, limit, offset]
-      );
+        ORDER BY us.nombre_completo
+        LIMIT ? OFFSET ?;
+      `, [searchPattern, searchPattern, limit, offset]);
+
       return rows;
     } catch (error) {
       console.error("Error buscando peritos:", error);

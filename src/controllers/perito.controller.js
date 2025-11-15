@@ -331,6 +331,15 @@ export class PeritoController {
         });
       }
 
+      // Si está suspendido, detener proceso y mostrar mensaje formateado
+      const peritoStatus = await Perito.checkIfSuspended(CIP);
+      if (peritoStatus.suspended) {
+        return res.status(403).json({
+          success: false,
+          message: peritoStatus.message,
+        });
+      }
+
       // Verificar contraseña
       const isValidPassword = await bcrypt.compare(
         password_hash,
