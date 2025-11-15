@@ -1,4 +1,5 @@
 import db from '../database/db.js';
+import { Perito } from './Perito.js';
 
 export class Oficio {
   static async findAll() {
