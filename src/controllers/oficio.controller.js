@@ -169,6 +169,29 @@ export class OficioController {
     }
   }
 
+  static async getCasosAsignadosPorFuncion(req, res) {
+    try {
+      const { funcion } = req.query;
+      const perito = req.user;
+
+      if (!funcion) {
+        return res.status(400).json({ success: false, message: 'El parámetro "funcion" es requerido' });
+      }
+
+      const result = await Oficio.findCasosPorFuncion({ perito, funcion });
+
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+      
+      return res.json({ success: true, data: result.data });
+
+    } catch (error) {
+      console.error('Error en getCasosAsignadosPorFuncion:', error);
+      return res.status(500).json({ success: false, message: 'Error interno al obtener casos por función' });
+    }
+  }
+
   static async getAlertas(req, res) {
     try {
       const userId = req.user?.id_usuario ?? null;

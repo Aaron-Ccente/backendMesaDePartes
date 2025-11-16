@@ -70,6 +70,7 @@ router.get('/check/:numero', OficioController.checkNumero);
 
 // Solo para peritos
 router.get('/assigned', requirePerito, OficioController.getAssignedToUser);
+router.get('/casos-asignados', requirePerito, OficioController.getCasosAsignadosPorFuncion);
 router.get('/alerts', requirePerito, OficioController.getAlertas);
 
 // Solo para mesa de partes
