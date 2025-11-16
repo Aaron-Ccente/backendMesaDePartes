@@ -309,7 +309,8 @@ export class Perito {
           r.nombre_rol, 
           td.nombre_departamento, 
           g.nombre AS nombre_grado,
-          usec.id_seccion
+          s.id_seccion,
+          s.nombre as seccion_nombre
          FROM usuario AS us
          INNER JOIN usuario_grado as ug ON ug.id_usuario = us.id_usuario
          INNER JOIN grado as g ON g.id_grado = ug.id_grado
@@ -318,6 +319,7 @@ export class Perito {
          INNER JOIN usuario_tipo_departamento AS utp ON utp.id_usuario = us.id_usuario
          INNER JOIN tipo_departamento AS td ON td.id_tipo_departamento = utp.id_tipo_departamento
          LEFT JOIN usuario_seccion as usec ON us.id_usuario = usec.id_usuario
+         LEFT JOIN seccion as s ON usec.id_seccion = s.id_seccion
          WHERE us.CIP = ? AND r.nombre_rol = 'PERITO'
          LIMIT 1
          `,
