@@ -887,8 +887,42 @@ export class Perito {
         GROUP BY tp.nombre_prioridad;
       `);
 
+      // Usuarios habilitados
+      const [usersEnable] = await db.promise().query(`
+       SELECT 
+            eu.id_estado,
+            COUNT(*) AS cantidad
+        FROM estado_usuario eu
+        INNER JOIN (
+            SELECT 
+                id_usuario,
+                MAX(id_estado_usuario) AS ultimo_estado_id
+            FROM estado_usuario
+            GROUP BY id_usuario
+        ) ult ON eu.id_estado_usuario = ult.ultimo_estado_id
+        WHERE eu.id_estado = 1;
+      `);
+
+      // Usuarios deshabilitados
+      const [usersDisable] = await db.promise().query(`
+       SELECT 
+            eu.id_estado,
+            COUNT(*) AS cantidad
+        FROM estado_usuario eu
+        INNER JOIN (
+            SELECT 
+                id_usuario,
+                MAX(id_estado_usuario) AS ultimo_estado_id
+            FROM estado_usuario
+            GROUP BY id_usuario
+        ) ult ON eu.id_estado_usuario = ult.ultimo_estado_id
+        WHERE eu.id_estado = 2;
+      `);
+
       return {
         totalPeritos: totalPeritos[0].total,
+        usersEnable,
+        usersDisable,
         usuariosActivos,
         prioridadOficios,
       };
