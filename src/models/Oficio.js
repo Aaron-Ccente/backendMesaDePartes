@@ -128,6 +128,52 @@ export class Oficio {
     }
   }
 
+  static async findAllForAdminStats(){
+    try {
+      const [oficios] = await db.promise().query(
+        `SELECT 
+            o.id_oficio,
+            o.numero_oficio, 
+            o.fecha_creacion, 
+            o.perito_asignado,
+            o.especialidad_requerida,
+            so.estado_nuevo as ultimo_estado,
+            so.fecha_seguimiento as fecha_ultimo_estado
+          FROM oficio o
+          LEFT JOIN seguimiento_oficio so ON so.id_oficio = o.id_oficio
+          WHERE so.id_seguimiento = (
+            SELECT MAX(so2.id_seguimiento) 
+            FROM seguimiento_oficio so2 
+            WHERE so2.id_oficio = o.id_oficio
+          )
+          OR so.id_seguimiento IS NULL
+          ORDER BY o.fecha_creacion DESC`
+      );
+      return { success: true, data: oficios };
+    } catch (error) {
+      console.error('Error en findAllForAdminStats:', error);
+      return { success: false, message: 'Error al obtener estadísticas para admin' };
+    }
+  }
+
+  static async getSeguimientoByIdForAdmin(id_oficio){
+    try {
+      const query = `
+        SELECT 
+          so.*, u.nombre_completo AS usuario_asignado, u.CIP
+        FROM seguimiento_oficio so
+        INNER JOIN usuario u ON so.id_conductor = u.id_usuario
+        WHERE so.id_oficio = ?
+        ORDER BY so.fecha_seguimiento DESC
+      `;
+      const [rows] = await db.promise().query(query, [id_oficio]);
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error en getSeguimientoByIdForAdmin:', error);
+      return { success: false, message: 'Error al obtener seguimiento por ID para admin' };
+    }
+  }
+
   static async getStatsForMesaDePartes(id_creador) {
     try {
       const statsQuery = `
