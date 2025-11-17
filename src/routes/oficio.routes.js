@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { OficioController } from '../controllers/oficio.controller.js';
-import { authenticateToken, requireMesaDePartes, requirePerito } from '../middleware/authMiddleware.js';
+import { authenticateToken, requireMesaDePartes, requirePerito, requireAdmin } from '../middleware/authMiddleware.js';
 import { OficioResultadosController } from '../controllers/OficioResultados.controller.js';
 // Importamos Multer para subir archivos locales
 import multer from 'multer';
@@ -70,7 +70,12 @@ router.get('/check/:numero', OficioController.checkNumero);
 
 // Solo para peritos
 router.get('/assigned', requirePerito, OficioController.getAssignedToUser);
+router.get('/casos-asignados', requirePerito, OficioController.getCasosAsignadosPorFuncion);
 router.get('/alerts', requirePerito, OficioController.getAlertas);
+
+// Solo para admins
+router.get('/all/seguimiento', requireAdmin, OficioController.getAllOficiosForAdminStats);
+router.get('/all/seguimiento/:id', requireAdmin, OficioController.getSeguimientoOficioByIdForAdmin);
 
 // Solo para mesa de partes
 router.post('/', requireMesaDePartes, OficioController.createOficio);

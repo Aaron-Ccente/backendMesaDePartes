@@ -128,6 +128,52 @@ export class Oficio {
     }
   }
 
+  static async findAllForAdminStats(){
+    try {
+      const [oficios] = await db.promise().query(
+        `SELECT 
+            o.id_oficio,
+            o.numero_oficio, 
+            o.fecha_creacion, 
+            o.perito_asignado,
+            o.especialidad_requerida,
+            so.estado_nuevo as ultimo_estado,
+            so.fecha_seguimiento as fecha_ultimo_estado
+          FROM oficio o
+          LEFT JOIN seguimiento_oficio so ON so.id_oficio = o.id_oficio
+          WHERE so.id_seguimiento = (
+            SELECT MAX(so2.id_seguimiento) 
+            FROM seguimiento_oficio so2 
+            WHERE so2.id_oficio = o.id_oficio
+          )
+          OR so.id_seguimiento IS NULL
+          ORDER BY o.fecha_creacion DESC`
+      );
+      return { success: true, data: oficios };
+    } catch (error) {
+      console.error('Error en findAllForAdminStats:', error);
+      return { success: false, message: 'Error al obtener estadísticas para admin' };
+    }
+  }
+
+  static async getSeguimientoByIdForAdmin(id_oficio){
+    try {
+      const query = `
+        SELECT 
+          so.*, u.nombre_completo AS usuario_asignado, u.CIP
+        FROM seguimiento_oficio so
+        INNER JOIN usuario u ON so.id_conductor = u.id_usuario
+        WHERE so.id_oficio = ?
+        ORDER BY so.fecha_seguimiento DESC
+      `;
+      const [rows] = await db.promise().query(query, [id_oficio]);
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error en getSeguimientoByIdForAdmin:', error);
+      return { success: false, message: 'Error al obtener seguimiento por ID para admin' };
+    }
+  }
+
   static async getStatsForMesaDePartes(id_creador) {
     try {
       const statsQuery = `
@@ -470,6 +516,95 @@ export class Oficio {
     } catch (error) {
       console.error('Error en findAssignedToUser:', error);
       return { success: false, message: 'Error al obtener oficios asignados' };
+    }
+  }
+
+  static async findCasosPorFuncion({ perito, funcion }) {
+    try {
+      const id_perito = perito.id_usuario;
+      const seccion_perito = perito.id_seccion; 
+
+      const SECCIONES = { TOMA_MUESTRA: 1, LABORATORIO: 2, INSTRUMENTALIZACION: 3 };
+      const EXAMENES = { TOXICOLOGICO: 1, DOSAJE_ETILICO: 2, SARRO_UNGUEAL: 3 };
+
+      let queryWhere = 'WHERE o.id_usuario_perito_asignado = ?';
+      const params = [id_perito];
+
+      const baseQuery = `
+        SELECT o.*,
+               tp.nombre_prioridad,
+               td.nombre_departamento AS especialidad,
+               s.estado_nuevo AS ultimo_estado,
+               s.fecha_seguimiento AS ultimo_fecha,
+               (SELECT GROUP_CONCAT(te.nombre SEPARATOR ', ') 
+                FROM oficio_examen oe 
+                JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen 
+                WHERE oe.id_oficio = o.id_oficio) AS tipos_de_examen
+        FROM oficio o
+        LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
+        LEFT JOIN tipo_departamento td ON o.id_especialidad_requerida = td.id_tipo_departamento
+        LEFT JOIN (
+          SELECT s1.id_oficio, s1.estado_nuevo, s1.fecha_seguimiento
+          FROM seguimiento_oficio s1
+          INNER JOIN (
+            SELECT id_oficio, MAX(fecha_seguimiento) AS max_fecha
+            FROM seguimiento_oficio
+            GROUP BY id_oficio
+          ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
+        ) s ON s.id_oficio = o.id_oficio
+      `;
+
+      switch (funcion) {
+        // --- Lógica para Perito TM ---
+        case 'extraccion':
+          queryWhere += ` AND o.tipo_de_muestra = 'TOMA DE MUESTRAS' 
+                          AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen != ?)`;
+          params.push(EXAMENES.SARRO_UNGUEAL);
+          break;
+        case 'analisis_tm':
+          queryWhere += ` AND o.tipo_de_muestra = 'MUESTRAS REMITIDAS' 
+                          AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
+          params.push(EXAMENES.SARRO_UNGUEAL);
+          break;
+        case 'extraccion_y_analisis':
+          queryWhere += ` AND o.tipo_de_muestra = 'TOMA DE MUESTRAS' 
+                          AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
+          params.push(EXAMENES.SARRO_UNGUEAL);
+          break;
+        
+        // --- Lógica para Perito INST ---
+        case 'analisis_inst':
+          queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
+          params.push(EXAMENES.DOSAJE_ETILICO);
+          break;
+
+        // --- Lógica para Perito LAB ---
+        case 'analisis_lab':
+           queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)
+                           AND s.estado_nuevo NOT LIKE 'DERIVADO A:%'`;
+          params.push(EXAMENES.TOXICOLOGICO);
+          break;
+        case 'consolidacion':
+          queryWhere += ` AND s.estado_nuevo LIKE 'DERIVADO A: LABORATORIO%'`;
+          break;
+
+        default:
+          return { success: false, message: 'Función no reconocida' };
+      }
+
+      const finalQuery = `
+        ${baseQuery}
+        ${queryWhere}
+        AND (s.estado_nuevo IS NULL OR s.estado_nuevo NOT IN ('COMPLETADO', 'CERRADO'))
+        ORDER BY s.fecha_seguimiento DESC, o.fecha_creacion DESC
+      `;
+
+      const [rows] = await db.promise().query(finalQuery, params);
+      return { success: true, data: rows };
+
+    } catch (error) {
+      console.error('Error en findCasosPorFuncion:', error);
+      return { success: false, message: 'Error al obtener casos por función' };
     }
   }
 
