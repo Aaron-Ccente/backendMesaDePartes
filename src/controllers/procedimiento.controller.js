@@ -1,10 +1,13 @@
 import { Oficio } from '../models/Oficio.js';
+import { Muestra } from '../models/Muestra.js';
+import { MuestraService } from '../services/MuestraService.js';
 import db from '../database/db.js';
 import { WorkflowService } from '../services/workflowService.js';
 
 export class ProcedimientoController {
   /**
-   * Registra el resultado de una extracción (exitosa o fallida) y las muestras asociadas.
+   * Registra el resultado de una extracción de muestra, generando códigos únicos
+   * y el evento inicial de la cadena de custodia.
    */
   static async registrarExtraccion(req, res) {
     const { id: id_oficio } = req.params;
@@ -15,7 +18,7 @@ export class ProcedimientoController {
     try {
       await connection.beginTransaction();
 
-      // Validar que el oficio pertenece al perito
+      // 1. Validar que el oficio pertenece al perito
       const oficio = await Oficio.findById(id_oficio);
       if (!oficio.success || oficio.data.id_usuario_perito_asignado !== id_usuario) {
         await connection.rollback();
@@ -23,43 +26,144 @@ export class ProcedimientoController {
       }
 
       if (fue_exitosa) {
-        // Si la extracción fue exitosa, guardar las muestras
+        // 2. Si la extracción fue exitosa, procesar y guardar las muestras
         if (!Array.isArray(muestras) || muestras.length === 0) {
           await connection.rollback();
           return res.status(400).json({ success: false, message: 'Se requiere al menos una muestra para una extracción exitosa.' });
         }
 
+        const codigosGenerados = [];
+
         for (const muestra of muestras) {
-          await connection.query(
-            'INSERT INTO muestras (id_oficio, descripcion, cantidad) VALUES (?, ?, ?)',
-            [id_oficio, muestra.descripcion, muestra.cantidad]
-          );
+          // 2.1. Generar el código único para la muestra
+          const codigoMuestra = await MuestraService.generarCodigoMuestra(id_oficio, muestra.tipo_muestra);
+          
+          const nuevaMuestra = {
+            id_oficio,
+            tipo_muestra: muestra.tipo_muestra,
+            descripcion: muestra.descripcion, // Descripción adicional opcional
+            cantidad: muestra.cantidad,
+            codigo_muestra: codigoMuestra,
+            esta_lacrado: true, // El lacrado es implícito en el proceso de extracción exitosa
+          };
+
+          // 2.2. Guardar la nueva muestra
+          const id_muestra = await Muestra.create(nuevaMuestra, connection);
+          codigosGenerados.push(codigoMuestra);
+
+          // 2.3. Crear el evento inicial en la cadena de custodia
+          await connection.query('INSERT INTO cadena_de_custodia SET ?', [{
+            id_muestra,
+            id_perito_entrega: id_usuario, // El perito que extrae es el primer custodio
+            proposito: 'CREACIÓN Y EXTRACCIÓN',
+            observaciones: 'Inicio de la cadena de custodia.'
+          }]);
         }
 
-        // Añadir seguimiento de éxito
+        // 2.4. Añadir seguimiento de éxito al oficio
         await Oficio.addSeguimiento({
           id_oficio,
           id_usuario,
           estado_nuevo: 'EXTRACCIÓN REALIZADA',
+          observaciones: `Se generaron ${codigosGenerados.length} muestras con los códigos: ${codigosGenerados.join(', ')}`
         }, connection);
+        
+        await connection.commit();
+        res.status(201).json({ 
+          success: true, 
+          message: 'Procedimiento de extracción registrado exitosamente.',
+          data: { codigos_generados: codigosGenerados }
+        });
 
       } else {
-        // Si la extracción fue fallida, solo registrar el seguimiento con las observaciones
+        // 3. Si la extracción fue fallida, solo registrar el seguimiento
         await Oficio.addSeguimiento({
           id_oficio,
           id_usuario,
           estado_nuevo: 'EXTRACCIÓN FALLIDA',
           observaciones: observaciones || 'No se especificaron observaciones.'
         }, connection);
+        
+        await connection.commit();
+        res.status(201).json({ success: true, message: 'Procedimiento de extracción fallida registrado exitosamente.' });
       }
-
-      await connection.commit();
-      res.status(201).json({ success: true, message: 'Procedimiento de extracción registrado exitosamente.' });
 
     } catch (error) {
       await connection.rollback();
       console.error('Error al registrar extracción:', error);
       res.status(500).json({ success: false, message: 'Error interno del servidor al registrar la extracción.' });
+    } finally {
+      connection.release();
+    }
+  }
+
+  /**
+   * Registra el resultado de un análisis de muestras recibidas.
+   */
+  static async registrarAnalisis(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
+    const { apertura_data, muestras_analizadas } = req.body;
+
+    const connection = await db.promise().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Validar que el oficio pertenece al perito
+      const oficio = await Oficio.findById(id_oficio);
+      if (!oficio.success || oficio.data.id_usuario_perito_asignado !== id_usuario) {
+        await connection.rollback();
+        return res.status(403).json({ success: false, message: 'Acceso denegado.' });
+      }
+
+      // 2. Guardar el acta de apertura
+      if (!apertura_data || !apertura_data.descripcion_paquete) {
+        await connection.rollback();
+        return res.status(400).json({ success: false, message: 'Los datos del acta de apertura son requeridos.' });
+      }
+      await connection.query('INSERT INTO actas_apertura SET ?', [{
+        id_oficio,
+        id_perito: id_usuario,
+        descripcion_paquete: apertura_data.descripcion_paquete,
+        observaciones: apertura_data.observaciones,
+      }]);
+
+      // 3. Procesar y actualizar las muestras con sus resultados
+      if (!Array.isArray(muestras_analizadas) || muestras_analizadas.length === 0) {
+        await connection.rollback();
+        return res.status(400).json({ success: false, message: 'Se requiere al menos una muestra analizada.' });
+      }
+
+      for (const muestra of muestras_analizadas) {
+        if (!muestra.codigo_muestra || !muestra.resultado_analisis) {
+          throw new Error('Cada muestra analizada debe tener un código y un resultado.');
+        }
+        // Actualizar el resultado en la tabla de muestras
+        const [updateResult] = await connection.query(
+          'UPDATE muestras SET resultado_analisis = ? WHERE codigo_muestra = ? AND id_oficio = ?',
+          [muestra.resultado_analisis, muestra.codigo_muestra, id_oficio]
+        );
+
+        if (updateResult.affectedRows === 0) {
+          throw new Error(`La muestra con el código ${muestra.codigo_muestra} no fue encontrada o no pertenece a este oficio.`);
+        }
+      }
+
+      // 4. Añadir seguimiento de éxito al oficio
+      await Oficio.addSeguimiento({
+        id_oficio,
+        id_usuario,
+        estado_nuevo: 'ANÁLISIS REALIZADO',
+        observaciones: `Se registraron los resultados de ${muestras_analizadas.length} muestra(s).`
+      }, connection);
+
+      await connection.commit();
+      res.status(201).json({ success: true, message: 'Análisis registrado exitosamente.' });
+
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error al registrar el análisis:', error);
+      res.status(500).json({ success: false, message: error.message || 'Error interno del servidor al registrar el análisis.' });
     } finally {
       connection.release();
     }

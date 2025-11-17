@@ -58,7 +58,61 @@ router.use(requirePerito);
  *       400:
  *         description: Datos inválidos.
  */
-router.post('/:id/registrar-extraccion', ProcedimientoController.registrarExtraccion);
+router.post('/:id/extraccion', ProcedimientoController.registrarExtraccion);
+
+
+/**
+ * @swagger
+ * /api/procedimientos/{id}/analisis:
+ *   post:
+ *     summary: Registra el resultado de un análisis de muestras recibidas.
+ *     tags: [Procedimientos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del oficio.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               apertura_data:
+ *                 type: object
+ *                 properties:
+ *                   descripcion_paquete:
+ *                     type: string
+ *                   observaciones:
+ *                     type: string
+ *               muestras_analizadas:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     codigo_muestra:
+ *                       type: string
+ *                     resultado_analisis:
+ *                       type: string
+ *             example:
+ *               apertura_data:
+ *                 descripcion_paquete: "Sobre manila sin alteraciones."
+ *                 observaciones: "Se procede a la apertura."
+ *               muestras_analizadas:
+ *                 - codigo_muestra: "0456-2025-SAN-01"
+ *                   resultado_analisis: "Positivo para metabolitos de Cocaína."
+ *     responses:
+ *       201:
+ *         description: Análisis registrado exitosamente.
+ *       400:
+ *         description: Datos inválidos.
+ */
+router.post('/:id/analisis', ProcedimientoController.registrarAnalisis);
 
 /**
  * @swagger
