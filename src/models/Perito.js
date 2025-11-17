@@ -904,32 +904,25 @@ export class Perito {
           u.nombre_completo,
           s.nombre as seccion_nombre,
           t.nombre as nombre_turno,
-          COUNT(o.id_oficio) as casos_activos
+          COUNT(o_activos.id_oficio) as casos_asignados
         FROM usuario u
         
-        -- Unir con la sección del perito
-        JOIN usuario_seccion us ON u.id_usuario = us.id_usuario
-        JOIN seccion s ON us.id_seccion = s.id_seccion
-
-        -- Unir con el turno del perito
+        INNER JOIN usuario_seccion us ON u.id_usuario = us.id_usuario
+        INNER JOIN seccion s ON us.id_seccion = s.id_seccion
+        
         LEFT JOIN usuario_turno ut ON u.id_usuario = ut.id_usuario
         LEFT JOIN turno t ON ut.id_turno = t.id_turno
         
-        -- Unir con los oficios (solo los activos)
-        LEFT JOIN oficio o ON u.id_usuario = o.id_usuario_perito_asignado
-          AND o.id_oficio NOT IN (
-            -- Excluir oficios que ya están 'COMPLETADO'
-            SELECT id_oficio FROM seguimiento_oficio WHERE estado_nuevo = 'COMPLETADO'
-          )
+        LEFT JOIN oficio o_activos ON u.id_usuario = o_activos.id_usuario_perito_asignado AND o_activos.id_oficio NOT IN (
+          SELECT DISTINCT so.id_oficio 
+          FROM seguimiento_oficio so 
+          WHERE so.estado_nuevo = 'COMPLETADO' OR so.estado_nuevo = 'CERRADO'
+        )
 
-        -- Filtrar por la sección requerida
         WHERE us.id_seccion = ?
-
-        -- Agrupar para contar los oficios por perito
+        
         GROUP BY u.id_usuario, u.CIP, u.nombre_completo, s.nombre, t.nombre
-
-        -- Ordenar por el que tiene menos casos primero
-        ORDER BY casos_activos ASC, u.nombre_completo ASC;
+        ORDER BY casos_asignados ASC, u.nombre_completo ASC;
       `;
       
       const [rows] = await db.promise().query(query, [id_seccion]);
@@ -937,7 +930,12 @@ export class Perito {
 
     } catch (error) {
       console.error('Error en findCargaTrabajoPorSeccion:', error);
-      throw error;
+      // En lugar de lanzar un error genérico, devolvemos una respuesta de error estructurada.
+      return { 
+        success: false, 
+        message: 'Error al consultar la carga de trabajo de los peritos.',
+        error: error.message
+      };
     }
   }
 

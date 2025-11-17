@@ -60,5 +60,53 @@ router.use(requirePerito);
  */
 router.post('/:id/registrar-extraccion', ProcedimientoController.registrarExtraccion);
 
+/**
+ * @swagger
+ * /api/procedimientos/{id}/siguiente-paso:
+ *   get:
+ *     summary: Obtiene la información del siguiente paso para la derivación.
+ *     tags: [Procedimientos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del oficio.
+ *     responses:
+ *       200:
+ *         description: Devuelve el nombre de la sección de destino y la lista de peritos disponibles.
+ *       404:
+ *         description: No se pudo determinar un siguiente paso.
+ */
+router.get('/:id/siguiente-paso', ProcedimientoController.obtenerSiguientePaso);
+
+/**
+ * @swagger
+ * /api/procedimientos/{id}/derivar:
+ *   post:
+ *     summary: Deriva un caso al siguiente perito según el flujo de trabajo.
+ *     tags: [Procedimientos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del oficio a derivar.
+ *     responses:
+ *       200:
+ *         description: Caso derivado exitosamente.
+ *       404:
+ *         description: No se encontraron peritos disponibles para la derivación.
+ *       500:
+ *         description: Error interno del servidor.
+ */
+router.post('/:id/derivar', ProcedimientoController.derivarCaso);
+
 export default router;
 

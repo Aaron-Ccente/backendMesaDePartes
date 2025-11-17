@@ -714,19 +714,32 @@ export class Oficio {
 
       const [rows] = await db.promise().query(query, [id_oficio]);
 
-      const resultados = rows.map(row => {
-        try {
-          row.resultados = JSON.parse(row.resultados);
-        } catch (e) {
-          row.resultados = { error: "Formato de resultado inválido en la BD." };
-        }
-        return row;
-      });
-
-      return { success: true, data: resultados };
+      // Devuelve los datos crudos para que el servicio los procese
+      return rows;
 
     } catch (error) {
       console.error('Error en Oficio.getResultados:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene los nombres de todos los exámenes requeridos para un oficio.
+   * @param {number} id_oficio - El ID del oficio.
+   * @returns {Promise<string[]>} Un array con los nombres de los exámenes.
+   */
+  static async getExamenesRequeridos(id_oficio) {
+    try {
+      const [examenesRows] = await db.promise().query(
+        `SELECT te.nombre 
+         FROM oficio_examen oe
+         JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen
+         WHERE oe.id_oficio = ?`,
+        [id_oficio]
+      );
+      return examenesRows.map(e => e.nombre);
+    } catch (error) {
+      console.error('Error en getExamenesRequeridos:', error);
       throw error;
     }
   }

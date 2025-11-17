@@ -1,5 +1,6 @@
 import { Perito } from "../models/Perito.js";
 import { Validators } from "../utils/validators.js";
+import { WorkflowService } from '../services/workflowService.js';
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../config/config.js";
@@ -111,64 +112,32 @@ export class PeritoController {
     }
   }
 
-  // Controlador "inteligente" para obtener peritos disponibles
-  static async getPeritosDisponibles(req, res) {
+  static async getPeritosParaAsignacion(req, res) {
     try {
-      // Ahora recibe un array de idTiposExamen
-      const { idEspecialidad, idTiposExamen } = req.query;
-      let peritos = [];
+      const { idTiposExamen, tipoDeIngreso } = req.query;
 
-      if (idTiposExamen && idTiposExamen.length > 0) {
-        // Asegurarse de que idTiposExamen sea siempre un array
-        const examenesIds = Array.isArray(idTiposExamen) ? idTiposExamen : [idTiposExamen];
+      const examenesIds = Array.isArray(idTiposExamen) 
+        ? idTiposExamen 
+        : (idTiposExamen ? [idTiposExamen] : []);
 
-        // Mapa de Examen a Sección
-        const examenToSeccionMap = {
-          '1': 2, // Toxicologico -> LAB
-          '2': 3, // Dosaje etilico -> INST
-          '3': 1, // Sarro Ungueal -> TM
-        };
+      // Para el caso de "Toma de Muestras", el flujo siempre inicia en la sección TM.
+      // El examen real puede ser otro (ej. Toxicológico), pero la primera acción es la toma.
+      // El ID '3' corresponde a 'Sarro Ungueal', que es el examen marcador de la sección TM.
+      // Si el tipo de ingreso es TM, nos aseguramos de que la lógica de prioridad empiece por ahí.
+      const finalExamenesIds = tipoDeIngreso === 'TOMA DE MUESTRAS' 
+        ? [...new Set([...examenesIds, '3'])] 
+        : examenesIds;
 
-        // Prioridad de Secciones: TM > LAB > INST
-        const SECCIONES = { TOMA_MUESTRA: 1, LABORATORIO: 2, INSTRUMENTALIZACION: 3 };
-        const prioridadSecciones = [SECCIONES.TOMA_MUESTRA, SECCIONES.LABORATORIO, SECCIONES.INSTRUMENTALIZACION];
-
-        // Mapear los IDs de examen a un Set de IDs de sección para tener valores únicos
-        const seccionesRequeridas = new Set(
-          examenesIds.map(id => examenToSeccionMap[id]).filter(Boolean) // .filter(Boolean) para eliminar nulos/undefined
-        );
-
-        let idSeccionDestino = null;
-        // Encontrar la sección de mayor prioridad que esté en el Set de requeridas
-        for (const idSeccion of prioridadSecciones) {
-          if (seccionesRequeridas.has(idSeccion)) {
-            idSeccionDestino = idSeccion;
-            break; // Encontramos la de mayor prioridad, salimos del bucle
-          }
-        }
-        
-        // Si se encontró una sección de destino, buscar los peritos
-        if (idSeccionDestino) {
-          const result = await Perito.findCargaTrabajoPorSeccion(idSeccionDestino);
-          if (result.success) {
-            peritos = result.data;
-          }
-        } else if (idEspecialidad) {
-          // Fallback a la especialidad si ningún examen mapea a una sección conocida
-          peritos = await Perito.findAccordingToSpecialty(idEspecialidad);
-        }
-
-      } else if (idEspecialidad) {
-        // Comportamiento original si solo se provee la especialidad
-        peritos = await Perito.findAccordingToSpecialty(idEspecialidad);
-      } else {
-        return res.status(400).json({ success: false, message: 'Se requiere idEspecialidad o un arreglo de idTiposExamen' });
+      if (finalExamenesIds.length === 0) {
+        return res.json({ success: true, data: [] });
       }
-
-      res.status(200).json({ success: true, data: peritos });
+      
+      const peritosDisponibles = await WorkflowService.determinarAsignacionInicial(finalExamenesIds);
+      
+      res.status(200).json({ success: true, data: peritosDisponibles });
 
     } catch (error) {
-      console.error("Error en getPeritosDisponibles:", error);
+      console.error("Error en getPeritosParaAsignacion:", error);
       res.status(500).json({
         success: false,
         message: "Error interno del servidor",

@@ -1,97 +1,157 @@
-import db from '../database/db.js';
+import { Oficio } from '../models/Oficio.js';
+import { Perito } from '../models/Perito.js';
 
-/**
- * El WorkflowService encapsula la lógica de negocio compleja para determinar
- * el flujo de un oficio a través de las diferentes secciones y peritos.
- */
+// Constantes para evitar "números mágicos" y facilitar mantenimiento
+const SECCIONES = {
+  TOMA_MUESTRA: { id: 1, nombre: 'Toma de Muestra' },
+  LABORATORIO: { id: 2, nombre: 'Laboratorio' },
+  INSTRUMENTALIZACION: { id: 3, nombre: 'Instrumentalización' },
+};
+
+const EXAMEN_A_SECCION = {
+  'Sarro Ungueal': SECCIONES.TOMA_MUESTRA,
+  'Toxicológico': SECCIONES.LABORATORIO,
+  'Dosaje Etílico': SECCIONES.INSTRUMENTALIZACION,
+};
+
+// Orden de prioridad definido por la lógica de negocio
+const ORDEN_PRIORIDAD = [
+  SECCIONES.TOMA_MUESTRA,
+  SECCIONES.LABORATORIO,
+  SECCIONES.INSTRUMENTALIZACION,
+];
+
+const normalizeString = (str) => {
+  if (!str) return '';
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/ /g, '_');
+};
+
 export class WorkflowService {
-
   /**
-   * Determina el siguiente paso lógico para un oficio basado en los exámenes requeridos
-   * y los resultados ya presentados.
-   * 
+   * Determina el siguiente paso lógico para un oficio, identificando la sección
+   * de destino y los peritos disponibles con menor carga de trabajo.
+   *
    * @param {number} id_oficio - El ID del oficio a analizar.
    * @returns {Promise<object>} Un objeto que indica el siguiente paso.
-   *          Ej: { next_step: 'ASSIGN_TO_SECTION', section_name: 'Instrumentalización' }
-   *          Ej: { next_step: 'CONSOLIDATE', consolidator_id: 123 }
-   *          Ej: { next_step: 'WORKFLOW_COMPLETE' }
    */
-  static async getNextStep(id_oficio) {
+  static async determinarSiguientePaso(id_oficio) {
     try {
-      // 1. Obtener todos los exámenes requeridos para el oficio
-      const [requiredExams] = await db.promise().query(
-        `SELECT te.nombre 
-         FROM oficio_examen oe
-         JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen
-         WHERE oe.id_oficio = ?`,
-        [id_oficio]
+      // 1. Obtener los exámenes requeridos y los resultados ya presentados
+      const [examenesRequeridos, resultadosEnviados] = await Promise.all([
+        Oficio.getExamenesRequeridos(id_oficio),
+        Oficio.getResultados(id_oficio),
+      ]);
+
+      const nombresResultados = new Set(resultadosEnviados.map(r => normalizeString(r.tipo_resultado)));
+
+      // 2. Determinar qué exámenes están pendientes
+      const examenesPendientes = examenesRequeridos.filter(
+        examen => !nombresResultados.has(normalizeString(examen))
       );
-      const requiredExamNames = requiredExams.map(e => e.nombre);
 
-      // 2. Obtener todos los resultados que ya han sido enviados para el oficio
-      const [submittedResults] = await db.promise().query(
-        `SELECT tipo_resultado FROM oficio_resultados_perito WHERE id_oficio = ?`,
-        [id_oficio]
-      );
-      const submittedResultTypes = submittedResults.map(r => r.tipo_resultado);
-
-      // --- Lógica de decisión del flujo de Toxicología ---
-
-      // Regla 1: Si se requiere "Dosaje Etílico" y aún no se ha presentado, ese es el siguiente paso.
-      if (requiredExamNames.includes('Dosaje Etílico') && !submittedResultTypes.includes('DOSAJE_ETILICO')) {
-        return { 
-          next_step: 'ASSIGN_TO_SECTION', 
-          section_name: 'Instrumentalización',
-          reason: 'Dosaje Etílico pendiente.'
-        };
-      }
-
-      // Regla 2: Si se requiere "Toxicológico" y aún no se ha presentado, ese es el siguiente paso.
-      // Nota: Esto se ejecutaría después de la regla del Dosaje Etílico.
-      if (requiredExamNames.includes('Toxicológico') && !submittedResultTypes.includes('TOXICOLOGICO')) {
-        return {
-          next_step: 'ASSIGN_TO_SECTION',
-          section_name: 'Laboratorio',
-          reason: 'Examen Toxicológico pendiente.'
-        };
-      }
-      
-      // Regla 3: Si se requiere "Sarro Ungueal" y aún no se ha presentado.
-      if (requiredExamNames.includes('Sarro Ungueal') && !submittedResultTypes.includes('SARRO_UNGUEAL')) {
-        return {
-          next_step: 'ASSIGN_TO_SECTION',
-          section_name: 'Laboratorio',
-          reason: 'Examen de Sarro Ungueal pendiente.'
-        };
-      }
-
-      // Regla 4: Si todos los exámenes requeridos tienen un resultado, el siguiente paso es la consolidación.
-      const allResultsSubmitted = requiredExamNames.every(reqExam => {
-        // Normalizar nombres para la comparación
-        const normalizedReq = reqExam.toUpperCase().replace(/ /g, '_');
-        return submittedResultTypes.includes(normalizedReq);
-      });
-
-      if (allResultsSubmitted && requiredExamNames.length > 0) {
-        // El consolidador es siempre un perito del Laboratorio.
-        // Necesitamos encontrar quién fue el perito original del laboratorio o uno disponible.
-        // Por ahora, indicamos la necesidad de consolidar en la sección Laboratorio.
+      // 3. Si no hay exámenes pendientes, el caso debe ir a consolidación
+      if (examenesPendientes.length === 0) {
+        // La consolidación siempre ocurre en Laboratorio
+        const peritosDisponibles = await Perito.findCargaTrabajoPorSeccion(SECCIONES.LABORATORIO.id);
         return {
           next_step: 'CONSOLIDATE',
-          section_name: 'Laboratorio',
-          reason: 'Todos los resultados han sido presentados. Listo para consolidar.'
+          section_id: SECCIONES.LABORATORIO.id,
+          section_name: SECCIONES.LABORATORIO.nombre,
+          reason: 'Todos los análisis han sido completados, listo para la consolidación final.',
+          peritos_disponibles: peritosDisponibles.data || [],
         };
       }
 
-      // Regla 5: Si no hay más pasos lógicos, el flujo puede considerarse completo desde la perspectiva del perito.
+      // 4. Aplicar la lógica de prioridad para encontrar el siguiente paso
+      let seccionDestino = null;
+      for (const seccionPrioritaria of ORDEN_PRIORIDAD) {
+        const examenDeEstaSeccion = Object.keys(EXAMEN_A_SECCION).find(
+          examen => EXAMEN_A_SECCION[examen].id === seccionPrioritaria.id
+        );
+
+        if (examenesPendientes.includes(examenDeEstaSeccion)) {
+          seccionDestino = seccionPrioritaria;
+          break; // Encontramos la sección de mayor prioridad pendiente
+        }
+      }
+
+      // 5. Si se encontró una sección de destino, buscar peritos disponibles
+      if (seccionDestino) {
+        const peritosDisponibles = await Perito.findCargaTrabajoPorSeccion(seccionDestino.id);
+        const examenPendiente = examenesPendientes.find(e => EXAMEN_A_SECCION[e]?.id === seccionDestino.id);
+
+        return {
+          next_step: 'ASSIGN_TO_SECTION',
+          section_id: seccionDestino.id,
+          section_name: seccionDestino.nombre,
+          reason: `Examen ${examenPendiente} pendiente.`,
+          peritos_disponibles: peritosDisponibles.data || [],
+        };
+      }
+
+      // 6. Caso fallback: si algo sale mal, indicar que no hay más pasos.
       return {
         next_step: 'WORKFLOW_COMPLETE',
-        reason: 'No hay más pasos de análisis pendientes.'
+        reason: 'No se pudo determinar un siguiente paso lógico. Revisar configuración.',
       };
 
     } catch (error) {
-      console.error('Error en WorkflowService.getNextStep:', error);
+      console.error('Error en WorkflowService.determinarSiguientePaso:', error);
+      throw new Error('Error al determinar el siguiente paso del flujo de trabajo.');
+    }
+  }
+
+  /**
+   * Determina la asignación inicial de un perito basado en los exámenes requeridos.
+   * @param {number[]} id_tipos_examen - Array de IDs de los tipos de examen.
+   * @returns {Promise<object|null>} El objeto del perito a asignar o null si no se encuentra.
+   */
+  static async determinarAsignacionInicial(id_tipos_examen) {
+    try {
+      if (!id_tipos_examen || id_tipos_examen.length === 0) {
+        throw new Error('Se requieren tipos de examen para la asignación inicial.');
+      }
+
+      // Mapeo directo y robusto de ID de Examen a ID de Sección
+      const EXAMEN_ID_A_SECCION_ID = {
+        '1': SECCIONES.LABORATORIO.id,      // Toxicológico -> LAB
+        '2': SECCIONES.INSTRUMENTALIZACION.id, // Dosaje Etílico -> INST
+        '3': SECCIONES.TOMA_MUESTRA.id,       // Sarro Ungueal -> TM
+      };
+
+      const seccionesRequeridas = new Set(
+        id_tipos_examen.map(id => EXAMEN_ID_A_SECCION_ID[id]).filter(Boolean)
+      );
+
+      if (seccionesRequeridas.size === 0) {
+        return []; // No se encontró una sección para los exámenes dados
+      }
+      
+      let seccionDestinoId = null;
+      // Encontrar la sección de mayor prioridad según el orden definido
+      for (const seccion of ORDEN_PRIORIDAD) {
+        if (seccionesRequeridas.has(seccion.id)) {
+          seccionDestinoId = seccion.id;
+          break;
+        }
+      }
+
+      if (!seccionDestinoId) {
+        return []; // No se pudo determinar una sección de destino
+      }
+
+      const peritosDisponibles = await Perito.findCargaTrabajoPorSeccion(seccionDestinoId);
+      
+      return peritosDisponibles.data || []; // Devolver la lista completa de peritos
+
+    } catch (error) {
+      console.error('Error en determinarAsignacionInicial:', error);
       throw error;
     }
   }
 }
+
