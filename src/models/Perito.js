@@ -902,13 +902,15 @@ export class Perito {
           u.id_usuario,
           u.CIP,
           u.nombre_completo,
+          s.nombre as seccion_nombre,
           t.nombre as nombre_turno,
           COUNT(o.id_oficio) as casos_activos
         FROM usuario u
         
         -- Unir con la sección del perito
         JOIN usuario_seccion us ON u.id_usuario = us.id_usuario
-        
+        JOIN seccion s ON us.id_seccion = s.id_seccion
+
         -- Unir con el turno del perito
         LEFT JOIN usuario_turno ut ON u.id_usuario = ut.id_usuario
         LEFT JOIN turno t ON ut.id_turno = t.id_turno
@@ -924,7 +926,7 @@ export class Perito {
         WHERE us.id_seccion = ?
 
         -- Agrupar para contar los oficios por perito
-        GROUP BY u.id_usuario, u.CIP, u.nombre_completo, t.nombre
+        GROUP BY u.id_usuario, u.CIP, u.nombre_completo, s.nombre, t.nombre
 
         -- Ordenar por el que tiene menos casos primero
         ORDER BY casos_activos ASC, u.nombre_completo ASC;

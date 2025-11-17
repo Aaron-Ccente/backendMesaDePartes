@@ -486,10 +486,10 @@ export class Oficio {
 
       const baseQuery = `
         SELECT o.*,
-               tp.nombre_prioridad,
-               td.nombre_departamento AS especialidad,
-               s.estado_nuevo AS ultimo_estado,
-               s.fecha_seguimiento AS ultimo_fecha,
+               MAX(tp.nombre_prioridad) as nombre_prioridad,
+               MAX(td.nombre_departamento) AS especialidad,
+               MAX(s.estado_nuevo) AS ultimo_estado,
+               MAX(s.fecha_seguimiento) AS ultimo_fecha,
                (SELECT GROUP_CONCAT(te.nombre SEPARATOR ', ') 
                 FROM oficio_examen oe 
                 JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen 
@@ -550,7 +550,8 @@ export class Oficio {
         ${baseQuery}
         ${queryWhere}
         AND (s.estado_nuevo IS NULL OR s.estado_nuevo NOT IN ('COMPLETADO', 'CERRADO'))
-        ORDER BY s.fecha_seguimiento DESC, o.fecha_creacion DESC
+        GROUP BY o.id_oficio
+        ORDER BY o.fecha_creacion DESC
       `;
 
       const [rows] = await db.promise().query(finalQuery, params);
