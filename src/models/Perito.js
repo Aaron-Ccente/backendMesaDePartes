@@ -889,10 +889,65 @@ export class Perito {
         GROUP BY tp.nombre_prioridad;
       `);
 
+      // Usuarios habilitados
+      const [usersEnable] = await db.promise().query(`
+       SELECT 
+            eu.id_estado,
+            COUNT(*) AS cantidad
+        FROM estado_usuario eu
+        INNER JOIN (
+            SELECT 
+                id_usuario,
+                MAX(id_estado_usuario) AS ultimo_estado_id
+            FROM estado_usuario
+            GROUP BY id_usuario
+        ) ult ON eu.id_estado_usuario = ult.ultimo_estado_id
+        WHERE eu.id_estado = 1;
+      `);
+
+      // Usuarios deshabilitados
+      const [usersDisable] = await db.promise().query(`
+       SELECT 
+            eu.id_estado,
+            COUNT(*) AS cantidad
+        FROM estado_usuario eu
+        INNER JOIN (
+            SELECT 
+                id_usuario,
+                MAX(id_estado_usuario) AS ultimo_estado_id
+            FROM estado_usuario
+            GROUP BY id_usuario
+        ) ult ON eu.id_estado_usuario = ult.ultimo_estado_id
+        WHERE eu.id_estado = 2;
+      `);
+
+      // Oficios de la semana
+     const [oficiosDeLaSemana] = await db.promise().query(`
+        SELECT 
+          DAYOFWEEK(fecha_creacion) AS dia_semana_num,
+          ELT(
+            DAYOFWEEK(fecha_creacion),
+            'domingo','lunes','martes','miércoles','jueves','viernes','sábado'
+          ) AS dia_semana_nombre,
+          COUNT(*) AS cantidad_oficios
+        FROM oficio
+        WHERE fecha_creacion >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+        GROUP BY 
+          DAYOFWEEK(fecha_creacion),
+          ELT(
+            DAYOFWEEK(fecha_creacion),
+            'domingo','lunes','martes','miércoles','jueves','viernes','sábado'
+          )
+        ORDER BY dia_semana_num;
+      `);
+
       return {
         totalPeritos: totalPeritos[0].total,
+        usersEnable,
+        usersDisable,
         usuariosActivos,
         prioridadOficios,
+        oficiosDeLaSemana
       };
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
