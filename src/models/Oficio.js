@@ -395,65 +395,121 @@ export class Oficio {
   static async findDetalleById(id_oficio) {
     const connection = await db.promise().getConnection();
     try {
-      // Iniciar un array de promesas
-      const promises = [];
-
-      // Promesa 1: Obtener los datos principales del oficio
-      const oficioPromise = connection.query(
+      // Paso 1: Obtener el oficio principal y datos básicos con JOINs seguros.
+      const [oficioRows] = await connection.query(
         `SELECT 
           o.*, 
           tp.nombre_prioridad, 
           td.nombre_departamento as especialidad,
-          u_creador.nombre_completo as nombre_creador,
-          u_perito.nombre_completo as nombre_perito_actual
+          u_creador.nombre_completo as nombre_creador
          FROM oficio o
          LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
          LEFT JOIN tipo_departamento td ON o.id_especialidad_requerida = td.id_tipo_departamento
          LEFT JOIN usuario u_creador ON o.creado_por = u_creador.id_usuario
-         LEFT JOIN usuario u_perito ON o.id_usuario_perito_asignado = u_perito.id_usuario
          WHERE o.id_oficio = ?`,
         [id_oficio]
       );
-      promises.push(oficioPromise);
 
-      // Promesa 2: Obtener el historial de seguimiento completo
+      if (oficioRows.length === 0) {
+        return { success: false, message: "Oficio no encontrado" };
+      }
+      const oficio = oficioRows[0];
+
+      // Paso 2: Obtener detalles del perito asignado (si existe) en una consulta separada.
+      if (oficio.id_usuario_perito_asignado) {
+        const [peritoDetailsRows] = await connection.query(
+          `SELECT 
+            u.nombre_completo as nombre_perito_actual,
+            u.CIP as cip_perito,
+            u.cqfp,
+            u.domicilio_laboral,
+            p.dni as dni_perito,
+            g.nombre as grado_perito
+           FROM usuario u
+           LEFT JOIN perito p ON u.id_usuario = p.id_usuario
+           LEFT JOIN usuario_grado ug ON u.id_usuario = ug.id_usuario
+           LEFT JOIN grado g ON ug.id_grado = g.id_grado
+           WHERE u.id_usuario = ?`,
+          [oficio.id_usuario_perito_asignado]
+        );
+        if (peritoDetailsRows.length > 0) {
+          Object.assign(oficio, peritoDetailsRows[0]);
+        }
+      }
+
+      // Paso 3: Obtener datos concurrentes (seguimiento, exámenes, muestras).
       const seguimientoPromise = connection.query(
-        `SELECT 
-          s.*, 
-          u.nombre_completo as nombre_usuario, 
-          c.nombre_completo as nombre_conductor,
-          sec.nombre as nombre_seccion_usuario
+        `SELECT s.*, u.nombre_completo as nombre_usuario, c.nombre_completo as nombre_conductor, sec.nombre as nombre_seccion_usuario
          FROM seguimiento_oficio s
          LEFT JOIN usuario u ON s.id_usuario = u.id_usuario
          LEFT JOIN usuario c ON s.id_conductor = c.id_usuario
          LEFT JOIN usuario_seccion us ON u.id_usuario = us.id_usuario
          LEFT JOIN seccion sec ON us.id_seccion = sec.id_seccion
-         WHERE s.id_oficio = ?
-         ORDER BY s.fecha_seguimiento ASC`,
+         WHERE s.id_oficio = ? ORDER BY s.fecha_seguimiento ASC`,
         [id_oficio]
       );
-      promises.push(seguimientoPromise);
 
-      // Promesa 3: Obtener los tipos de examen asociados
       const examenesPromise = connection.query(
-        `SELECT te.nombre 
-         FROM oficio_examen oe
-         JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen
-         WHERE oe.id_oficio = ?`,
+        `SELECT te.nombre FROM oficio_examen oe JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen WHERE oe.id_oficio = ?`,
         [id_oficio]
       );
-      promises.push(examenesPromise);
 
-      // Ejecutar todas las promesas en paralelo
-      const [[oficioRows], [seguimientoRows], [examenesRows]] = await Promise.all(promises);
+      const muestrasPromise = connection.query(
+        `SELECT * FROM muestras WHERE id_oficio = ?`,
+        [id_oficio]
+      );
+      
+      const metadataPromise = connection.query(
+        `SELECT objeto_pericia, metodo_utilizado FROM oficio_resultados_metadata WHERE id_oficio = ?`,
+        [id_oficio]
+      );
 
-      if (oficioRows.length === 0) {
-        return { success: false, message: "Oficio no encontrado" };
-      }
+      const [[seguimientoRows], [examenesRows], [muestrasRows], [metadataRows]] = await Promise.all([
+        seguimientoPromise,
+        examenesPromise,
+        muestrasPromise,
+        metadataPromise
+      ]);
 
-      const oficio = oficioRows[0];
+      // Paso 4: Ensamblar todos los datos.
       oficio.seguimiento_historial = seguimientoRows;
       oficio.tipos_de_examen = examenesRows.map(e => e.nombre);
+      oficio.muestras_registradas = muestrasRows.map((m, index) => ({ ...m, index: index + 1 }));
+      if (metadataRows.length > 0) {
+        Object.assign(oficio, metadataRows[0]);
+      }
+
+      // Formateo de fechas para la plantilla
+      const formatDate = (date) => {
+        if (!date) return '';
+        const d = new Date(date);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'][d.getMonth()];
+        const year = d.getFullYear();
+        return `${day}${month}${year}`;
+      };
+      
+      const formatLongDate = (date) => {
+        if (!date) return '';
+        const d = new Date(date);
+        return d.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+      };
+
+      const formatTime = (date) => {
+        if (!date) return '';
+        return new Date(date).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
+      }
+
+      oficio.fecha_oficio_formateada = formatDate(oficio.fecha_creacion);
+      oficio.fecha_actual_formateada = formatLongDate(new Date());
+      oficio.hora_actual = formatTime(new Date());
+      oficio.hora_final_diligencia = formatTime(new Date(Date.now() + 5 * 60000)); // 5 minutos después
+
+      if (oficio.fecha_hora_incidente) {
+        const [fechaIncidente, horaIncidente] = oficio.fecha_hora_incidente.split(' ');
+        oficio.fecha_incidente_formateada = formatDate(fechaIncidente);
+        oficio.hora_incidente = horaIncidente;
+      }
 
       return { success: true, data: oficio };
 
@@ -532,10 +588,10 @@ export class Oficio {
 
       const baseQuery = `
         SELECT o.*,
-               tp.nombre_prioridad,
-               td.nombre_departamento AS especialidad,
-               s.estado_nuevo AS ultimo_estado,
-               s.fecha_seguimiento AS ultimo_fecha,
+               MAX(tp.nombre_prioridad) as nombre_prioridad,
+               MAX(td.nombre_departamento) AS especialidad,
+               MAX(s.estado_nuevo) AS ultimo_estado,
+               MAX(s.fecha_seguimiento) AS ultimo_fecha,
                (SELECT GROUP_CONCAT(te.nombre SEPARATOR ', ') 
                 FROM oficio_examen oe 
                 JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen 
@@ -596,7 +652,8 @@ export class Oficio {
         ${baseQuery}
         ${queryWhere}
         AND (s.estado_nuevo IS NULL OR s.estado_nuevo NOT IN ('COMPLETADO', 'CERRADO'))
-        ORDER BY s.fecha_seguimiento DESC, o.fecha_creacion DESC
+        GROUP BY o.id_oficio
+        ORDER BY o.fecha_creacion DESC
       `;
 
       const [rows] = await db.promise().query(finalQuery, params);
@@ -759,19 +816,32 @@ export class Oficio {
 
       const [rows] = await db.promise().query(query, [id_oficio]);
 
-      const resultados = rows.map(row => {
-        try {
-          row.resultados = JSON.parse(row.resultados);
-        } catch (e) {
-          row.resultados = { error: "Formato de resultado inválido en la BD." };
-        }
-        return row;
-      });
-
-      return { success: true, data: resultados };
+      // Devuelve los datos crudos para que el servicio los procese
+      return rows;
 
     } catch (error) {
       console.error('Error en Oficio.getResultados:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene los nombres de todos los exámenes requeridos para un oficio.
+   * @param {number} id_oficio - El ID del oficio.
+   * @returns {Promise<string[]>} Un array con los nombres de los exámenes.
+   */
+  static async getExamenesRequeridos(id_oficio) {
+    try {
+      const [examenesRows] = await db.promise().query(
+        `SELECT te.nombre 
+         FROM oficio_examen oe
+         JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen
+         WHERE oe.id_oficio = ?`,
+        [id_oficio]
+      );
+      return examenesRows.map(e => e.nombre);
+    } catch (error) {
+      console.error('Error en getExamenesRequeridos:', error);
       throw error;
     }
   }

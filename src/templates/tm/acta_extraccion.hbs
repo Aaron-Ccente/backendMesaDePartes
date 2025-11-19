@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Acta de Extracción de Muestra</title>
+</head>
+<body>
+    {{> partials/membrete }}
+
+    <div class="content-body">
+        <h3 class="text-center font-bold underline uppercase" style="font-size: 12pt;">
+            ACTA DE EXTRACCIÓN Y LACRADO DE MUESTRA(S)
+        </h3>
+        
+        <br>
+
+        <p style="text-align: justify;">
+            En la ciudad de Huancayo, siendo las {{oficio.hora_actual}} horas del día {{oficio.fecha_actual_formateada}}, en las instalaciones de la OFICRI PNP Huancayo, el Perito Químico Farmacéutico que suscribe, {{perito.nombre_completo}} (CIP {{perito.CIP}}, DNI {{perito.dni_perito}}), en mérito al documento de la referencia, se procedió a realizar la diligencia de EXTRACCIÓN Y LACRADO DE MUESTRA(S) para el análisis pericial correspondiente, a la persona de:
+        </p>
+
+        <p class="text-center font-bold" style="margin: 10px 0;">
+            {{oficio.examinado_incriminado}} (DNI: {{oficio.dni_examinado_incriminado}})
+        </p>
+
+        <p style="text-align: justify;">
+            A quien se le extrajo la(s) siguiente(s) muestra(s):
+        </p>
+
+        <div style="margin: 15px 0 15px 20px;">
+            {{#each oficio.muestras_registradas}}
+            <p style="margin-bottom: 10px;">
+                <span class="font-bold">- MUESTRA N° {{this.index}}:</span> Consistente en {{this.cantidad}} de {{this.tipo_muestra}}, {{this.descripcion}}
+            </p>
+            {{/each}}
+        </div>
+
+        <p style="text-align: justify;">
+            La(s) muestra(s) fue(ron) debidamente rotulada(s) y lacrada(s) en presencia de los participantes para garantizar su seguridad e integridad, y se procedió a iniciar la cadena de custodia correspondiente para su traslado al laboratorio para el análisis respectivo.
+        </p>
+
+        {{#if oficio.observaciones}}
+        <p style="text-align: justify; margin-top: 15px;">
+            <span class="font-bold">OBSERVACIONES:</span> {{oficio.observaciones}}
+        </p>
+        {{/if}}
+
+        <p style="text-align: justify; margin-top: 15px;">
+            Siendo las {{oficio.hora_final_diligencia}} horas de la misma fecha, se dio por concluida la presente diligencia, firmando a continuación los participantes en señal de conformidad.
+        </p>
+
+        <br><br><br>
+
+        <table style="width: 100%; text-align: center; margin-top: 3cm;">
+            <tr>
+                <td style="width: 45%;">
+                    <hr style="border: none; border-top: 1px solid black; width: 80%; margin: 0 auto 5px auto;">
+                    <p style="font-size: 9pt;">EL INTERESADO</p>
+                    <p style="font-size: 9pt;">DNI: {{oficio.dni_examinado_incriminado}}</p>
+                </td>
+                <td style="width: 10%;"></td>
+                <td style="width: 45%;">
+                    <hr style="border: none; border-top: 1px solid black; width: 80%; margin: 0 auto 5px auto;">
+                    <p class="font-bold" style="font-size: 9pt;">{{perito.nombre_completo}}</p>
+                    <p style="font-size: 9pt;">{{perito.grado_perito}}</p>
+                    <p style="font-size: 9pt;">PERITO QUÍMICO</p>
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>
