@@ -1,0 +1,68 @@
+<style>
+    body { 
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        font-size: 11pt;
+        line-height: 1.5;
+    }
+    .membrete-container {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        margin-bottom: 8px;
+    }
+    .membrete-escudo {
+        width: 45px;
+        height: 52px;
+    }
+    .membrete-bloque {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: white;
+        font-size: 7pt;
+        line-height: 1.3;
+        padding: 2px;
+        box-sizing: border-box;
+        font-weight: bold;
+    }
+    .bloque-peru { background-color: #D32F2F; width: 64px; }
+    .bloque-ministerio { background-color: #424242; width: 94px; }
+    .bloque-policia { background-color: #616161; width: 94px; }
+    .bloque-comando { background-color: #757575; width: 110px; }
+    .bloque-direccion { background-color: #9E9E9E; width: 110px; }
+    .bloque-region { background-color: #BDBDBD; width: 83px; }
+    
+    .lema {
+        text-align: center;
+        font-size: 9pt;
+        font-style: italic;
+        margin: 5px 0 10px 0;
+    }
+    .linea-horizontal {
+        border-top: 1.5px solid #000;
+        margin-bottom: 10px;
+    }
+    .content-body {
+        padding-top: 10px;
+    }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .font-bold { font-weight: bold; }
+    .underline { text-decoration: underline; }
+    .uppercase { text-transform: uppercase; }
+</style>
+
+<div class="membrete-container">
+    <img src="{{assets.logoBase64}}" alt="Escudo" class="membrete-escudo">
+    <div class="membrete-bloque bloque-peru">PERÚ</div>
+    <div class="membrete-bloque bloque-ministerio">Ministerio<br>del Interior</div>
+    <div class="membrete-bloque bloque-policia">Policía Nacional<br>del Perú</div>
+    <div class="membrete-bloque bloque-comando">Comando de Operaciones Policiales</div>
+    <div class="membrete-bloque bloque-direccion">Dirección Nacional de Orden y Seguridad</div>
+    <div class="membrete-bloque bloque-region">Región Policial Junín</div>
+</div>
+
+<div class="linea-horizontal"></div>
+<div class="lema">"Año de la Unidad, la Paz y el Desarrollo"</div>

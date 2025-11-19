@@ -103,7 +103,7 @@ export class ProcedimientoController {
   static async registrarAnalisis(req, res) {
     const { id: id_oficio } = req.params;
     const { id_usuario } = req.user;
-    const { apertura_data, muestras_analizadas } = req.body;
+    const { apertura_data, muestras_analizadas, metadata } = req.body;
 
     const connection = await db.promise().getConnection();
     try {
@@ -128,7 +128,16 @@ export class ProcedimientoController {
         observaciones: apertura_data.observaciones,
       }]);
 
-      // 3. Procesar y actualizar las muestras con sus resultados
+      // 3. Guardar los metadatos del informe
+      if (metadata) {
+        await connection.query('INSERT INTO oficio_resultados_metadata SET ?', [{
+          id_oficio,
+          objeto_pericia: metadata.objeto_pericia,
+          metodo_utilizado: metadata.metodo_utilizado,
+        }]);
+      }
+
+      // 4. Procesar y actualizar las muestras con sus resultados
       if (!Array.isArray(muestras_analizadas) || muestras_analizadas.length === 0) {
         await connection.rollback();
         return res.status(400).json({ success: false, message: 'Se requiere al menos una muestra analizada.' });
@@ -138,10 +147,10 @@ export class ProcedimientoController {
         if (!muestra.codigo_muestra || !muestra.resultado_analisis) {
           throw new Error('Cada muestra analizada debe tener un código y un resultado.');
         }
-        // Actualizar el resultado en la tabla de muestras
+        // Actualizar el resultado y la descripción detallada en la tabla de muestras
         const [updateResult] = await connection.query(
-          'UPDATE muestras SET resultado_analisis = ? WHERE codigo_muestra = ? AND id_oficio = ?',
-          [muestra.resultado_analisis, muestra.codigo_muestra, id_oficio]
+          'UPDATE muestras SET resultado_analisis = ?, descripcion_detallada = ? WHERE codigo_muestra = ? AND id_oficio = ?',
+          [muestra.resultado_analisis, muestra.descripcion_detallada, muestra.codigo_muestra, id_oficio]
         );
 
         if (updateResult.affectedRows === 0) {
@@ -149,7 +158,7 @@ export class ProcedimientoController {
         }
       }
 
-      // 4. Añadir seguimiento de éxito al oficio
+      // 5. Añadir seguimiento de éxito al oficio
       await Oficio.addSeguimiento({
         id_oficio,
         id_usuario,
