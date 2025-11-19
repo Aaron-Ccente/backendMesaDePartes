@@ -69,11 +69,19 @@ export class WorkflowService {
       // 4. Aplicar la lógica de prioridad para encontrar el siguiente paso
       let seccionDestino = null;
       for (const seccionPrioritaria of ORDEN_PRIORIDAD) {
-        const examenDeEstaSeccion = Object.keys(EXAMEN_A_SECCION).find(
+        // Encontrar los exámenes que pertenecen a esta sección
+        const examenesDeEstaSeccion = Object.keys(EXAMEN_A_SECCION).filter(
           examen => EXAMEN_A_SECCION[examen].id === seccionPrioritaria.id
         );
 
-        if (examenesPendientes.includes(examenDeEstaSeccion)) {
+        // Verificar si alguno de los exámenes pendientes pertenece a esta sección
+        const tieneExamenPendiente = examenesDeEstaSeccion.some(examenSeccion =>
+          examenesPendientes.some(examenPendiente =>
+            normalizeString(examenPendiente) === normalizeString(examenSeccion)
+          )
+        );
+
+        if (tieneExamenPendiente) {
           seccionDestino = seccionPrioritaria;
           break; // Encontramos la sección de mayor prioridad pendiente
         }
@@ -130,7 +138,7 @@ export class WorkflowService {
       if (seccionesRequeridas.size === 0) {
         return []; // No se encontró una sección para los exámenes dados
       }
-      
+
       let seccionDestinoId = null;
       // Encontrar la sección de mayor prioridad según el orden definido
       for (const seccion of ORDEN_PRIORIDAD) {
@@ -145,7 +153,7 @@ export class WorkflowService {
       }
 
       const peritosDisponibles = await Perito.findCargaTrabajoPorSeccion(seccionDestinoId);
-      
+
       return peritosDisponibles.data || []; // Devolver la lista completa de peritos
 
     } catch (error) {

@@ -147,7 +147,7 @@ export class Oficio {
         ) s ON s.id_oficio = o.id_oficio
         WHERE o.creado_por = ?
       `;
-      
+
       const [rows] = await db.promise().query(statsQuery, [id_creador]);
       // Los resultados de SUM pueden ser null si no hay filas, así que los convertimos a 0
       const stats = {
@@ -165,24 +165,24 @@ export class Oficio {
 
 
   static async getCountNewOficios({ id_usuario = null, CIP = null }) {
-  try {
-    const params = [];
-    let userCond = '';
-    
-    if (id_usuario) {
-      userCond = 'o.id_usuario_perito_asignado = ?';
-      params.push(id_usuario);
-    }
-    if (CIP) {
-      if (userCond) userCond += ' OR ';
-      userCond += `o.id_usuario_perito_asignado = (SELECT id_usuario FROM usuario WHERE CIP = ?)`;
-      params.push(CIP);
-    }
-    if (!userCond) {
-      return { success: false, message: 'Se requiere id_usuario o CIP' };
-    }
+    try {
+      const params = [];
+      let userCond = '';
 
-    const query = `
+      if (id_usuario) {
+        userCond = 'o.id_usuario_perito_asignado = ?';
+        params.push(id_usuario);
+      }
+      if (CIP) {
+        if (userCond) userCond += ' OR ';
+        userCond += `o.id_usuario_perito_asignado = (SELECT id_usuario FROM usuario WHERE CIP = ?)`;
+        params.push(CIP);
+      }
+      if (!userCond) {
+        return { success: false, message: 'Se requiere id_usuario o CIP' };
+      }
+
+      const query = `
       SELECT COUNT(*) AS count_new_oficios
       FROM oficio o
       WHERE (${userCond})
@@ -193,13 +193,13 @@ export class Oficio {
       )
     `;
 
-    const [rows] = await db.promise().query(query, params);
-    return { success: true, data: rows[0].count_new_oficios };
-  } catch (error) {
-    console.error('Error en getCountNewOficios:', error);
-    return { success: false, message: "Error al obtener el conteo de nuevos oficios" };
+      const [rows] = await db.promise().query(query, params);
+      return { success: true, data: rows[0].count_new_oficios };
+    } catch (error) {
+      console.error('Error en getCountNewOficios:', error);
+      return { success: false, message: "Error al obtener el conteo de nuevos oficios" };
+    }
   }
-}
 
   static async findById(id_oficio) {
     try {
@@ -211,7 +211,7 @@ export class Oficio {
          WHERE o.id_oficio = ?`,
         [id_oficio]
       );
-      
+
       if (oficios.length === 0) {
         return { success: false, message: "Oficio no encontrado" };
       }
@@ -225,7 +225,7 @@ export class Oficio {
 
   static async create(oficioData) {
     const connection = await db.promise().getConnection();
-    
+
     try {
       await connection.beginTransaction();
 
@@ -273,7 +273,7 @@ export class Oficio {
           oficioPrincipalData.actualizado_por
         ]
       );
-      
+
       const newOficioId = result.insertId;
 
       // --- INSERCIÓN EN TABLA PIVOTE oficio_examen ---
@@ -294,20 +294,20 @@ export class Oficio {
       );
 
       await connection.commit();
-      return { 
-        success: true, 
-        data: { 
+      return {
+        success: true,
+        data: {
           id_oficio: newOficioId,
-          numero_oficio: oficioPrincipalData.numero_oficio 
+          numero_oficio: oficioPrincipalData.numero_oficio
         },
-        message: "Oficio creado exitosamente" 
+        message: "Oficio creado exitosamente"
       };
 
     } catch (error) {
       await connection.rollback();
       console.error('ERROR DETALLADO EN Oficio.create:', error); // <-- LOG DE DEBUG
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: error.message || "Error desconocido al crear el oficio",
       };
     } finally {
@@ -338,7 +338,7 @@ export class Oficio {
          ORDER BY s.fecha_seguimiento ASC`,
         [id_oficio]
       );
-      
+
       return { success: true, data: seguimiento };
     } catch (error) {
       console.error('Error en getSeguimiento:', error);
@@ -412,7 +412,7 @@ export class Oficio {
         `SELECT * FROM muestras WHERE id_oficio = ?`,
         [id_oficio]
       );
-      
+
       const metadataPromise = connection.query(
         `SELECT objeto_pericia, metodo_utilizado FROM oficio_resultados_metadata WHERE id_oficio = ?`,
         [id_oficio]
@@ -442,7 +442,7 @@ export class Oficio {
         const year = d.getFullYear();
         return `${day}${month}${year}`;
       };
-      
+
       const formatLongDate = (date) => {
         if (!date) return '';
         const d = new Date(date);
@@ -532,7 +532,7 @@ export class Oficio {
   static async findCasosPorFuncion({ perito, funcion }) {
     try {
       const id_perito = perito.id_usuario;
-      const seccion_perito = perito.id_seccion; 
+      const seccion_perito = perito.id_seccion;
 
       const SECCIONES = { TOMA_MUESTRA: 1, LABORATORIO: 2, INSTRUMENTALIZACION: 3 };
       const EXAMENES = { TOXICOLOGICO: 1, DOSAJE_ETILICO: 2, SARRO_UNGUEAL: 3 };
@@ -581,7 +581,7 @@ export class Oficio {
                           AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.SARRO_UNGUEAL);
           break;
-        
+
         // --- Lógica para Perito INST ---
         case 'analisis_inst':
           queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
@@ -590,7 +590,7 @@ export class Oficio {
 
         // --- Lógica para Perito LAB ---
         case 'analisis_lab':
-           queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)
+          queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)
                            AND s.estado_nuevo NOT LIKE 'DERIVADO A:%'`;
           params.push(EXAMENES.TOXICOLOGICO);
           break;
@@ -624,21 +624,21 @@ export class Oficio {
   static async addSeguimiento({ id_oficio, id_usuario, estado_anterior = null, estado_nuevo = null }, connection = null) {
     // Si no se pasa una conexión, usa el pool por defecto. Si se pasa, usa la transacción.
     const dbConn = connection || db.promise();
-    
+
     try {
       const [result] = await dbConn.query(
         `INSERT INTO seguimiento_oficio (id_oficio, id_usuario, estado_anterior, estado_nuevo)
          VALUES (?, ?, ?, ?)`,
         [id_oficio, id_usuario, estado_anterior, estado_nuevo]
       );
-      
+
       return { success: true, data: { id_seguimiento: result.insertId } };
 
     } catch (error) {
       console.error('Error en addSeguimiento:', error);
       // Si estamos en una transacción, solo propagamos el error sin lanzar
-      if (connection) throw error; 
-      
+      if (connection) throw error;
+
       return { success: false, message: 'Error al agregar seguimiento' };
     }
     // No liberamos la conexión si es una transacción externa
@@ -683,20 +683,20 @@ export class Oficio {
 
       // 3. Añadir un registro en 'seguimiento_oficio'
       const nuevo_estado = `DERIVADO A: ${String(nombre_seccion_destino).toUpperCase()}`;
-      
+
       // Llamamos a addSeguimiento PASÁNDOLE la conexión de la transacción
       await Oficio.addSeguimiento({
         id_oficio: id_oficio,
         id_usuario: id_perito_actual, // El perito que HACE la derivación
         estado_nuevo: nuevo_estado,
         estado_anterior: null // addSeguimiento manejará esto
-      }, connection); 
+      }, connection);
 
       await connection.commit(); // Confirmar transacción
-      
-      return { 
-        success: true, 
-        message: 'Oficio reasignado y seguimiento actualizado.' 
+
+      return {
+        success: true,
+        message: 'Oficio reasignado y seguimiento actualizado.'
       };
 
     } catch (error) {
@@ -715,15 +715,17 @@ export class Oficio {
    * @param {number} resultadoData.id_perito_responsable - ID del perito que emite el resultado.
    * @param {string} resultadoData.tipo_resultado - Ej: 'TOXICOLOGICO', 'DOSAJE_ETILICO'.
    * @param {object} resultadoData.resultados - Objeto JSON con los hallazgos.
+   * @param {object} connection - Conexión de base de datos opcional para transacciones.
    */
-  static async addResultado({ id_oficio, id_perito_responsable, tipo_resultado, resultados }) {
+  static async addResultado({ id_oficio, id_perito_responsable, tipo_resultado, resultados }, connection = null) {
+    const dbConn = connection || db.promise();
     try {
       // Validar que los datos necesarios están presentes
       if (!id_oficio || !id_perito_responsable || !tipo_resultado || !resultados) {
         throw new Error('Faltan datos requeridos para agregar el resultado.');
       }
 
-      const [result] = await db.promise().query(
+      const [result] = await dbConn.query(
         `INSERT INTO oficio_resultados_perito (id_oficio, id_perito_responsable, tipo_resultado, resultados)
          VALUES (?, ?, ?, ?)`,
         [id_oficio, id_perito_responsable, tipo_resultado, JSON.stringify(resultados)]
@@ -732,8 +734,9 @@ export class Oficio {
       return { success: true, data: { id_resultado: result.insertId } };
     } catch (error) {
       console.error('Error en Oficio.addResultado:', error);
-      // Lanza el error para que el controlador lo maneje
-      throw error;
+      // Si estamos en una transacción, propagamos el error
+      if (connection) throw error;
+      return { success: false, message: 'Error al agregar resultado' };
     }
   }
 
@@ -815,7 +818,7 @@ export class Oficio {
       const examenToSeccionMap = {
         [EXAMENES.TOXICOLOGICO]: SECCIONES.LABORATORIO,
         [EXAMENES.DOSAJE_ETILICO]: SECCIONES.INSTRUMENTALIZACION,
-        [EXAMENES.SARRO_UNGUEAL]: SECCIONES.TOMA_MUESTRA, 
+        [EXAMENES.SARRO_UNGUEAL]: SECCIONES.TOMA_MUESTRA,
       };
 
       // Paso 1: Obtener los exámenes requeridos para el oficio
@@ -875,8 +878,7 @@ export class Oficio {
       console.error('Error en findPeritosParaDerivacion:', error);
       return { success: false, message: 'Error al buscar peritos para derivación.' };
     } finally {
-            connection.release();
-          }
-        }
-      }
-      
+      connection.release();
+    }
+  }
+}

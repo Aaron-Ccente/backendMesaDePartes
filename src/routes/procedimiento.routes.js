@@ -162,5 +162,60 @@ router.get('/:id/siguiente-paso', ProcedimientoController.obtenerSiguientePaso);
  */
 router.post('/:id/derivar', ProcedimientoController.derivarCaso);
 
+/**
+ * @swagger
+ * /api/procedimientos/{id}/resultados-completos:
+ *   get:
+ *     summary: Obtiene todos los resultados registrados para un oficio.
+ *     tags: [Procedimientos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del oficio.
+ *     responses:
+ *       200:
+ *         description: Lista de resultados.
+ */
+router.get('/:id/resultados-completos', ProcedimientoController.obtenerResultadosCompletos);
+
+/**
+ * @swagger
+ * /api/procedimientos/{id}/consolidacion:
+ *   post:
+ *     summary: Registra la consolidación final y cierra el caso.
+ *     tags: [Procedimientos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del oficio.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               conclusiones:
+ *                 type: string
+ *               observaciones:
+ *                 type: string
+ *               cerrar_caso:
+ *                 type: boolean
+ *     responses:
+ *       201:
+ *         description: Consolidación registrada exitosamente.
+ */
+router.post('/:id/consolidacion', ProcedimientoController.registrarConsolidacion);
+
 export default router;
 
