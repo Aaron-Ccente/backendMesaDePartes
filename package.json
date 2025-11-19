@@ -4,7 +4,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "start": "nodemon server.js",
     "migrate:make": "knex migrate:make --esm -x js",
     "migrate:latest": "knex migrate:latest --knexfile ./knexfile.js",
@@ -29,7 +29,10 @@
     "multer": "^2.0.2",
     "mysql2": "^3.14.3",
     "nodemon": "^3.1.10",
-    "puppeteer-core": "^24.29.1",
+    "puppeteer": "^24.30.0",
     "stream": "^0.0.3"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0"
   }
 }

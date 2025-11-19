@@ -1,7 +1,7 @@
 import { Oficio } from '../models/Oficio.js';
 import { Validators } from '../utils/validators.js';
 import { WorkflowService } from '../services/workflowService.js';
-import { ReportService } from '../services/reportService.js';
+import { DocumentBuilderService } from '../services/DocumentBuilderService.js';
 
 export class OficioController {
 
@@ -308,7 +308,7 @@ export class OficioController {
   static async generarReporte(req, res) {
     try {
       const { id } = req.params;
-      const pdfBuffer = await ReportService.generateReport(Number(id));
+      const pdfBuffer = await DocumentBuilderService.generateReport(Number(id));
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=reporte_oficio_${id}.pdf`);

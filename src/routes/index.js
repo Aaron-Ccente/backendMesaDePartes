@@ -11,6 +11,8 @@ import oficioRoutes from './oficio.routes.js'
 import googleRoutes from './googleapi.routes.js'
 import seguimientoRoutes from './seguimiento.routes.js'
 import mesaDePartesDashboardRoutes from './mesadepartes.dashboard.routes.js';
+import procedimientoRoutes from './procedimiento.routes.js';
+import documentoRoutes from './documento.routes.js';
 
 const router = express.Router();
 
@@ -62,5 +64,11 @@ router.use('/api/google', googleRoutes)
 
 // Rutas para el seguimiento de casos
 router.use('/api/seguimiento', seguimientoRoutes)
+
+// Rutas para los procedimientos de los peritos
+router.use('/api/procedimientos', procedimientoRoutes);
+
+// Rutas para la generación de documentos
+router.use('/api/documentos', documentoRoutes);
 
 export default router;
