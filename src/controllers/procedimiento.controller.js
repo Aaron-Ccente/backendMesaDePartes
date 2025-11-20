@@ -18,12 +18,18 @@ export class ProcedimientoController {
     try {
       await connection.beginTransaction();
 
-      // 1. Validar que el oficio pertenece al perito
+      // 1. Validar que el oficio pertenece al perito y obtener datos
       const oficio = await Oficio.findById(id_oficio);
       if (!oficio.success || oficio.data.id_usuario_perito_asignado !== id_usuario) {
         await connection.rollback();
         return res.status(403).json({ success: false, message: 'Acceso denegado.' });
       }
+
+      // Obtener los exámenes requeridos para la lógica de estado
+      const examenesRequeridos = await Oficio.getExamenesRequeridos(id_oficio);
+      const requiereAnalisisTM = examenesRequeridos.some(ex => ex.toUpperCase().includes('SARRO UNGUEAL'));
+
+      let estadoNuevo = '';
 
       if (fue_exitosa) {
         // 2. Si la extracción fue exitosa, procesar y guardar las muestras
@@ -35,36 +41,37 @@ export class ProcedimientoController {
         const codigosGenerados = [];
 
         for (const muestra of muestras) {
-          // 2.1. Generar el código único para la muestra
           const codigoMuestra = await MuestraService.generarCodigoMuestra(id_oficio, muestra.tipo_muestra);
-
           const nuevaMuestra = {
             id_oficio,
             tipo_muestra: muestra.tipo_muestra,
-            descripcion: muestra.descripcion, // Descripción adicional opcional
+            descripcion: muestra.descripcion,
             cantidad: muestra.cantidad,
             codigo_muestra: codigoMuestra,
-            esta_lacrado: true, // El lacrado es implícito en el proceso de extracción exitosa
+            esta_lacrado: true,
           };
-
-          // 2.2. Guardar la nueva muestra
           const id_muestra = await Muestra.create(nuevaMuestra, connection);
           codigosGenerados.push(codigoMuestra);
 
-          // 2.3. Crear el evento inicial en la cadena de custodia
           await connection.query('INSERT INTO cadena_de_custodia SET ?', [{
             id_muestra,
-            id_perito_entrega: id_usuario, // El perito que extrae es el primer custodio
+            id_perito_entrega: id_usuario,
             proposito: 'CREACIÓN Y EXTRACCIÓN',
             observaciones: 'Inicio de la cadena de custodia.'
           }]);
         }
+        
+        // Decidir el estado basado en si se requiere un análisis posterior por TM
+        if (requiereAnalisisTM) {
+          estadoNuevo = 'PENDIENTE_ANALISIS_TM';
+        } else {
+          estadoNuevo = 'EXTRACCION_FINALIZADA';
+        }
 
-        // 2.4. Añadir seguimiento de éxito al oficio
         await Oficio.addSeguimiento({
           id_oficio,
           id_usuario,
-          estado_nuevo: 'EXTRACCIÓN REALIZADA',
+          estado_nuevo: estadoNuevo,
           observaciones: `Se generaron ${codigosGenerados.length} muestras con los códigos: ${codigosGenerados.join(', ')}`
         }, connection);
 
@@ -77,10 +84,11 @@ export class ProcedimientoController {
 
       } else {
         // 3. Si la extracción fue fallida, solo registrar el seguimiento
+        estadoNuevo = 'EXTRACCION_FALLIDA';
         await Oficio.addSeguimiento({
           id_oficio,
           id_usuario,
-          estado_nuevo: 'EXTRACCIÓN FALLIDA',
+          estado_nuevo: estadoNuevo,
           observaciones: observaciones || 'No se especificaron observaciones.'
         }, connection);
 
@@ -145,8 +153,6 @@ export class ProcedimientoController {
 
       for (const muestra of muestras_analizadas) {
         if (!muestra.codigo_muestra || !muestra.resultado_analisis) {
-          // Para LAB, resultado_analisis puede ser un objeto (resultados: {cocaina: 'POSITIVO', ...})
-          // Si viene como 'resultados' dentro del objeto muestra, lo usamos.
           if (muestra.resultados && typeof muestra.resultados === 'object') {
             muestra.resultado_analisis = JSON.stringify(muestra.resultados);
           } else {
@@ -154,21 +160,17 @@ export class ProcedimientoController {
           }
         }
 
-        // Asegurarse de que resultado_analisis sea string para la BD
         const resultadoParaBD = typeof muestra.resultado_analisis === 'object'
           ? JSON.stringify(muestra.resultado_analisis)
           : muestra.resultado_analisis;
 
-        // Actualizar el resultado y la descripción detallada en la tabla de muestras
         const [updateResult] = await connection.query(
           'UPDATE muestras SET resultado_analisis = ?, descripcion_detallada = ? WHERE codigo_muestra = ? AND id_oficio = ?',
           [resultadoParaBD, muestra.descripcion_detallada, muestra.codigo_muestra, id_oficio]
         );
 
         if (updateResult.affectedRows === 0) {
-          // Si no existe por código (ej. nueva muestra en LAB), intentar insertarla
-          // Esto es necesario si LAB agrega muestras que no venían de TM
-          const [insertResult] = await connection.query(
+          await connection.query(
             'INSERT INTO muestras (id_oficio, codigo_muestra, tipo_muestra, descripcion_detallada, resultado_analisis, cantidad) VALUES (?, ?, ?, ?, ?, ?)',
             [id_oficio, muestra.codigo_muestra, muestra.tipo_muestra || 'Desconocido', muestra.descripcion_detallada, resultadoParaBD, 1]
           );
@@ -176,7 +178,6 @@ export class ProcedimientoController {
       }
 
       // 5. Registrar el resultado en oficio_resultados_perito para el WorkflowService
-      // Determinar el tipo de resultado basado en la sección del perito
       const [peritoData] = await connection.query(
         `SELECT s.nombre as nombre_seccion 
          FROM usuario_seccion us 
@@ -186,18 +187,24 @@ export class ProcedimientoController {
       );
 
       let tipoResultado = 'RESULTADO_GENERICO';
+      let estadoNuevo = 'ANALISIS_FINALIZADO';
       if (peritoData.length > 0) {
         const seccion = peritoData[0].nombre_seccion.toUpperCase();
-        if (seccion === 'TOMA DE MUESTRA') tipoResultado = 'Sarro Ungueal';
-        else if (seccion === 'LABORATORIO') tipoResultado = 'Toxicológico';
-        else if (seccion === 'INSTRUMENTALIZACION') tipoResultado = 'Dosaje Etílico';
+        if (seccion === 'TOMA DE MUESTRA') {
+          tipoResultado = 'Sarro Ungueal';
+          estadoNuevo = 'ANALISIS_TM_FINALIZADO';
+        } else if (seccion === 'LABORATORIO') {
+          tipoResultado = 'Toxicológico';
+          estadoNuevo = 'ANALISIS_LAB_FINALIZADO';
+        } else if (seccion === 'INSTRUMENTALIZACION') {
+          tipoResultado = 'Dosaje Etílico';
+          estadoNuevo = 'ANALISIS_INST_FINALIZADO';
+        }
       }
 
-      // Recopilar todos los resultados en un solo objeto
       const resultadosConsolidados = {};
       muestras_analizadas.forEach(m => {
         let val = m.resultado_analisis;
-        // Intentar parsear si es JSON (caso LAB)
         if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
           try { val = JSON.parse(val); } catch (e) { }
         }
@@ -209,13 +216,13 @@ export class ProcedimientoController {
         id_perito_responsable: id_usuario,
         tipo_resultado: tipoResultado,
         resultados: resultadosConsolidados
-      });
+      }, connection);
 
       // 6. Añadir seguimiento de éxito al oficio
       await Oficio.addSeguimiento({
         id_oficio,
         id_usuario,
-        estado_nuevo: 'ANÁLISIS REALIZADO',
+        estado_nuevo: estadoNuevo,
         observaciones: `Se registraron los resultados de ${muestras_analizadas.length} muestra(s).`
       }, connection);
 

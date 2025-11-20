@@ -939,26 +939,4 @@ export class Perito {
     }
   }
 
-  static async findNextAvailable(id_seccion) {
-    if (!id_seccion) {
-      throw new Error('El ID de la sección es requerido para encontrar un perito disponible.');
-    }
-    try {
-      // Lógica simple: devuelve el primer perito de la sección.
-      // Una versión más avanzada podría usar findCargaTrabajoPorSeccion y devolver el que tenga menos carga.
-      const [rows] = await db.promise().query(
-        `SELECT id_usuario FROM usuario_seccion WHERE id_seccion = ? LIMIT 1`,
-        [id_seccion]
-      );
-      
-      if (rows.length === 0) {
-        return null; // No se encontraron peritos
-      }
-      
-      return rows[0]; // Devuelve { id_usuario: X }
-    } catch (error) {
-      console.error('Error en findNextAvailable:', error);
-      throw error;
-    }
-  }
 }

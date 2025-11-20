@@ -532,16 +532,16 @@ export class Oficio {
   static async findCasosPorFuncion({ perito, funcion }) {
     try {
       const id_perito = perito.id_usuario;
-      const seccion_perito = perito.id_seccion;
 
-      const SECCIONES = { TOMA_MUESTRA: 1, LABORATORIO: 2, INSTRUMENTALIZACION: 3 };
       const EXAMENES = { TOXICOLOGICO: 1, DOSAJE_ETILICO: 2, SARRO_UNGUEAL: 3 };
 
       let queryWhere = 'WHERE o.id_usuario_perito_asignado = ?';
       const params = [id_perito];
 
+      // Esta es la subconsulta que obtiene y agrupa todos los datos necesarios
       const baseQuery = `
-        SELECT o.*,
+        SELECT 
+               o.id_oficio, o.numero_oficio, o.tipo_de_muestra, o.asunto, o.examinado_incriminado, o.delito, o.fecha_creacion, o.id_usuario_perito_asignado,
                MAX(tp.nombre_prioridad) as nombre_prioridad,
                MAX(td.nombre_departamento) AS especialidad,
                MAX(s.estado_nuevo) AS ultimo_estado,
@@ -562,54 +562,62 @@ export class Oficio {
             GROUP BY id_oficio
           ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
         ) s ON s.id_oficio = o.id_oficio
+        GROUP BY o.id_oficio
       `;
 
+      let estadoFilter = '';
+
       switch (funcion) {
-        // --- Lógica para Perito TM ---
         case 'extraccion':
           queryWhere += ` AND o.tipo_de_muestra = 'TOMA DE MUESTRAS' 
-                          AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen != ?)`;
+                          AND NOT EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.SARRO_UNGUEAL);
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado = 'CREACION DEL OFICIO')";
           break;
+
         case 'analisis_tm':
-          queryWhere += ` AND o.tipo_de_muestra = 'MUESTRAS REMITIDAS' 
+          queryWhere += ` AND o.tipo_de_muestra = 'MUESTRAS REMITIDAS'
                           AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.SARRO_UNGUEAL);
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado = 'CREACION DEL OFICIO')";
           break;
+
         case 'extraccion_y_analisis':
           queryWhere += ` AND o.tipo_de_muestra = 'TOMA DE MUESTRAS' 
                           AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.SARRO_UNGUEAL);
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado IN ('CREACION DEL OFICIO', 'PENDIENTE_ANALISIS_TM'))";
           break;
 
-        // --- Lógica para Perito INST ---
         case 'analisis_inst':
           queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.DOSAJE_ETILICO);
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado = 'CREACION DEL OFICIO' OR o.ultimo_estado LIKE 'DERIVADO A%')";
           break;
 
-        // --- Lógica para Perito LAB ---
         case 'analisis_lab':
-          queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)
-                           AND s.estado_nuevo NOT LIKE 'DERIVADO A:%'`;
+          queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.TOXICOLOGICO);
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado = 'CREACION DEL OFICIO' OR o.ultimo_estado LIKE 'DERIVADO A%')";
           break;
+
         case 'consolidacion':
-          queryWhere += ` AND s.estado_nuevo LIKE 'DERIVADO A: LABORATORIO%'`;
+          queryWhere += ` AND o.ultimo_estado LIKE 'DERIVADO A: LABORATORIO%'`;
+          estadoFilter = "AND (o.ultimo_estado NOT IN ('COMPLETADO', 'CERRADO'))";
           break;
 
         default:
           return { success: false, message: 'Función no reconocida' };
       }
 
+      // La consulta final envuelve la subconsulta y aplica los filtros
       const finalQuery = `
-        ${baseQuery}
+        SELECT * FROM (${baseQuery}) as o
         ${queryWhere}
-        AND (s.estado_nuevo IS NULL OR s.estado_nuevo NOT IN ('COMPLETADO', 'CERRADO'))
-        GROUP BY o.id_oficio
+        ${estadoFilter}
         ORDER BY o.fecha_creacion DESC
       `;
-
+      
       const [rows] = await db.promise().query(finalQuery, params);
       return { success: true, data: rows };
 
