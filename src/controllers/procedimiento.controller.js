@@ -5,6 +5,37 @@ import db from '../database/db.js';
 import { WorkflowService } from '../services/workflowService.js';
 
 export class ProcedimientoController {
+  static async getDatosExtraccion(req, res) {
+    const { id: id_oficio } = req.params;
+    try {
+      const muestras = await Muestra.findByOficioId(id_oficio);
+      const seguimiento = await Oficio.getSeguimientoDeProcedimiento(id_oficio, [
+        'EXTRACCION_FINALIZADA', 
+        'PENDIENTE_ANALISIS_TM', 
+        'EXTRACCION_FALLIDA'
+      ]);
+
+      // Si no hay datos, es un procedimiento nuevo. Devolver éxito con data nula.
+      if (muestras.length === 0 && !seguimiento) {
+        return res.status(200).json({ success: true, data: null });
+      }
+
+      const fueExitosa = seguimiento ? seguimiento.estado_nuevo !== 'EXTRACCION_FALLIDA' : true;
+      
+      res.status(200).json({
+        success: true,
+        data: {
+          muestras,
+          observaciones: seguimiento ? seguimiento.observaciones : '',
+          fue_exitosa: fueExitosa
+        }
+      });
+    } catch (error) {
+      console.error('Error en getDatosExtraccion:', error);
+      res.status(500).json({ success: false, message: 'Error interno del servidor.' });
+    }
+  }
+
   /**
    * Registra el resultado de una extracción de muestra, generando códigos únicos
    * y el evento inicial de la cadena de custodia.
@@ -18,28 +49,29 @@ export class ProcedimientoController {
     try {
       await connection.beginTransaction();
 
-      // 1. Validar que el oficio pertenece al perito y obtener datos
+      // 1. Validar que el oficio pertenece al perito
       const oficio = await Oficio.findById(id_oficio);
       if (!oficio.success || oficio.data.id_usuario_perito_asignado !== id_usuario) {
         await connection.rollback();
         return res.status(403).json({ success: false, message: 'Acceso denegado.' });
       }
 
-      // Obtener los exámenes requeridos para la lógica de estado
+      // 2. Sincronizar Muestras (Borrar y Re-insertar)
+      await Muestra.deleteByOficioId(id_oficio, connection);
+
       const examenesRequeridos = await Oficio.getExamenesRequeridos(id_oficio);
       const requiereAnalisisTM = examenesRequeridos.some(ex => ex.toUpperCase().includes('SARRO UNGUEAL'));
-
       let estadoNuevo = '';
+      let finalObservaciones = observaciones || null;
 
       if (fue_exitosa) {
-        // 2. Si la extracción fue exitosa, procesar y guardar las muestras
         if (!Array.isArray(muestras) || muestras.length === 0) {
           await connection.rollback();
           return res.status(400).json({ success: false, message: 'Se requiere al menos una muestra para una extracción exitosa.' });
         }
 
         const codigosGenerados = [];
-
+        // 3. Insertar las nuevas muestras.
         for (const muestra of muestras) {
           const codigoMuestra = await MuestraService.generarCodigoMuestra(id_oficio, muestra.tipo_muestra);
           const nuevaMuestra = {
@@ -50,51 +82,41 @@ export class ProcedimientoController {
             codigo_muestra: codigoMuestra,
             esta_lacrado: true,
           };
-          const id_muestra = await Muestra.create(nuevaMuestra, connection);
+          await Muestra.create(nuevaMuestra, connection);
           codigosGenerados.push(codigoMuestra);
-
-          await connection.query('INSERT INTO cadena_de_custodia SET ?', [{
-            id_muestra,
-            id_perito_entrega: id_usuario,
-            proposito: 'CREACIÓN Y EXTRACCIÓN',
-            observaciones: 'Inicio de la cadena de custodia.'
-          }]);
         }
         
-        // Decidir el estado basado en si se requiere un análisis posterior por TM
-        if (requiereAnalisisTM) {
-          estadoNuevo = 'PENDIENTE_ANALISIS_TM';
-        } else {
-          estadoNuevo = 'EXTRACCION_FINALIZADA';
+        estadoNuevo = requiereAnalisisTM ? 'PENDIENTE_ANALISIS_TM' : 'EXTRACCION_FINALIZADA';
+        
+        // Lógica de sincronización para las observaciones
+        const systemMessage = `Se guardaron ${codigosGenerados.length} muestras con los códigos: ${codigosGenerados.join(', ')}.`;
+        const separator = '\n\nObservaciones del perito:\n';
+        let userObservaciones = observaciones || '';
+
+        if (userObservaciones.includes(separator)) {
+          userObservaciones = userObservaciones.split(separator)[1] || '';
         }
 
-        await Oficio.addSeguimiento({
-          id_oficio,
-          id_usuario,
-          estado_nuevo: estadoNuevo,
-          observaciones: `Se generaron ${codigosGenerados.length} muestras con los códigos: ${codigosGenerados.join(', ')}`
-        }, connection);
-
-        await connection.commit();
-        res.status(201).json({
-          success: true,
-          message: 'Procedimiento de extracción registrado exitosamente.',
-          data: { codigos_generados: codigosGenerados }
-        });
+        finalObservaciones = userObservaciones ? `${systemMessage}${separator}${userObservaciones}` : systemMessage;
 
       } else {
-        // 3. Si la extracción fue fallida, solo registrar el seguimiento
         estadoNuevo = 'EXTRACCION_FALLIDA';
-        await Oficio.addSeguimiento({
-          id_oficio,
-          id_usuario,
-          estado_nuevo: estadoNuevo,
-          observaciones: observaciones || 'No se especificaron observaciones.'
-        }, connection);
-
-        await connection.commit();
-        res.status(201).json({ success: true, message: 'Procedimiento de extracción fallida registrado exitosamente.' });
+        finalObservaciones = observaciones || 'No se especificaron observaciones.';
       }
+
+      // 4. Añadir el registro de seguimiento
+      await Oficio.addSeguimiento({
+        id_oficio,
+        id_usuario,
+        estado_nuevo: estadoNuevo,
+        observaciones: finalObservaciones
+      }, connection);
+
+      await connection.commit();
+      res.status(201).json({
+        success: true,
+        message: 'Procedimiento de extracción guardado exitosamente.',
+      });
 
     } catch (error) {
       await connection.rollback();

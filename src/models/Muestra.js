@@ -9,6 +9,12 @@ export class Muestra {
     return result.insertId;
   }
 
+  // Método para eliminar todas las muestras por ID de oficio
+  static async deleteByOficioId(id_oficio, connection) {
+    const conn = connection || db.promise();
+    await conn.query('DELETE FROM muestras WHERE id_oficio = ?', [id_oficio]);
+  }
+
   // Método para encontrar muestras por ID de oficio
   static async findByOficioId(id_oficio) {
     const [rows] = await db.promise().query('SELECT * FROM muestras WHERE id_oficio = ?', [id_oficio]);

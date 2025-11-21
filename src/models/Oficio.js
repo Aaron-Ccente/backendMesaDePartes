@@ -572,33 +572,33 @@ export class Oficio {
           queryWhere += ` AND o.tipo_de_muestra = 'TOMA DE MUESTRAS' 
                           AND NOT EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.SARRO_UNGUEAL);
-          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado = 'CREACION DEL OFICIO')";
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado IN ('CREACION DEL OFICIO', 'EXTRACCION_FINALIZADA'))";
           break;
 
         case 'analisis_tm':
           queryWhere += ` AND o.tipo_de_muestra = 'MUESTRAS REMITIDAS'
                           AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.SARRO_UNGUEAL);
-          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado = 'CREACION DEL OFICIO')";
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado IN ('CREACION DEL OFICIO', 'ANALISIS_TM_FINALIZADO'))";
           break;
 
         case 'extraccion_y_analisis':
           queryWhere += ` AND o.tipo_de_muestra = 'TOMA DE MUESTRAS' 
                           AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.SARRO_UNGUEAL);
-          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado IN ('CREACION DEL OFICIO', 'PENDIENTE_ANALISIS_TM'))";
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado IN ('CREACION DEL OFICIO', 'PENDIENTE_ANALISIS_TM', 'ANALISIS_TM_FINALIZADO'))";
           break;
 
         case 'analisis_inst':
           queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.DOSAJE_ETILICO);
-          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado = 'CREACION DEL OFICIO' OR o.ultimo_estado LIKE 'DERIVADO A%')";
+          estadoFilter = "AND (o.ultimo_estado LIKE 'DERIVADO A%' OR o.ultimo_estado = 'ANALISIS_INST_FINALIZADO')";
           break;
 
         case 'analisis_lab':
           queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.TOXICOLOGICO);
-          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado = 'CREACION DEL OFICIO' OR o.ultimo_estado LIKE 'DERIVADO A%')";
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado = 'CREACION DEL OFICIO' OR o.ultimo_estado LIKE 'DERIVADO A%' OR o.ultimo_estado = 'ANALISIS_LAB_FINALIZADO')";
           break;
 
         case 'consolidacion':
@@ -629,15 +629,15 @@ export class Oficio {
 
   // Agregar seguimiento
   // (MODIFICADO para aceptar transacciones)
-  static async addSeguimiento({ id_oficio, id_usuario, estado_anterior = null, estado_nuevo = null }, connection = null) {
+  static async addSeguimiento({ id_oficio, id_usuario, estado_anterior = null, estado_nuevo = null, observaciones = null }, connection = null) {
     // Si no se pasa una conexión, usa el pool por defecto. Si se pasa, usa la transacción.
     const dbConn = connection || db.promise();
 
     try {
       const [result] = await dbConn.query(
-        `INSERT INTO seguimiento_oficio (id_oficio, id_usuario, estado_anterior, estado_nuevo)
-         VALUES (?, ?, ?, ?)`,
-        [id_oficio, id_usuario, estado_anterior, estado_nuevo]
+        `INSERT INTO seguimiento_oficio (id_oficio, id_usuario, estado_anterior, estado_nuevo, observaciones)
+         VALUES (?, ?, ?, ?, ?)`,
+        [id_oficio, id_usuario, estado_anterior, estado_nuevo, observaciones]
       );
 
       return { success: true, data: { id_seguimiento: result.insertId } };
@@ -887,6 +887,27 @@ export class Oficio {
       return { success: false, message: 'Error al buscar peritos para derivación.' };
     } finally {
       connection.release();
+    }
+  }
+
+  static async getSeguimientoDeProcedimiento(id_oficio, estados) {
+    if (!id_oficio || !Array.isArray(estados) || estados.length === 0) {
+      return null;
+    }
+    try {
+      const placeholders = estados.map(() => '?').join(',');
+      const [rows] = await db.promise().query(
+        `SELECT estado_nuevo, observaciones 
+         FROM seguimiento_oficio 
+         WHERE id_oficio = ? AND estado_nuevo IN (${placeholders})
+         ORDER BY fecha_seguimiento DESC
+         LIMIT 1`,
+        [id_oficio, ...estados]
+      );
+      return rows[0] || null;
+    } catch (error) {
+      console.error('Error en getSeguimientoDeProcedimiento:', error);
+      throw error;
     }
   }
 }

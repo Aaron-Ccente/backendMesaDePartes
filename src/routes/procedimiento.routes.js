@@ -10,6 +10,29 @@ router.use(requirePerito);
 
 /**
  * @swagger
+ * /api/procedimientos/{id}/extraccion:
+ *   get:
+ *     summary: Obtiene los datos guardados de un procedimiento de extracción.
+ *     tags: [Procedimientos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del oficio.
+ *     responses:
+ *       200:
+ *         description: Datos de la extracción encontrados.
+ *       404:
+ *         description: No se encontraron datos para este procedimiento.
+ */
+router.get('/:id/extraccion', ProcedimientoController.getDatosExtraccion);
+
+/**
+ * @swagger
  * /api/procedimientos/{id}/registrar-extraccion:
  *   post:
  *     summary: Registra el resultado de un procedimiento de extracción de muestras.
