@@ -14,9 +14,9 @@ export class OficioController {
       return res.json(result);
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ 
-        success: false, 
-        message: "Error interno del servidor" 
+      return res.status(500).json({
+        success: false,
+        message: "Error interno del servidor"
       });
     }
   }
@@ -25,17 +25,17 @@ export class OficioController {
     try {
       const { id } = req.params;
       const result = await Oficio.findById(id);
-      
+
       if (!result.success) {
         return res.status(404).json(result);
       }
-      
+
       return res.json(result);
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ 
-        success: false, 
-        message: "Error interno del servidor" 
+      return res.status(500).json({
+        success: false,
+        message: "Error interno del servidor"
       });
     }
   }
@@ -88,7 +88,7 @@ export class OficioController {
       }
 
       const result = await Oficio.create(oficioMapeado);
-      
+
       if (!result.success) {
         return res.status(400).json({
           success: false,
@@ -133,22 +133,22 @@ export class OficioController {
       return res.status(500).json({ success: false, message: "Error interno al verificar número de oficio" });
     }
   }
-  
+
   static async getSeguimientoOficio(req, res) {
     try {
       const { id } = req.params;
       const result = await Oficio.getSeguimiento(id);
-      
+
       if (!result.success) {
         return res.status(400).json(result);
       }
-      
+
       return res.json(result);
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ 
-        success: false, 
-        message: "Error interno del servidor" 
+      return res.status(500).json({
+        success: false,
+        message: "Error interno del servidor"
       });
     }
   }
@@ -183,7 +183,7 @@ export class OficioController {
       if (!result.success) {
         return res.status(500).json(result);
       }
-      
+
       return res.json({ success: true, data: result.data });
 
     } catch (error) {
@@ -308,16 +308,21 @@ export class OficioController {
   static async generarReporte(req, res) {
     try {
       const { id } = req.params;
-      const pdfBuffer = await DocumentBuilderService.generateReport(Number(id));
+      // Por defecto generamos el informe pericial si no se especifica otro
+      // TODO: Recibir el tipo de reporte por query param o body si hay varios
+      const pdfResult = await DocumentBuilderService.build('lab/informe_pericial_lab', Number(id));
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=reporte_oficio_${id}.pdf`);
-      res.send(pdfBuffer);
+      res.send(pdfResult.pdfBuffer);
     } catch (error) {
       console.error('Error en generarReporte:', error);
       return res.status(500).json({
         success: false,
         message: 'Error interno al generar el reporte.',
+      });
+    }
+  }
             });
           }
         }
@@ -348,4 +353,5 @@ export class OficioController {
       });
     } 
   }
+}
 }

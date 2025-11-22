@@ -193,7 +193,7 @@ export class Oficio {
         ) s ON s.id_oficio = o.id_oficio
         WHERE o.creado_por = ?
       `;
-      
+
       const [rows] = await db.promise().query(statsQuery, [id_creador]);
       // Los resultados de SUM pueden ser null si no hay filas, así que los convertimos a 0
       const stats = {
@@ -211,41 +211,48 @@ export class Oficio {
 
 
   static async getCountNewOficios({ id_usuario = null, CIP = null }) {
-  try {
-    const params = [];
-    let userCond = '';
-    
-    if (id_usuario) {
-      userCond = 'o.id_usuario_perito_asignado = ?';
-      params.push(id_usuario);
-    }
-    if (CIP) {
-      if (userCond) userCond += ' OR ';
-      userCond += `o.id_usuario_perito_asignado = (SELECT id_usuario FROM usuario WHERE CIP = ?)`;
-      params.push(CIP);
-    }
-    if (!userCond) {
-      return { success: false, message: 'Se requiere id_usuario o CIP' };
-    }
+    try {
+      const params = [];
+      let userCond = '';
 
-    const query = `
+      if (id_usuario) {
+        userCond = 'o.id_usuario_perito_asignado = ?';
+        params.push(id_usuario);
+      }
+      if (CIP) {
+        if (userCond) userCond += ' OR ';
+        userCond += `o.id_usuario_perito_asignado = (SELECT id_usuario FROM usuario WHERE CIP = ?)`;
+        params.push(CIP);
+      }
+      if (!userCond) {
+        return { success: false, message: 'Se requiere id_usuario o CIP' };
+      }
+
+      const query = `
       SELECT COUNT(*) AS count_new_oficios
       FROM oficio o
       WHERE (${userCond})
       AND o.id_oficio NOT IN (
         SELECT DISTINCT id_oficio 
         FROM seguimiento_oficio 
-        WHERE estado_nuevo IN ('OFICIO VISTO', 'OFICIO EN PROCESO', 'COMPLETADO')
+        WHERE estado_nuevo IN (
+          'OFICIO VISTO', 'OFICIO EN PROCESO', 'COMPLETADO', 
+          'PENDIENTE_ANALISIS_TM', 'ANALISIS_TM_FINALIZADO', 
+          'EXTRACCION_FINALIZADA', 'EXTRACCION_FALLIDA',
+          'ANALISIS_INST_FINALIZADO', 'ANALISIS_LAB_FINALIZADO',
+          'PENDIENTE_CONSOLIDACION', 'CONSOLIDACION_FINALIZADA',
+          'DICTAMEN_EMITIDO'
+        )
       )
     `;
 
-    const [rows] = await db.promise().query(query, params);
-    return { success: true, data: rows[0].count_new_oficios };
-  } catch (error) {
-    console.error('Error en getCountNewOficios:', error);
-    return { success: false, message: "Error al obtener el conteo de nuevos oficios" };
+      const [rows] = await db.promise().query(query, params);
+      return { success: true, data: rows[0].count_new_oficios };
+    } catch (error) {
+      console.error('Error en getCountNewOficios:', error);
+      return { success: false, message: "Error al obtener el conteo de nuevos oficios" };
+    }
   }
-}
 
   static async findById(id_oficio) {
     try {
@@ -257,7 +264,7 @@ export class Oficio {
          WHERE o.id_oficio = ?`,
         [id_oficio]
       );
-      
+
       if (oficios.length === 0) {
         return { success: false, message: "Oficio no encontrado" };
       }
@@ -271,7 +278,7 @@ export class Oficio {
 
   static async create(oficioData) {
     const connection = await db.promise().getConnection();
-    
+
     try {
       await connection.beginTransaction();
 
@@ -319,7 +326,7 @@ export class Oficio {
           oficioPrincipalData.actualizado_por
         ]
       );
-      
+
       const newOficioId = result.insertId;
 
       // --- INSERCIÓN EN TABLA PIVOTE oficio_examen ---
@@ -340,20 +347,20 @@ export class Oficio {
       );
 
       await connection.commit();
-      return { 
-        success: true, 
-        data: { 
+      return {
+        success: true,
+        data: {
           id_oficio: newOficioId,
-          numero_oficio: oficioPrincipalData.numero_oficio 
+          numero_oficio: oficioPrincipalData.numero_oficio
         },
-        message: "Oficio creado exitosamente" 
+        message: "Oficio creado exitosamente"
       };
 
     } catch (error) {
       await connection.rollback();
       console.error('ERROR DETALLADO EN Oficio.create:', error); // <-- LOG DE DEBUG
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: error.message || "Error desconocido al crear el oficio",
       };
     } finally {
@@ -384,7 +391,7 @@ export class Oficio {
          ORDER BY s.fecha_seguimiento ASC`,
         [id_oficio]
       );
-      
+
       return { success: true, data: seguimiento };
     } catch (error) {
       console.error('Error en getSeguimiento:', error);
@@ -458,7 +465,7 @@ export class Oficio {
         `SELECT * FROM muestras WHERE id_oficio = ?`,
         [id_oficio]
       );
-      
+
       const metadataPromise = connection.query(
         `SELECT objeto_pericia, metodo_utilizado FROM oficio_resultados_metadata WHERE id_oficio = ?`,
         [id_oficio]
@@ -488,7 +495,7 @@ export class Oficio {
         const year = d.getFullYear();
         return `${day}${month}${year}`;
       };
-      
+
       const formatLongDate = (date) => {
         if (!date) return '';
         const d = new Date(date);
@@ -578,16 +585,16 @@ export class Oficio {
   static async findCasosPorFuncion({ perito, funcion }) {
     try {
       const id_perito = perito.id_usuario;
-      const seccion_perito = perito.id_seccion; 
 
-      const SECCIONES = { TOMA_MUESTRA: 1, LABORATORIO: 2, INSTRUMENTALIZACION: 3 };
       const EXAMENES = { TOXICOLOGICO: 1, DOSAJE_ETILICO: 2, SARRO_UNGUEAL: 3 };
 
       let queryWhere = 'WHERE o.id_usuario_perito_asignado = ?';
       const params = [id_perito];
 
+      // Esta es la subconsulta que obtiene y agrupa todos los datos necesarios
       const baseQuery = `
-        SELECT o.*,
+        SELECT 
+               o.id_oficio, o.numero_oficio, o.tipo_de_muestra, o.asunto, o.examinado_incriminado, o.delito, o.fecha_creacion, o.id_usuario_perito_asignado,
                MAX(tp.nombre_prioridad) as nombre_prioridad,
                MAX(td.nombre_departamento) AS especialidad,
                MAX(s.estado_nuevo) AS ultimo_estado,
@@ -608,54 +615,62 @@ export class Oficio {
             GROUP BY id_oficio
           ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
         ) s ON s.id_oficio = o.id_oficio
+        GROUP BY o.id_oficio
       `;
 
+      let estadoFilter = '';
+
       switch (funcion) {
-        // --- Lógica para Perito TM ---
         case 'extraccion':
           queryWhere += ` AND o.tipo_de_muestra = 'TOMA DE MUESTRAS' 
-                          AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen != ?)`;
+                          AND NOT EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.SARRO_UNGUEAL);
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado IN ('CREACION DEL OFICIO', 'EXTRACCION_FINALIZADA'))";
           break;
+
         case 'analisis_tm':
-          queryWhere += ` AND o.tipo_de_muestra = 'MUESTRAS REMITIDAS' 
+          queryWhere += ` AND o.tipo_de_muestra = 'MUESTRAS REMITIDAS'
                           AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.SARRO_UNGUEAL);
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado IN ('CREACION DEL OFICIO', 'ANALISIS_TM_FINALIZADO'))";
           break;
+
         case 'extraccion_y_analisis':
           queryWhere += ` AND o.tipo_de_muestra = 'TOMA DE MUESTRAS' 
                           AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.SARRO_UNGUEAL);
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado IN ('CREACION DEL OFICIO', 'PENDIENTE_ANALISIS_TM', 'ANALISIS_TM_FINALIZADO'))";
           break;
-        
-        // --- Lógica para Perito INST ---
+
         case 'analisis_inst':
           queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.DOSAJE_ETILICO);
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado = 'CREACION DEL OFICIO' OR o.ultimo_estado LIKE 'DERIVADO A%' OR o.ultimo_estado = 'ANALISIS_INST_FINALIZADO')";
           break;
 
-        // --- Lógica para Perito LAB ---
         case 'analisis_lab':
-           queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)
-                           AND s.estado_nuevo NOT LIKE 'DERIVADO A:%'`;
+          queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.TOXICOLOGICO);
+          estadoFilter = "AND (o.ultimo_estado IN ('CREACION DEL OFICIO', 'DERIVADO A: LABORATORIO', 'ANALISIS_LAB_FINALIZADO'))";
           break;
-        case 'consolidacion':
-          queryWhere += ` AND s.estado_nuevo LIKE 'DERIVADO A: LABORATORIO%'`;
+
+        case 'consolidacion_lab':
+          queryWhere += ` AND o.ultimo_estado IN ('PENDIENTE_CONSOLIDACION', 'CONSOLIDACION_FINALIZADA')`;
+          estadoFilter = "AND (o.ultimo_estado NOT IN ('COMPLETADO', 'CERRADO', 'DICTAMEN_EMITIDO'))";
           break;
 
         default:
           return { success: false, message: 'Función no reconocida' };
       }
 
+      // La consulta final envuelve la subconsulta y aplica los filtros
       const finalQuery = `
-        ${baseQuery}
+        SELECT * FROM (${baseQuery}) as o
         ${queryWhere}
-        AND (s.estado_nuevo IS NULL OR s.estado_nuevo NOT IN ('COMPLETADO', 'CERRADO'))
-        GROUP BY o.id_oficio
+        ${estadoFilter}
         ORDER BY o.fecha_creacion DESC
       `;
-
+      
       const [rows] = await db.promise().query(finalQuery, params);
       return { success: true, data: rows };
 
@@ -667,24 +682,24 @@ export class Oficio {
 
   // Agregar seguimiento
   // (MODIFICADO para aceptar transacciones)
-  static async addSeguimiento({ id_oficio, id_usuario, estado_anterior = null, estado_nuevo = null }, connection = null) {
+  static async addSeguimiento({ id_oficio, id_usuario, estado_anterior = null, estado_nuevo = null, observaciones = null }, connection = null) {
     // Si no se pasa una conexión, usa el pool por defecto. Si se pasa, usa la transacción.
     const dbConn = connection || db.promise();
-    
+
     try {
       const [result] = await dbConn.query(
-        `INSERT INTO seguimiento_oficio (id_oficio, id_usuario, estado_anterior, estado_nuevo)
-         VALUES (?, ?, ?, ?)`,
-        [id_oficio, id_usuario, estado_anterior, estado_nuevo]
+        `INSERT INTO seguimiento_oficio (id_oficio, id_usuario, estado_anterior, estado_nuevo, observaciones)
+         VALUES (?, ?, ?, ?, ?)`,
+        [id_oficio, id_usuario, estado_anterior, estado_nuevo, observaciones]
       );
-      
+
       return { success: true, data: { id_seguimiento: result.insertId } };
 
     } catch (error) {
       console.error('Error en addSeguimiento:', error);
       // Si estamos en una transacción, solo propagamos el error sin lanzar
-      if (connection) throw error; 
-      
+      if (connection) throw error;
+
       return { success: false, message: 'Error al agregar seguimiento' };
     }
     // No liberamos la conexión si es una transacción externa
@@ -697,7 +712,7 @@ export class Oficio {
    * @param {number} id_perito_actual - ID del usuario (perito) que deriva el caso
    * @param {string} nombre_seccion_destino - Nombre de la sección a la que se deriva
    */
-  static async reasignarPerito(id_oficio, id_nuevo_perito, id_perito_actual, nombre_seccion_destino = 'OTRA SECCIÓN') {
+  static async reasignarPerito(id_oficio, id_nuevo_perito, id_perito_actual, nuevo_estado) {
     const connection = await db.promise().getConnection(); // Obtener una conexión para la transacción
     try {
       await connection.beginTransaction(); // Iniciar transacción
@@ -727,22 +742,19 @@ export class Oficio {
         ]
       );
 
-      // 3. Añadir un registro en 'seguimiento_oficio'
-      const nuevo_estado = `DERIVADO A: ${String(nombre_seccion_destino).toUpperCase()}`;
-      
-      // Llamamos a addSeguimiento PASÁNDOLE la conexión de la transacción
+      // 3. Añadir un registro en 'seguimiento_oficio' usando el estado específico
       await Oficio.addSeguimiento({
         id_oficio: id_oficio,
         id_usuario: id_perito_actual, // El perito que HACE la derivación
-        estado_nuevo: nuevo_estado,
-        estado_anterior: null // addSeguimiento manejará esto
-      }, connection); 
+        estado_nuevo: nuevo_estado,   // Usa el estado exacto pasado como parámetro
+        estado_anterior: null
+      }, connection);
 
       await connection.commit(); // Confirmar transacción
-      
-      return { 
-        success: true, 
-        message: 'Oficio reasignado y seguimiento actualizado.' 
+
+      return {
+        success: true,
+        message: 'Oficio reasignado y seguimiento actualizado.'
       };
 
     } catch (error) {
@@ -761,15 +773,17 @@ export class Oficio {
    * @param {number} resultadoData.id_perito_responsable - ID del perito que emite el resultado.
    * @param {string} resultadoData.tipo_resultado - Ej: 'TOXICOLOGICO', 'DOSAJE_ETILICO'.
    * @param {object} resultadoData.resultados - Objeto JSON con los hallazgos.
+   * @param {object} connection - Conexión de base de datos opcional para transacciones.
    */
-  static async addResultado({ id_oficio, id_perito_responsable, tipo_resultado, resultados }) {
+  static async addResultado({ id_oficio, id_perito_responsable, tipo_resultado, resultados }, connection = null) {
+    const dbConn = connection || db.promise();
     try {
       // Validar que los datos necesarios están presentes
       if (!id_oficio || !id_perito_responsable || !tipo_resultado || !resultados) {
         throw new Error('Faltan datos requeridos para agregar el resultado.');
       }
 
-      const [result] = await db.promise().query(
+      const [result] = await dbConn.query(
         `INSERT INTO oficio_resultados_perito (id_oficio, id_perito_responsable, tipo_resultado, resultados)
          VALUES (?, ?, ?, ?)`,
         [id_oficio, id_perito_responsable, tipo_resultado, JSON.stringify(resultados)]
@@ -778,8 +792,9 @@ export class Oficio {
       return { success: true, data: { id_resultado: result.insertId } };
     } catch (error) {
       console.error('Error en Oficio.addResultado:', error);
-      // Lanza el error para que el controlador lo maneje
-      throw error;
+      // Si estamos en una transacción, propagamos el error
+      if (connection) throw error;
+      return { success: false, message: 'Error al agregar resultado' };
     }
   }
 
@@ -861,7 +876,7 @@ export class Oficio {
       const examenToSeccionMap = {
         [EXAMENES.TOXICOLOGICO]: SECCIONES.LABORATORIO,
         [EXAMENES.DOSAJE_ETILICO]: SECCIONES.INSTRUMENTALIZACION,
-        [EXAMENES.SARRO_UNGUEAL]: SECCIONES.TOMA_MUESTRA, 
+        [EXAMENES.SARRO_UNGUEAL]: SECCIONES.TOMA_MUESTRA,
       };
 
       // Paso 1: Obtener los exámenes requeridos para el oficio
@@ -921,8 +936,69 @@ export class Oficio {
       console.error('Error en findPeritosParaDerivacion:', error);
       return { success: false, message: 'Error al buscar peritos para derivación.' };
     } finally {
-            connection.release();
-          }
-        }
-      }
-      
+      connection.release();
+    }
+  }
+
+  static async getSeguimientoDeProcedimiento(id_oficio, estados) {
+    if (!id_oficio || !Array.isArray(estados) || estados.length === 0) {
+      return null;
+    }
+    try {
+      const placeholders = estados.map(() => '?').join(',');
+      const [rows] = await db.promise().query(
+        `SELECT estado_nuevo, observaciones 
+         FROM seguimiento_oficio 
+         WHERE id_oficio = ? AND estado_nuevo IN (${placeholders})
+         ORDER BY fecha_seguimiento DESC
+         LIMIT 1`,
+        [id_oficio, ...estados]
+      );
+      return rows[0] || null;
+    } catch (error) {
+      console.error('Error en getSeguimientoDeProcedimiento:', error);
+      throw error;
+    }
+  }
+
+  static async getCasosCulminados() {
+    try {
+      const query = `
+        SELECT 
+          o.id_oficio,
+          o.numero_oficio,
+          o.fecha_creacion,
+          o.asunto,
+          o.examinado_incriminado,
+          o.delito,
+          s.estado_nuevo AS ultimo_estado,
+          u.nombre_completo AS perito_asignado,
+          (SELECT GROUP_CONCAT(te.nombre SEPARATOR ', ') 
+            FROM oficio_examen oe 
+            JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen 
+            WHERE oe.id_oficio = o.id_oficio) AS tipos_de_examen,
+          tp.nombre_prioridad
+        FROM oficio o
+        LEFT JOIN (
+          SELECT s1.id_oficio, s1.estado_nuevo, s1.fecha_seguimiento
+          FROM seguimiento_oficio s1
+          INNER JOIN (
+            SELECT id_oficio, MAX(fecha_seguimiento) AS max_fecha
+            FROM seguimiento_oficio
+            GROUP BY id_oficio
+          ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
+        ) s ON s.id_oficio = o.id_oficio
+        LEFT JOIN usuario u ON o.id_usuario_perito_asignado = u.id_usuario
+        LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
+        WHERE s.estado_nuevo = 'DICTAMEN_EMITIDO'
+        ORDER BY s.fecha_seguimiento DESC
+      `;
+
+      const [rows] = await db.promise().query(query);
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error en getCasosCulminados:', error);
+      return { success: false, message: 'Error al obtener los casos culminados' };
+    }
+  }
+}

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Acta de Apertura de Muestra</title>
+</head>
+
+<body>
+    {{> partials/membrete }}
+
+    <div class="content-body">
+        <h3 class="text-center font-bold underline uppercase" style="font-size: 12pt;">
+            ACTA DE APERTURA DE MUESTRA
+        </h3>
+
+        <br>
+
+        <p style="text-align: justify;">
+            En la ciudad de Huancayo, siendo las {{formatTime oficio.fecha_actual}} horas del día {{formatLongDate
+            oficio.fecha_actual}}, en las instalaciones de la OFICRI PNP Huancayo, el Perito Químico Farmacéutico que
+            suscribe, {{perito.nombre_completo}} (CIP {{perito.CIP}}, DNI {{perito.dni_perito}}), en mérito al documento
+            de la referencia, se procedió a realizar la diligencia de APERTURA DE MUESTRA para el análisis pericial
+            correspondiente.
+        </p>
+
+        <p style="text-align: justify; margin-top: 15px;">
+            Se procedió a la apertura y verificación de un (01) paquete, el cual presenta las siguientes
+            características: <span class="font-bold">{{aperturaData.descripcion_paquete}}</span>.
+        </p>
+
+        <p style="text-align: justify; margin-top: 15px;">
+            En el interior del paquete se encontró lo siguiente:
+        </p>
+
+        <div style="margin: 15px 0 15px 20px;">
+            {{#each oficio.muestras_registradas}}
+            <p style="margin-bottom: 10px;">
+                <span class="font-bold">- MUESTRA N° {{this.index}}:</span> Consistente en {{this.cantidad}} de
+                {{this.tipo_muestra}}, {{this.descripcion_detallada}}
+            </p>
+            {{/each}}
+        </div>
+
+        {{#if aperturaData.observaciones}}
+        <p style="text-align: justify; margin-top: 15px;">
+            <span class="font-bold">OBSERVACIONES:</span> {{aperturaData.observaciones}}
+        </p>
+        {{/if}}
+
+        <p style="text-align: justify; margin-top: 15px;">
+            Siendo las {{formatTime oficio.fecha_actual}} horas de la misma fecha, se dio por concluida la presente
+            diligencia, firmando a continuación en señal de conformidad.
+        </p>
+
+        <br><br><br>
+
+        <div style="width: 40%; margin: 5cm auto 0 auto; text-align: center;">
+            <hr style="border: none; border-top: 1px solid black; width: 80%; margin: 0 auto 5px auto;">
+            <p class="font-bold" style="font-size: 9pt;">{{perito.nombre_completo}}</p>
+            <p style="font-size: 9pt;">{{perito.grado_perito}}</p>
+            <p style="font-size: 9pt;">PERITO QUÍMICO</p>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -18,7 +18,11 @@ export function up(knex) {
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
-export function down(knex) {
+export async function down(knex) {
+  // Paso 1: Actualizar todos los valores NULL en 'descripcion' a un valor por defecto.
+  await knex('muestras').whereNull('descripcion').update({ descripcion: '' });
+
+  // Paso 2: Ahora que no hay NULLs, se puede alterar la tabla de forma segura.
   return knex.schema.alterTable('muestras', (table) => {
     // Revertir los cambios en orden inverso
     table.text('descripcion').notNullable().alter();

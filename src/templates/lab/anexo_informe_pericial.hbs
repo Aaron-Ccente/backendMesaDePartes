@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: A4;
+            margin: 15mm 10mm 15mm 10mm;
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 9pt;
+            line-height: 1.4;
+            color: #000;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .header h1 {
+            font-size: 11pt;
+            font-weight: bold;
+            margin: 0 0 3px 0;
+        }
+        
+        .header h2 {
+            font-size: 10pt;
+            font-weight: bold;
+            margin: 0 0 3px 0;
+        }
+        
+        .header p {
+            font-size: 9pt;
+            margin: 0;
+        }
+        
+        .title-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            font-size: 10pt;
+            margin: 15px 0 10px 0;
+        }
+        
+        .section {
+            margin-bottom: 5px;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .section-letter {
+            font-weight: bold;
+            min-width: 8mm;
+        }
+        
+        .section-label {
+            font-weight: bold;
+            min-width: 50mm;
+        }
+        
+        .section-colon {
+            margin: 0 2px;
+        }
+        
+        .section-content {
+            flex: 1;
+        }
+        
+        .subsection {
+            margin-left: 12mm;
+            margin-top: 3px;
+        }
+        
+        .horizontal-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .separator {
+            border-top: 1px dashed #000;
+            margin: 5px 0;
+        }
+        
+        .footer-section {
+            position: fixed;
+            bottom: 15mm;
+            left: 10mm;
+            right: 10mm;
+            text-align: center;
+        }
+        
+        .footer-date {
+            font-size: 9pt;
+            margin-bottom: 10px;
+        }
+        
+        .signature-area {
+            display: grid;
+            grid-template-columns: 1fr 80px 1fr;
+            align-items: center;
+            margin-top: 10px;
+        }
+        
+        .signature-left {
+            text-align: left;
+            font-weight: bold;
+            font-size: 9pt;
+        }
+        
+        .signature-center {
+            text-align: center;
+        }
+        
+        .seal {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #000;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 6pt;
+            line-height: 1.2;
+            margin: 0 auto;
+        }
+        
+        .signature-right {
+            text-align: center;
+        }
+        
+        .signature-line {
+            border-top: 1px solid #000;
+            width: 120px;
+            margin: 0 auto 5px auto;
+        }
+        
+        .signature-info {
+            font-size: 7pt;
+            line-height: 1.3;
+        }
+        
+        strong {
+            font-weight: bold;
+        }
+        
+        .indent-1 { margin-left: 5mm; }
+        .indent-2 { margin-left: 8mm; }
+        .indent-3 { margin-left: 12mm; }
+    </style>
+</head>
+<body>
+    <!-- Encabezado -->
+    <div class="header">
+        <h1>DIVINCRI PNP HUANCAYO</h1>
+        <h2>OFICINA DE CRIMINALISTICA</h2>
+        <p>Jr. Cuzco Nro. 666 Huancayo Telf. 064-212453</p>
+    </div>
+    
+    <!-- Título del informe -->
+    <div class="title-section">
+        <span>INFORME PERICIAL TOXICOLOGICO – SARRO UNGUEAL</span>
+        <span>{{reportNumber}}</span>
+    </div>
+    
+    <!-- Sección A - PROCEDENCIA -->
+    <div class="section">
+        <span class="section-letter">A.</span>
+        <span class="section-label">PROCEDENCIA:</span>
+        <span class="section-content">{{procedencia}}</span>
+    </div>
+    
+    <!-- Sección B - ANTECEDENTE -->
+    <div class="section">
+        <span class="section-letter">B.</span>
+        <span class="section-label">ANTECEDENTE:</span>
+        <span class="section-content">OF. {{oficioNumber}}<br>({{oficioDate}}).</span>
+    </div>
+    
+    <!-- Sección C - DATOS DEL PERITO -->
+    <div class="section" style="margin-top: 8px;">
+        <span class="section-letter">C.</span>
+        <span class="section-label">DATOS DEL PERITO:</span>
+        <span class="section-content">
+            {{perito.nombre}}, identificado con CIP: {{perito.cip}} y DNI: {{perito.dni}}, 
+            Químico Farmacéutico C.Q.F.P N°{{perito.cqfp}}, con domicilio laboral en Jirón Cuzco N° 666- Huancayo.
+        </span>
+    </div>
+    
+    <!-- Sección D - OBJETO DE LA PERICIA -->
+    <div class="section" style="margin-top: 8px;">
+        <span class="section-letter">D.</span>
+        <span class="section-label">OBJETO DE LA PERICIA:</span>
+        <span class="section-content">
+            Identificación de sustancias tóxicas y adherencias de drogas ilícitas en muestra biológica.
+        </span>
+    </div>
+    
+    <!-- Secciones E-H (DATOS DEL INCIDENTE) -->
+    <div class="section" style="margin-top: 8px;">
+        <span class="section-letter">E.</span>
+        <span class="section-label" style="min-width: 52mm;">HORA DEL INCIDENTE</span>
+        <span class="section-colon">:</span>
+        <span style="margin-right: 15px;">{{incidentTime}}</span>
+        <strong>FECHA:</strong>
+        <span style="margin-left: 5px;">{{incidentDate}}</span>
+    </div>
+    
+    <div class="section">
+        <span class="section-letter">F.</span>
+        <span class="section-label" style="min-width: 52mm;">HORA DE TOMA DE MUESTRA</span>
+        <span class="section-colon">:</span>
+        <span style="margin-right: 15px;">{{sampleTime}}</span>
+        <strong>FECHA:</strong>
+        <span style="margin-left: 5px;">{{sampleDate}}</span>
+    </div>
+    
+    <div class="section">
+        <span class="section-letter">G.</span>
+        <span class="section-label" style="min-width: 52mm;">CONDUCTOR</span>
+        <span class="section-colon">:</span>
+        <span>{{conductor}}</span>
+    </div>
+    
+    <div class="section">
+        <span class="section-letter">H.</span>
+        <span class="section-label" style="min-width: 52mm;">MUESTRA TOMADA A</span>
+        <span class="section-colon">:</span>
+        <span>{{subjectName}} ({{subjectAge}}).</span>
+    </div>
+    
+    <!-- Sección I - MUESTRAS -->
+    <div class="section" style="margin-top: 5px;">
+        <span class="section-letter">I.</span>
+        <span class="section-label">MUESTRAS:</span>
+    </div>
+    
+    <div class="subsection">
+        <strong>M1:</strong> UN (01) frasco de plástico transparente, boca ancha, con tapa rosca de plástico 
+        de color azul asegurado en todo el contorno con cinta de embalaje transparente, lleva a modo de 
+        etiqueta cinta masking con manuscrito que se lee: {{subjectName}} ({{subjectAge}}), 
+        conteniendo sustancia orgánica liquida color amarillo parduzco (orina), en volumen Aprox. de 50ml.
+    </div>
+    
+    <!-- Sección J - EXAMEN -->
+    <div class="section" style="margin-top: 8px;">
+        <span class="section-letter">J.</span>
+        <span class="section-label">EXAMEN:</span>
+    </div>
+    
+    <div class="subsection">
+        <strong>Análisis Toxicológico</strong>
+    </div>
+    
+    <div class="indent-2" style="margin-top: 3px;">
+        Alcaloide de cocaína<span style="margin-left: 35mm;">: {{resultados.cocaina}} en (M1)</span>
+    </div>
+    
+    <div class="indent-2">
+        Cannabinoides (Marihuana)<span style="margin-left: 25mm;">: {{resultados.marihuana}} en (M1)</span>
+    </div>
+    
+    <div class="indent-2">
+        Benzodiacepinas<span style="margin-left: 38mm;">: {{resultados.benzodiacepinas}} en (M1)</span>
+    </div>
+    
+    <div class="indent-2">
+        Fenotiacinas<span style="margin-left: 44mm;">: {{resultados.fenotiacinas}} en (M1)</span>
+    </div>
+    
+    <div class="indent-2">
+        Barbitúricos<span style="margin-left: 45mm;">: {{resultados.barbituricos}} en (M1)</span>
+    </div>
+    
+    <div class="indent-2" style="margin-top: 5px;">
+        <strong>Sarro Ungueal: {{resultados.sarroResult}}.</strong>
+    </div>
+    
+    <!-- Sección K - CONCLUSIONES -->
+    <div class="section" style="margin-top: 8px;">
+        <span class="section-letter">K.</span>
+        <span class="section-label">CONCLUSIONES:</span>
+    </div>
+    
+    <div class="subsection">
+        <div style="display: flex;">
+            <span style="margin-right: 5px;">1.</span>
+            <span>{{conclusion1}}</span>
+        </div>
+        <div class="separator"></div>
+    </div>
+    
+    <div class="subsection">
+        <div style="display: flex;">
+            <span style="margin-right: 5px;">2.</span>
+            <span>Muestras agotadas en los análisis.</span>
+        </div>
+        <div class="separator"></div>
+    </div>
+    
+    <!-- Sección L - MUESTRA TOMADA POR -->
+    <div class="section" style="margin-top: 8px;">
+        <span class="section-letter">L.</span>
+        <span class="section-label">MUESTRA TOMADA POR:</span>
+        <span class="section-content">{{perito.nombre}}.</span>
+    </div>
+    <div class="separator"></div>
+    
+    <!-- Sección M - MÉTODO UTILIZADO -->
+    <div class="section" style="margin-top: 8px;">
+        <span class="section-letter">M.</span>
+        <span class="section-label">METODO UTILIZADO:</span>
+        <span class="section-content">Experimental.</span>
+    </div>
+    
+    <div class="indent-2" style="margin-top: 3px;">
+        <strong>Toxicológico</strong><span style="margin-left: 10px;">: - Cromatografía en capa fina.</span>
+    </div>
+    <div class="indent-3">
+        - Inmunoensayo
+    </div>
+    
+    <div class="indent-2" style="margin-top: 5px;">
+        <strong>Sarro ungueal</strong><span style="margin-left: 10px;">: Químico - colorimétrico.</span>
+    </div>
+    
+    <!-- Pie de página con firmas -->
+    <div class="footer-section">
+        <div class="footer-date">{{footerDate}}</div>
+        
+        <div class="signature-area">
+            <div class="signature-left">{{perito.iniciales}}/</div>
+            
+            <div class="signature-center">
+                <div class="seal">
+                    <div>POLICIA NACIONAL</div>
+                    <div>DEL PERU</div>
+                    <div>DIVINCRI - PNP</div>
+                </div>
+            </div>
+            
+            <div class="signature-right">
+                <div class="signature-line"></div>
+                <div class="signature-info">
+                    <div>{{perito.cg}}</div>
+                    <div>{{perito.nombre}}</div>
+                    <div>{{perito.grado}}</div>
+                    <div>PERITO QUIMICO FARMACETICO</div>
+                    <div>C.Q.F.P {{perito.cqfp}}</div>
+                </div>
+            </div>
+        </div>
+        <div style="font-size: 8pt; margin-top: 5mm; border-top: 0.5px solid #000; padding-top: 2mm;">Página <span class="pageNumber"></span> de <span class="totalPages"></span></div>
+    </div>
+</body>
+</html>
