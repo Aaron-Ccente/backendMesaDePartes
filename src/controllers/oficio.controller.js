@@ -323,6 +323,9 @@ export class OficioController {
       });
     }
   }
+            });
+          }
+        }
     
   static async getAllOficiosForAdminStats(_, res) {
     try {
@@ -350,4 +353,5 @@ export class OficioController {
       });
     } 
   }
+}
 }
