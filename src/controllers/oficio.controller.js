@@ -323,4 +323,31 @@ export class OficioController {
       });
     }
   }
+    
+  static async getAllOficiosForAdminStats(_, res) {
+    try {
+      const result = await Oficio.findAllForAdminStats();
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('Error en getAllOficiosForAdminStats:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno al obtener estadísticas de oficios para admin.',
+      });
+    }
+  } 
+
+  static async getSeguimientoOficioByIdForAdmin(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await Oficio.getSeguimientoByIdForAdmin(id);
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('Error en getSeguimientoOficioByIdForAdmin:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno al obtener seguimiento de oficio por ID para admin.',
+      });
+    } 
+  }
 }
