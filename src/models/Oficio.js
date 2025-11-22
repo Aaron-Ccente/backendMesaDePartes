@@ -189,7 +189,14 @@ export class Oficio {
       AND o.id_oficio NOT IN (
         SELECT DISTINCT id_oficio 
         FROM seguimiento_oficio 
-        WHERE estado_nuevo IN ('OFICIO VISTO', 'OFICIO EN PROCESO', 'COMPLETADO')
+        WHERE estado_nuevo IN (
+          'OFICIO VISTO', 'OFICIO EN PROCESO', 'COMPLETADO', 
+          'PENDIENTE_ANALISIS_TM', 'ANALISIS_TM_FINALIZADO', 
+          'EXTRACCION_FINALIZADA', 'EXTRACCION_FALLIDA',
+          'ANALISIS_INST_FINALIZADO', 'ANALISIS_LAB_FINALIZADO',
+          'PENDIENTE_CONSOLIDACION', 'CONSOLIDACION_FINALIZADA',
+          'DICTAMEN_EMITIDO'
+        )
       )
     `;
 
@@ -592,18 +599,18 @@ export class Oficio {
         case 'analisis_inst':
           queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.DOSAJE_ETILICO);
-          estadoFilter = "AND (o.ultimo_estado LIKE 'DERIVADO A%' OR o.ultimo_estado = 'ANALISIS_INST_FINALIZADO')";
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado = 'CREACION DEL OFICIO' OR o.ultimo_estado LIKE 'DERIVADO A%' OR o.ultimo_estado = 'ANALISIS_INST_FINALIZADO')";
           break;
 
         case 'analisis_lab':
           queryWhere += ` AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.TOXICOLOGICO);
-          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado = 'CREACION DEL OFICIO' OR o.ultimo_estado LIKE 'DERIVADO A%' OR o.ultimo_estado = 'ANALISIS_LAB_FINALIZADO')";
+          estadoFilter = "AND (o.ultimo_estado IN ('CREACION DEL OFICIO', 'DERIVADO A: LABORATORIO', 'ANALISIS_LAB_FINALIZADO'))";
           break;
 
-        case 'consolidacion':
-          queryWhere += ` AND o.ultimo_estado LIKE 'DERIVADO A: LABORATORIO%'`;
-          estadoFilter = "AND (o.ultimo_estado NOT IN ('COMPLETADO', 'CERRADO'))";
+        case 'consolidacion_lab':
+          queryWhere += ` AND o.ultimo_estado IN ('PENDIENTE_CONSOLIDACION', 'CONSOLIDACION_FINALIZADA')`;
+          estadoFilter = "AND (o.ultimo_estado NOT IN ('COMPLETADO', 'CERRADO', 'DICTAMEN_EMITIDO'))";
           break;
 
         default:
@@ -659,7 +666,7 @@ export class Oficio {
    * @param {number} id_perito_actual - ID del usuario (perito) que deriva el caso
    * @param {string} nombre_seccion_destino - Nombre de la sección a la que se deriva
    */
-  static async reasignarPerito(id_oficio, id_nuevo_perito, id_perito_actual, nombre_seccion_destino = 'OTRA SECCIÓN') {
+  static async reasignarPerito(id_oficio, id_nuevo_perito, id_perito_actual, nuevo_estado) {
     const connection = await db.promise().getConnection(); // Obtener una conexión para la transacción
     try {
       await connection.beginTransaction(); // Iniciar transacción
@@ -689,15 +696,12 @@ export class Oficio {
         ]
       );
 
-      // 3. Añadir un registro en 'seguimiento_oficio'
-      const nuevo_estado = `DERIVADO A: ${String(nombre_seccion_destino).toUpperCase()}`;
-
-      // Llamamos a addSeguimiento PASÁNDOLE la conexión de la transacción
+      // 3. Añadir un registro en 'seguimiento_oficio' usando el estado específico
       await Oficio.addSeguimiento({
         id_oficio: id_oficio,
         id_usuario: id_perito_actual, // El perito que HACE la derivación
-        estado_nuevo: nuevo_estado,
-        estado_anterior: null // addSeguimiento manejará esto
+        estado_nuevo: nuevo_estado,   // Usa el estado exacto pasado como parámetro
+        estado_anterior: null
       }, connection);
 
       await connection.commit(); // Confirmar transacción
@@ -908,6 +912,47 @@ export class Oficio {
     } catch (error) {
       console.error('Error en getSeguimientoDeProcedimiento:', error);
       throw error;
+    }
+  }
+
+  static async getCasosCulminados() {
+    try {
+      const query = `
+        SELECT 
+          o.id_oficio,
+          o.numero_oficio,
+          o.fecha_creacion,
+          o.asunto,
+          o.examinado_incriminado,
+          o.delito,
+          s.estado_nuevo AS ultimo_estado,
+          u.nombre_completo AS perito_asignado,
+          (SELECT GROUP_CONCAT(te.nombre SEPARATOR ', ') 
+            FROM oficio_examen oe 
+            JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen 
+            WHERE oe.id_oficio = o.id_oficio) AS tipos_de_examen,
+          tp.nombre_prioridad
+        FROM oficio o
+        LEFT JOIN (
+          SELECT s1.id_oficio, s1.estado_nuevo, s1.fecha_seguimiento
+          FROM seguimiento_oficio s1
+          INNER JOIN (
+            SELECT id_oficio, MAX(fecha_seguimiento) AS max_fecha
+            FROM seguimiento_oficio
+            GROUP BY id_oficio
+          ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
+        ) s ON s.id_oficio = o.id_oficio
+        LEFT JOIN usuario u ON o.id_usuario_perito_asignado = u.id_usuario
+        LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
+        WHERE s.estado_nuevo = 'DICTAMEN_EMITIDO'
+        ORDER BY s.fecha_seguimiento DESC
+      `;
+
+      const [rows] = await db.promise().query(query);
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error en getCasosCulminados:', error);
+      return { success: false, message: 'Error al obtener los casos culminados' };
     }
   }
 }

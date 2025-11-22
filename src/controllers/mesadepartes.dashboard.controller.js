@@ -43,4 +43,17 @@ export class MesaDePartesDashboardController {
       return res.status(500).json({ success: false, message: 'Error interno al obtener casos recientes.' });
     }
   }
+
+  static async getCasosCulminados(req, res) {
+    try {
+      const result = await Oficio.getCasosCulminados();
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+      return res.json(result);
+    } catch (error) {
+      console.error('Error en getCasosCulminados:', error);
+      return res.status(500).json({ success: false, message: 'Error interno al obtener casos culminados.' });
+    }
+  }
 }

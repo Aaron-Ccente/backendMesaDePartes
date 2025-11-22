@@ -127,6 +127,157 @@ export class ProcedimientoController {
     }
   }
 
+  static async finalizarExtraccionInterna(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
+    const { fue_exitosa, observaciones, muestras } = req.body;
+
+    const connection = await db.promise().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Validar que el oficio pertenece al perito
+      const oficio = await Oficio.findById(id_oficio);
+      if (!oficio.success || oficio.data.id_usuario_perito_asignado !== id_usuario) {
+        await connection.rollback();
+        return res.status(403).json({ success: false, message: 'Acceso denegado. El oficio no le pertenece.' });
+      }
+
+      // 2. Limpiar muestras anteriores para evitar duplicados en caso de re-envío
+      await Muestra.deleteByOficioId(id_oficio, connection);
+
+      let estadoNuevo = '';
+      let finalObservaciones = observaciones || null;
+
+      if (fue_exitosa) {
+        if (!Array.isArray(muestras) || muestras.length === 0) {
+          await connection.rollback();
+          return res.status(400).json({ success: false, message: 'Para una extracción exitosa se requiere al menos una muestra.' });
+        }
+
+        // 3. Estado específico para este flujo
+        estadoNuevo = 'PENDIENTE_ANALISIS_TM';
+
+        // 4. Insertar las nuevas muestras
+        const codigosGenerados = [];
+        for (const muestra of muestras) {
+          const codigoMuestra = await MuestraService.generarCodigoMuestra(id_oficio, muestra.tipo_muestra);
+          await Muestra.create({
+            id_oficio,
+            tipo_muestra: muestra.tipo_muestra,
+            descripcion: muestra.descripcion,
+            cantidad: muestra.cantidad,
+            codigo_muestra: codigoMuestra,
+            esta_lacrado: true,
+          }, connection);
+          codigosGenerados.push(codigoMuestra);
+        }
+        
+        // 5. Formatear observaciones para incluir información del sistema
+        const systemMessage = `FASE 1/2: Extracción completada. Se generaron ${codigosGenerados.length} muestras con los códigos: ${codigosGenerados.join(', ')}. El caso está listo para la fase de análisis.`;
+        finalObservaciones = observaciones ? `${systemMessage}\n\nObservaciones del perito:\n${observaciones}` : systemMessage;
+
+      } else {
+        // Si la extracción no fue exitosa en este flujo, se marca como fallida
+        estadoNuevo = 'EXTRACCION_FALLIDA';
+        finalObservaciones = observaciones || 'No se especificaron observaciones para la extracción fallida.';
+      }
+
+      // 6. Añadir el registro de seguimiento con el estado correspondiente
+      await Oficio.addSeguimiento({
+        id_oficio,
+        id_usuario,
+        estado_nuevo: estadoNuevo,
+        observaciones: finalObservaciones
+      }, connection);
+
+      await connection.commit();
+      
+      res.status(200).json({
+        success: true,
+        message: 'Fase de extracción finalizada. El caso ha sido actualizado para análisis.',
+        next_status: estadoNuevo
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error en finalizarExtraccionInterna:', error);
+      res.status(500).json({ success: false, message: 'Error interno del servidor.' });
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async getDatosAnalisisTM(req, res) {
+    const { id: id_oficio } = req.params;
+    const connection = await db.promise().getConnection();
+    try {
+      // Consultas para obtener todos los datos guardados del análisis
+      const [actas] = await connection.query('SELECT * FROM actas_apertura WHERE id_oficio = ? ORDER BY fecha_apertura DESC LIMIT 1', [id_oficio]);
+      const [metadata] = await connection.query('SELECT * FROM oficio_resultados_metadata WHERE id_oficio = ? LIMIT 1', [id_oficio]);
+      const [muestras] = await connection.query('SELECT * FROM muestras WHERE id_oficio = ?', [id_oficio]);
+
+      // Si no hay acta, asumimos que el procedimiento no se ha iniciado
+      if (actas.length === 0) {
+        return res.status(200).json({ success: true, data: null });
+      }
+
+      // Procesar y formatear los datos para el frontend
+      const aperturaData = {
+        descripcion_paquete: actas[0].descripcion_paquete,
+        observaciones: actas[0].observaciones,
+      };
+
+      const metadataData = metadata.length > 0 ? {
+        objeto_pericia: metadata[0].objeto_pericia,
+        metodo_utilizado: metadata[0].metodo_utilizado,
+      } : null;
+      
+      const muestrasAnalizadas = muestras.map(m => {
+        let resultados = {};
+        if (m.resultado_analisis) {
+          try {
+            // Si ya es un objeto, lo usamos, si es string, lo parseamos
+            resultados = typeof m.resultado_analisis === 'object' ? m.resultado_analisis : JSON.parse(m.resultado_analisis);
+          } catch (e) {
+            console.warn(`Resultado de muestra ${m.id_muestra} no es un JSON válido.`, m.resultado_analisis);
+            // Si falla el parseo, se deja como objeto vacío para no romper el front
+          }
+        }
+        return {
+          id: m.id_muestra,
+          codigo_muestra: m.codigo_muestra,
+          tipo_muestra: m.tipo_muestra,
+          descripcion_detallada: m.descripcion_detallada,
+          resultados,
+        };
+      });
+      
+      const [seguimiento] = await connection.query(
+        'SELECT observaciones FROM seguimiento_oficio WHERE id_oficio = ? AND estado_nuevo = ? ORDER BY fecha_seguimiento DESC LIMIT 1',
+        [id_oficio, 'ANALISIS_TM_FINALIZADO']
+      );
+
+      const muestrasAgotadas = seguimiento.length > 0 ? (seguimiento[0].observaciones || '').includes('muestras se agotaron') : false;
+
+      res.status(200).json({
+        success: true,
+        data: {
+          aperturaData,
+          metadata: metadataData,
+          muestrasAnalizadas,
+          muestrasAgotadas
+        }
+      });
+
+    } catch (error) {
+      console.error('Error en getDatosAnalisisTM:', error);
+      res.status(500).json({ success: false, message: 'Error interno del servidor.' });
+    } finally {
+      connection.release();
+    }
+  }
+
   /**
    * Registra el resultado de un análisis de muestras recibidas.
    */
@@ -294,14 +445,13 @@ export class ProcedimientoController {
   static async derivarCaso(req, res) {
     const { id: id_oficio } = req.params;
     const { id_usuario: id_perito_actual } = req.user;
-    const { id_nuevo_perito } = req.body; // El perito es seleccionado en el frontend
+    const { id_nuevo_perito } = req.body;
 
     if (!id_nuevo_perito) {
       return res.status(400).json({ success: false, message: 'Se requiere el ID del nuevo perito.' });
     }
 
     try {
-      // Aunque el perito se selecciona en el front, usamos el service para validar la sección de destino
       const siguientePaso = await WorkflowService.determinarSiguientePaso(id_oficio);
 
       if (!siguientePaso || !siguientePaso.section_name) {
@@ -310,18 +460,26 @@ export class ProcedimientoController {
           message: 'No se pudo determinar la sección de destino para la derivación.'
         });
       }
+      
+      // Determinar el nuevo estado basado en la tarea
+      let nuevo_estado;
+      if (siguientePaso.next_step === 'CONSOLIDATE') {
+        nuevo_estado = 'PENDIENTE_CONSOLIDACION';
+      } else {
+        nuevo_estado = `DERIVADO A: ${siguientePaso.section_name.toUpperCase()}`;
+      }
 
-      // Reasignar el oficio al perito seleccionado por el usuario
+      // Reasignar el oficio y establecer el estado específico
       await Oficio.reasignarPerito(
         id_oficio,
         id_nuevo_perito,
         id_perito_actual,
-        siguientePaso.section_name // Usamos el nombre de la sección calculado por el servicio
+        nuevo_estado
       );
 
       res.status(200).json({
         success: true,
-        message: `Caso derivado exitosamente a la sección ${siguientePaso.section_name}.`
+        message: `Caso derivado exitosamente.`
       });
 
     } catch (error) {
@@ -457,6 +615,103 @@ export class ProcedimientoController {
       await connection.rollback();
       console.error('Error en registrarConsolidacion:', error);
       res.status(500).json({ success: false, message: 'Error interno al registrar la consolidación.' });
+    } finally {
+      connection.release();
+    }
+  }
+
+  // --- Métodos para flujos con formularios placeholder ---
+
+  static async registrarAnalisisPlaceholder(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
+    const { tipo_analisis } = req.body; // 'INST' o 'LAB'
+
+    if (!['INST', 'LAB'].includes(tipo_analisis)) {
+      return res.status(400).json({ success: false, message: 'Tipo de análisis no válido.' });
+    }
+
+    const connection = await db.promise().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const estado_nuevo = `ANALISIS_${tipo_analisis}_FINALIZADO`;
+      const tipo_resultado = tipo_analisis === 'INST' ? 'Dosaje Etílico' : 'Toxicológico';
+
+      // Guardar un resultado genérico para el workflow
+      await Oficio.addResultado({
+        id_oficio,
+        id_perito_responsable: id_usuario,
+        tipo_resultado,
+        resultados: { placeholder: true, message: 'Análisis completado desde flujo placeholder.' }
+      }, connection);
+
+      // Añadir seguimiento
+      await Oficio.addSeguimiento({
+        id_oficio,
+        id_usuario,
+        estado_nuevo,
+        observaciones: 'Análisis finalizado (placeholder).'
+      }, connection);
+
+      await connection.commit();
+      res.status(200).json({ success: true, message: 'Análisis (placeholder) registrado.' });
+    } catch (error) {
+      await connection.rollback();
+      console.error(`Error en registrarAnalisisPlaceholder (${tipo_analisis}):`, error);
+      res.status(500).json({ success: false, message: 'Error interno del servidor.' });
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async registrarConsolidacionPlaceholder(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
+    const connection = await db.promise().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Añadir seguimiento
+      await Oficio.addSeguimiento({
+        id_oficio,
+        id_usuario,
+        estado_nuevo: 'CONSOLIDACION_FINALIZADA',
+        observaciones: 'Consolidación finalizada (placeholder).'
+      }, connection);
+
+      await connection.commit();
+      res.status(200).json({ success: true, message: 'Consolidación (placeholder) registrada.' });
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error en registrarConsolidacionPlaceholder:', error);
+      res.status(500).json({ success: false, message: 'Error interno del servidor.' });
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async finalizarParaMP(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
+    const connection = await db.promise().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Añadir seguimiento final
+      await Oficio.addSeguimiento({
+        id_oficio,
+        id_usuario,
+        estado_nuevo: 'DICTAMEN_EMITIDO',
+        observaciones: 'El dictamen ha sido emitido y el caso está cerrado.'
+      }, connection);
+
+      await connection.commit();
+      res.status(200).json({ success: true, message: 'Caso finalizado y enviado a Mesa de Partes.' });
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error en finalizarParaMP:', error);
+      res.status(500).json({ success: false, message: 'Error interno del servidor.' });
     } finally {
       connection.release();
     }

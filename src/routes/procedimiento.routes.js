@@ -86,6 +86,61 @@ router.post('/:id/extraccion', ProcedimientoController.registrarExtraccion);
 
 /**
  * @swagger
+ * /api/procedimientos/{id}/finalizar-extraccion-interna:
+ *   post:
+ *     summary: Finaliza la fase de extracción para un caso de 'Extracción y Análisis'.
+ *     description: Registra las muestras y el acta de extracción, y actualiza el estado del caso a 'PENDIENTE_ANALISIS_TM' sin derivarlo.
+ *     tags: [Procedimientos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del oficio.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/RegistrarExtraccionBody'
+ *     responses:
+ *       200:
+ *         description: Fase de extracción finalizada. Caso actualizado para análisis.
+ *       400:
+ *         description: Datos inválidos.
+ */
+router.post('/:id/finalizar-extraccion-interna', ProcedimientoController.finalizarExtraccionInterna);
+
+
+/**
+ * @swagger
+ * /api/procedimientos/{id}/analisis-tm:
+ *   get:
+ *     summary: Obtiene los datos guardados de un procedimiento de análisis de TM.
+ *     tags: [Procedimientos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del oficio.
+ *     responses:
+ *       200:
+ *         description: Datos del análisis de TM encontrados.
+ *       404:
+ *         description: No se encontraron datos para este procedimiento.
+ */
+router.get('/:id/analisis-tm', ProcedimientoController.getDatosAnalisisTM);
+
+
+/**
+ * @swagger
  * /api/procedimientos/{id}/analisis:
  *   post:
  *     summary: Registra el resultado de un análisis de muestras recibidas.
@@ -239,6 +294,61 @@ router.get('/:id/resultados-completos', ProcedimientoController.obtenerResultado
  *         description: Consolidación registrada exitosamente.
  */
 router.post('/:id/consolidacion', ProcedimientoController.registrarConsolidacion);
+
+// --- Rutas para flujos con formularios placeholder ---
+
+/**
+ * @swagger
+ * /api/procedimientos/{id}/placeholder-analisis:
+ *   post:
+ *     summary: Registra un análisis placeholder para INST o LAB.
+ *     tags: [Procedimientos, Placeholder]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               tipo_analisis:
+ *                 type: string
+ *                 enum: [INST, LAB]
+ *     responses:
+ *       200:
+ *         description: Análisis placeholder registrado.
+ */
+router.post('/:id/placeholder-analisis', ProcedimientoController.registrarAnalisisPlaceholder);
+
+/**
+ * @swagger
+ * /api/procedimientos/{id}/placeholder-consolidacion:
+ *   post:
+ *     summary: Registra una consolidación placeholder para LAB.
+ *     tags: [Procedimientos, Placeholder]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Consolidación placeholder registrada.
+ */
+router.post('/:id/placeholder-consolidacion', ProcedimientoController.registrarConsolidacionPlaceholder);
+
+/**
+ * @swagger
+ * /api/procedimientos/{id}/finalizar-para-mp:
+ *   post:
+ *     summary: Finaliza el caso y lo envía a la bandeja de culminados de MP.
+ *     tags: [Procedimientos]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Caso finalizado exitosamente.
+ */
+router.post('/:id/finalizar-para-mp', ProcedimientoController.finalizarParaMP);
+
 
 export default router;
 
