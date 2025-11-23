@@ -231,6 +231,7 @@ export class ProcedimientoController {
       const metadataData = metadata.length > 0 ? {
         objeto_pericia: metadata[0].objeto_pericia,
         metodo_utilizado: metadata[0].metodo_utilizado,
+        observaciones_finales: metadata[0].observaciones_finales,
       } : null;
       
       const muestrasAnalizadas = muestras.map(m => {
@@ -253,12 +254,8 @@ export class ProcedimientoController {
         };
       });
       
-      const [seguimiento] = await connection.query(
-        'SELECT observaciones FROM seguimiento_oficio WHERE id_oficio = ? AND estado_nuevo = ? ORDER BY fecha_seguimiento DESC LIMIT 1',
-        [id_oficio, 'ANALISIS_TM_FINALIZADO']
-      );
-
-      const muestrasAgotadas = seguimiento.length > 0 ? (seguimiento[0].observaciones || '').includes('muestras se agotaron') : false;
+      // Leer el valor booleano directamente de la tabla de metadatos
+      const muestrasAgotadas = metadata.length > 0 ? !!metadata[0].muestras_agotadas : false;
 
       res.status(200).json({
         success: true,
@@ -284,7 +281,7 @@ export class ProcedimientoController {
   static async registrarAnalisis(req, res) {
     const { id: id_oficio } = req.params;
     const { id_usuario } = req.user;
-    const { apertura_data, muestras_analizadas, metadata } = req.body;
+    const { apertura_data, muestras_analizadas, metadata, muestras_agotadas } = req.body;
 
     const connection = await db.promise().getConnection();
     try {
@@ -302,20 +299,30 @@ export class ProcedimientoController {
         await connection.rollback();
         return res.status(400).json({ success: false, message: 'Los datos del acta de apertura son requeridos.' });
       }
-      await connection.query('INSERT INTO actas_apertura SET ?', [{
-        id_oficio,
-        id_perito: id_usuario,
-        descripcion_paquete: apertura_data.descripcion_paquete,
-        observaciones: apertura_data.observaciones,
-      }]);
+      // Usar INSERT ... ON DUPLICATE KEY UPDATE para evitar errores en re-edición
+      await connection.query(
+        `INSERT INTO actas_apertura (id_oficio, id_perito, descripcion_paquete, observaciones)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           id_perito = VALUES(id_perito),
+           descripcion_paquete = VALUES(descripcion_paquete),
+           observaciones = VALUES(observaciones)`,
+        [id_oficio, id_usuario, apertura_data.descripcion_paquete, apertura_data.observaciones]
+      );
 
-      // 3. Guardar los metadatos del informe
+
+      // 3. Guardar los metadatos del informe, incluyendo muestras_agotadas y observaciones_finales
       if (metadata) {
-        await connection.query('INSERT INTO oficio_resultados_metadata SET ?', [{
-          id_oficio,
-          objeto_pericia: metadata.objeto_pericia,
-          metodo_utilizado: metadata.metodo_utilizado,
-        }]);
+        await connection.query(
+          `INSERT INTO oficio_resultados_metadata (id_oficio, objeto_pericia, metodo_utilizado, muestras_agotadas, observaciones_finales)
+           VALUES (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             objeto_pericia = VALUES(objeto_pericia),
+             metodo_utilizado = VALUES(metodo_utilizado),
+             muestras_agotadas = VALUES(muestras_agotadas),
+             observaciones_finales = VALUES(observaciones_finales)`,
+          [id_oficio, metadata.objeto_pericia, metadata.metodo_utilizado, muestras_agotadas, metadata.observaciones_finales]
+        );
       }
 
       // 4. Procesar y actualizar las muestras con sus resultados
@@ -325,17 +332,13 @@ export class ProcedimientoController {
       }
 
       for (const muestra of muestras_analizadas) {
-        if (!muestra.codigo_muestra || !muestra.resultado_analisis) {
-          if (muestra.resultados && typeof muestra.resultados === 'object') {
-            muestra.resultado_analisis = JSON.stringify(muestra.resultados);
-          } else {
+        if (!muestra.codigo_muestra || !muestra.resultados) {
             throw new Error('Cada muestra analizada debe tener un código y un resultado.');
-          }
         }
 
-        const resultadoParaBD = typeof muestra.resultado_analisis === 'object'
-          ? JSON.stringify(muestra.resultado_analisis)
-          : muestra.resultado_analisis;
+        const resultadoParaBD = typeof muestra.resultados === 'object'
+          ? JSON.stringify(muestra.resultados)
+          : muestra.resultados;
 
         const [updateResult] = await connection.query(
           'UPDATE muestras SET resultado_analisis = ?, descripcion_detallada = ? WHERE codigo_muestra = ? AND id_oficio = ?',
@@ -343,9 +346,10 @@ export class ProcedimientoController {
         );
 
         if (updateResult.affectedRows === 0) {
+          // Si la muestra no existía (ej. se añadió manualmente en el form), la insertamos.
           await connection.query(
             'INSERT INTO muestras (id_oficio, codigo_muestra, tipo_muestra, descripcion_detallada, resultado_analisis, cantidad) VALUES (?, ?, ?, ?, ?, ?)',
-            [id_oficio, muestra.codigo_muestra, muestra.tipo_muestra || 'Desconocido', muestra.descripcion_detallada, resultadoParaBD, 1]
+            [id_oficio, muestra.codigo_muestra, muestra.tipo_muestra || 'Desconocido', muestra.descripcion_detallada, resultadoParaBD, muestra.cantidad || 'N/A']
           );
         }
       }
@@ -377,7 +381,7 @@ export class ProcedimientoController {
 
       const resultadosConsolidados = {};
       muestras_analizadas.forEach(m => {
-        let val = m.resultado_analisis;
+        let val = m.resultados;
         if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
           try { val = JSON.parse(val); } catch (e) { }
         }
@@ -392,11 +396,16 @@ export class ProcedimientoController {
       }, connection);
 
       // 6. Añadir seguimiento de éxito al oficio
+      let obsFinal = `Se registraron los resultados de ${muestras_analizadas.length} muestra(s).`;
+      if(muestras_agotadas) {
+        obsFinal += ' Las muestras se agotaron durante el análisis.'
+      }
+
       await Oficio.addSeguimiento({
         id_oficio,
         id_usuario,
         estado_nuevo: estadoNuevo,
-        observaciones: `Se registraron los resultados de ${muestras_analizadas.length} muestra(s).`
+        observaciones: obsFinal
       }, connection);
 
       await connection.commit();

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe de No Extracción de Muestra</title>
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5;">
+    {{> partials/membrete }}
+
+    <div class="content-body">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <span style="font-weight: bold; text-decoration: underline; font-size: 14pt;">INFORME DE NO EXTRACCIÓN DE MUESTRA</span><br>
+            <span style="font-weight: bold; font-size: 12pt;">N° {{oficio.numero_informe_pericial}}-{{oficio.anio_actual}}-IV-MACREPOL-JUN-DIVINCRI/OFICRI.</span>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; font-size: 11pt;">
+            <tbody>
+                <tr>
+                    <td style="min-width: 30mm; font-weight: bold; vertical-align: top;">ASUNTO</td>
+                    <td style="width: 5mm; vertical-align: top;">:</td>
+                    <td>No toma de muestras para el/los examen(es) solicitado(s), por motivo que se detalla.</td>
+                </tr>
+                <tr>
+                    <td style="min-width: 30mm; font-weight: bold; vertical-align: top;">REF.</td>
+                    <td style="width: 5mm; vertical-align: top;">:</td>
+                    <td>{{oficio.numero_oficio}} ({{oficio.fecha_oficio_formateada}})</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr style="border: none; border-top: 1px solid #000; margin: 15px 0;">
+
+        <p style="text-align: justify;">
+            El suscrito, Perito Químico Farmacéutico de la Oficina de Criminalística de Huancayo, cumple con informar a la superioridad lo siguiente:
+        </p>
+
+        <p style="text-align: justify;">
+            Que, con fecha y hora de recepción del documento de la referencia, procedente de <strong>{{oficio.unidad_solicitante}}</strong>, 
+            se solicitó la toma de muestras biológicas para el/los examen(es) de <strong>{{oficio.tipos_de_examen}}</strong>, 
+            a la persona de <strong>{{oficio.examinado_incriminado}}</strong> (DNI: {{oficio.dni_examinado_incriminado}}).
+        </p>
+
+        <p style="text-align: justify;">
+            Al respecto, se informa que no se realizó dicho procedimiento, debido a los siguientes motivos:
+        </p>
+
+        <div style="border: 1px solid #ccc; padding: 10px 15px; background-color: #f9f9f9; border-radius: 5px; margin-top: 10px;">
+            <p style="margin: 0; text-align: justify;">{{observaciones}}</p>
+        </div>
+
+        <p style="text-align: justify; margin-top: 15px;">
+            Lo que se cumple con informar a la Superioridad para los fines pertinentes.
+        </p>
+        
+        <div style="text-align: right; margin-top: 40px; margin-bottom: 50px;">
+            Huancayo, {{#formatLongDate oficio.fecha_creacion}}{{/formatLongDate}}
+        </div>
+
+        <table style="width: 100%; text-align: center; margin-top: 4cm; page-break-inside: avoid;">
+             <tr>
+                <td style="width: 50%;"></td>
+                <td style="width: 50%;">
+                    <div style="width: 80%; margin: 0 auto 5px auto; border-top: 1px solid black;"></div>
+                    <p style="margin: 0; font-weight: bold; font-size: 9pt;">{{perito.nombre_completo}}</p>
+                    <p style="margin: 0; font-size: 9pt;">{{perito.grado_perito}}</p>
+                    <p style="margin: 0; font-size: 9pt;">PERITO QUÍMICO FARMACÉUTICO</p>
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>
