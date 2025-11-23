@@ -216,10 +216,11 @@ export async function up(knex) {
       table.timestamp('fecha_actualizacion').defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
 
       table.string('unidad_solicitante', 150).notNullable();
-      table.string('unidad_remitente', 150).notNullable();
-      table.string('region_fiscalia', 150).notNullable();
+      table.string('celular_conductor', 20);
+      table.string('situacion_persona', 40);
+      table.string('region_fiscalia', 150);
       table.enum('tipo_de_muestra', ['MUESTRAS REMITIDAS', 'TOMA DE MUESTRAS']).notNullable();
-      table.string('asunto', 400).notNullable();
+      table.string('asunto', 400);
 
       table.string('examinado_incriminado', 200).nullable();
       table.string('dni_examinado_incriminado', 15).nullable();

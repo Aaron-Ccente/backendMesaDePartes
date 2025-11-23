@@ -128,51 +128,51 @@ export class Oficio {
     }
   }
 
-  static async findAllForAdminStats(){
-    try {
-      const [oficios] = await db.promise().query(
-        `SELECT 
-            o.id_oficio,
-            o.numero_oficio, 
-            o.fecha_creacion, 
-            o.perito_asignado,
-            o.especialidad_requerida,
-            so.estado_nuevo as ultimo_estado,
-            so.fecha_seguimiento as fecha_ultimo_estado
-          FROM oficio o
-          LEFT JOIN seguimiento_oficio so ON so.id_oficio = o.id_oficio
-          WHERE so.id_seguimiento = (
-            SELECT MAX(so2.id_seguimiento) 
-            FROM seguimiento_oficio so2 
-            WHERE so2.id_oficio = o.id_oficio
-          )
-          OR so.id_seguimiento IS NULL
-          ORDER BY o.fecha_creacion DESC`
-      );
-      return { success: true, data: oficios };
-    } catch (error) {
-      console.error('Error en findAllForAdminStats:', error);
-      return { success: false, message: 'Error al obtener estadísticas para admin' };
-    }
-  }
+  // static async findAllForAdminStats(){
+  //   try {
+  //     const [oficios] = await db.promise().query(
+  //       `SELECT 
+  //           o.id_oficio,
+  //           o.numero_oficio, 
+  //           o.fecha_creacion, 
+  //           o.perito_asignado,
+  //           o.especialidad_requerida,
+  //           so.estado_nuevo as ultimo_estado,
+  //           so.fecha_seguimiento as fecha_ultimo_estado
+  //         FROM oficio o
+  //         LEFT JOIN seguimiento_oficio so ON so.id_oficio = o.id_oficio
+  //         WHERE so.id_seguimiento = (
+  //           SELECT MAX(so2.id_seguimiento) 
+  //           FROM seguimiento_oficio so2 
+  //           WHERE so2.id_oficio = o.id_oficio
+  //         )
+  //         OR so.id_seguimiento IS NULL
+  //         ORDER BY o.fecha_creacion DESC`
+  //     );
+  //     return { success: true, data: oficios };
+  //   } catch (error) {
+  //     console.error('Error en findAllForAdminStats:', error);
+  //     return { success: false, message: 'Error al obtener estadísticas para admin' };
+  //   }
+  // }
 
-  static async getSeguimientoByIdForAdmin(id_oficio){
-    try {
-      const query = `
-        SELECT 
-          so.*, u.nombre_completo AS usuario_asignado, u.CIP
-        FROM seguimiento_oficio so
-        INNER JOIN usuario u ON so.id_conductor = u.id_usuario
-        WHERE so.id_oficio = ?
-        ORDER BY so.fecha_seguimiento DESC
-      `;
-      const [rows] = await db.promise().query(query, [id_oficio]);
-      return { success: true, data: rows };
-    } catch (error) {
-      console.error('Error en getSeguimientoByIdForAdmin:', error);
-      return { success: false, message: 'Error al obtener seguimiento por ID para admin' };
-    }
-  }
+  // static async getSeguimientoByIdForAdmin(id_oficio){
+  //   try {
+  //     const query = `
+  //       SELECT 
+  //         so.*, u.nombre_completo AS usuario_asignado, u.CIP
+  //       FROM seguimiento_oficio so
+  //       INNER JOIN usuario u ON so.id_conductor = u.id_usuario
+  //       WHERE so.id_oficio = ?
+  //       ORDER BY so.fecha_seguimiento DESC
+  //     `;
+  //     const [rows] = await db.promise().query(query, [id_oficio]);
+  //     return { success: true, data: rows };
+  //   } catch (error) {
+  //     console.error('Error en getSeguimientoByIdForAdmin:', error);
+  //     return { success: false, message: 'Error al obtener seguimiento por ID para admin' };
+  //   }
+  // }
 
   static async getStatsForMesaDePartes(id_creador) {
     try {
@@ -295,23 +295,24 @@ export class Oficio {
       // --- INSERCIÓN DEL OFICIO PRINCIPAL ---
       const [result] = await connection.query(
         `INSERT INTO oficio (
-          numero_oficio, unidad_solicitante, unidad_remitente, region_fiscalia,
+          numero_oficio, unidad_solicitante, region_fiscalia, celular_conductor,
           tipo_de_muestra, asunto, examinado_incriminado, dni_examinado_incriminado,
-          delito, direccion_implicado, celular_implicado,
+          delito, situacion_persona, direccion_implicado, celular_implicado,
           fecha_hora_incidente, especialidad_requerida, id_especialidad_requerida,
           muestra, perito_asignado, cip_perito_asignado, id_usuario_perito_asignado, 
           id_prioridad, creado_por, actualizado_por
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           oficioPrincipalData.numero_oficio,
           oficioPrincipalData.unidad_solicitante,
-          oficioPrincipalData.unidad_remitente,
           oficioPrincipalData.region_fiscalia,
+          oficioPrincipalData.celular_conductor,
           oficioPrincipalData.tipo_de_muestra,
           oficioPrincipalData.asunto,
           oficioPrincipalData.examinado_incriminado,
           oficioPrincipalData.dni_examinado_incriminado,
           oficioPrincipalData.delito,
+          oficioPrincipalData.situacion_persona,
           oficioPrincipalData.direccion_implicado,
           oficioPrincipalData.celular_implicado,
           oficioPrincipalData.fecha_hora_incidente,

@@ -325,7 +325,6 @@ export class Validators {
     // Validar campos de texto requeridos
     const requiredFields = {
         'unidad_solicitante': 150,
-        'asunto': 400,
         'especialidad_requerida': 200,
         'muestra': 250,
         'perito_asignado': 250
@@ -339,10 +338,7 @@ export class Validators {
         }
     }
 
-    // Validar tipo de muestra
-    if (!oficioData.tipo_de_muestra) {
-        errors.push("Tipo de muestra es requerido");
-    } else if (!['MUESTRAS REMITIDAS', 'TOMA DE MUESTRAS'].includes(oficioData.tipo_de_muestra)) {
+    if (!['MUESTRAS REMITIDAS', 'TOMA DE MUESTRAS'].includes(oficioData.tipo_de_muestra)) {
         errors.push("Tipo de muestra debe ser 'MUESTRAS REMITIDAS' o 'TOMA DE MUESTRAS'");
     }
 
