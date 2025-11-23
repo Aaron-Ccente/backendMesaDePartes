@@ -55,13 +55,14 @@ export class OficioController {
       const oficioMapeado = {
         numero_oficio: oficioData.numeroOficio,
         unidad_solicitante: oficioData.fiscalia,
-        unidad_remitente: oficioData.fiscal_remitente,
         region_fiscalia: oficioData.regionSolicitante,
+        celular_conductor: oficioData.celularConductor,
         tipo_de_muestra: oficioData.tipo_de_muestra,
         asunto: oficioData.asunto,
         examinado_incriminado: oficioData.implicado,
         dni_examinado_incriminado: oficioData.dniImplicado,
         delito: oficioData.delito,
+        situacion_persona: oficioData.situacionPersona,
         direccion_implicado: oficioData.direccionImplicado,
         celular_implicado: oficioData.celular,
         fecha_hora_incidente: `${oficioData.fechaIncidente} ${oficioData.horaIncidente}`,
@@ -323,35 +324,31 @@ export class OficioController {
       });
     }
   }
-            });
-          }
-        }
-    
-  static async getAllOficiosForAdminStats(_, res) {
-    try {
-      const result = await Oficio.findAllForAdminStats();
-      return res.status(200).json(result);
-    } catch (error) {
-      console.error('Error en getAllOficiosForAdminStats:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Error interno al obtener estadísticas de oficios para admin.',
-      });
-    }
-  } 
 
-  static async getSeguimientoOficioByIdForAdmin(req, res) {
-    try {
-      const { id } = req.params;
-      const result = await Oficio.getSeguimientoByIdForAdmin(id);
-      return res.status(200).json(result);
-    } catch (error) {
-      console.error('Error en getSeguimientoOficioByIdForAdmin:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Error interno al obtener seguimiento de oficio por ID para admin.',
-      });
-    } 
-  }
-}
+  // static async getAllOficiosForAdminStats(_, res) {
+  //   try {
+  //     const result = await Oficio.findAllForAdminStats();
+  //     return res.status(200).json(result);
+  //   } catch (error) {
+  //     console.error('Error en getAllOficiosForAdminStats:', error);
+  //     return res.status(500).json({
+  //       success: false,
+  //       message: 'Error interno al obtener estadísticas de oficios para admin.',
+  //     });
+  //   }
+  // } 
+
+  // static async getSeguimientoOficioByIdForAdmin(req, res) {
+  //   try {
+  //     const { id } = req.params;
+  //     const result = await Oficio.getSeguimientoByIdForAdmin(id);
+  //     return res.status(200).json(result);
+  //   } catch (error) {
+  //     console.error('Error en getSeguimientoOficioByIdForAdmin:', error);
+  //     return res.status(500).json({
+  //       success: false,
+  //       message: 'Error interno al obtener seguimiento de oficio por ID para admin.',
+  //     });
+  //   } 
+  // }
 }
