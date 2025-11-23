@@ -207,7 +207,6 @@ const create_oficio = `CREATE TABLE oficio (
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     unidad_solicitante VARCHAR(150) NOT NULL,
-    unidad_remitente VARCHAR(150) NOT NULL,
     region_fiscalia VARCHAR(150) NOT NULL,
     tipo_de_muestra ENUM('MUESTRAS REMITIDAS', 'TOMA DE MUESTRAS') NOT NULL,
     asunto VARCHAR(400) NOT NULL,

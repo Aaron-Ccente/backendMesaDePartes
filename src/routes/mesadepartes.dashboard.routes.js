@@ -13,4 +13,7 @@ router.get('/stats', MesaDePartesDashboardController.getStats);
 // Ruta para obtener los casos creados recientemente
 router.get('/casos-recientes', MesaDePartesDashboardController.getRecentCases);
 
+// Ruta para obtener los casos culminados
+router.get('/casos-culminados', MesaDePartesDashboardController.getCasosCulminados);
+
 export default router;

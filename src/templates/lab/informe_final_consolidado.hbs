@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            padding: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .title {
+            font-weight: bold;
+            text-align: center;
+            text-decoration: underline;
+            margin: 20px 0;
+            font-size: 14pt;
+        }
+
+        .subtitle {
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .content {
+            text-align: justify;
+            margin-bottom: 15px;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .signature {
+            margin-top: 60px;
+            text-align: center;
+            page-break-inside: avoid;
+        }
+
+        .footer {
+            font-size: 8pt;
+            text-align: center;
+            margin-top: 50px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    {{> partials/membrete }}
+
+    <div style="text-align: right; margin-bottom: 20px;">
+        {{formatLongDate oficio.fecha_actual}}
+    </div>
+
+    <div class="title">DICTAMEN PERICIAL DE TOXICOLOGÍA FORENSE</div>
+    <div class="subtitle">OFICIO N° {{oficio.numero_oficio}}</div>
+
+    <div class="content">
+        <p>
+            <span class="bold">SEÑOR:</span><br>
+            {{oficio.destinatario_cargo}} {{oficio.destinatario_nombre}}<br>
+            {{oficio.destinatario_dependencia}}
+        </p>
+
+        <p>
+            <span class="bold">ASUNTO:</span> Remite Informe Pericial Toxicológico.
+        </p>
+
+        <p>
+            <span class="bold">REF.:</span> {{oficio.referencia}}
+        </p>
+
+        <p>
+            Tengo el honor de dirigirme a Ud., con la finalidad de remitir adjunto al presente el Informe Pericial
+            Toxicológico,
+            practicado a las muestras procedentes de {{oficio.unidad_solicitante}}, relacionadas con la persona de
+            <span class="bold">{{oficio.examinado_incriminado}}</span>.
+        </p>
+
+        <p>
+            <span class="bold">CONCLUSIONES FINALES:</span><br>
+            {{oficio.conclusiones_finales}}
+        </p>
+
+        {{#if oficio.observaciones_finales}}
+        <p>
+            <span class="bold">OBSERVACIONES:</span><br>
+            {{oficio.observaciones_finales}}
+        </p>
+        {{/if}}
+
+        <p>
+            Es propicia la oportunidad para reiterarle los sentimientos de mi especial consideración y deferente estima.
+        </p>
+
+        <p style="text-align: right;">
+            Dios guarde a Ud.
+        </p>
+    </div>
+
+    <div class="signature">
+        {{#if assets.firmaBase64}}
+        <img src="{{assets.firmaBase64}}" alt="Firma" style="max-height: 70px;"><br>
+        {{/if}}
+        <span class="bold">{{perito.nombre_completo}}</span><br>
+        {{perito.grado}} PNP<br>
+        {{perito.cargo}}<br>
+        JEFE DEL LABORATORIO DE TOXICOLOGÍA
+    </div>
+
+    <div class="footer">
+        OFICINA DE CRIMINALISTICA HUANCAYO<br>
+        Jr. Cuzco N° 666 - Teléfono: 064212453
+    </div>
+</body>
+
+</html>
