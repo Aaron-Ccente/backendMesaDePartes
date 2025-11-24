@@ -161,6 +161,48 @@ export class WorkflowService {
       throw error;
     }
   }
+
+  static async determinarContextoAnalisis(id_oficio, id_perito_actual) {
+    try {
+      const [oficio, examenesRequeridos, peritoActual] = await Promise.all([
+        Oficio.findById(id_oficio),
+        Oficio.getExamenesRequeridos(id_oficio),
+        Perito.findByIdUsuario(id_perito_actual)
+      ]);
+  
+      if (!oficio.success || !peritoActual.success) {
+        return { esPrimerPeritoDelFlujo: false, permiteEditarMuestras: false };
+      }
+  
+      const esMuestrasRemitidas = oficio.data.tipo_de_muestra === 'MUESTRAS REMITIDAS';
+      if (!esMuestrasRemitidas) {
+        return { esPrimerPeritoDelFlujo: false, permiteEditarMuestras: false };
+      }
+  
+      const seccionesRequeridas = new Set(
+        examenesRequeridos.map(examen => EXAMEN_A_SECCION[examen]?.id).filter(Boolean)
+      );
+  
+      let seccionDeInicioId = null;
+      for (const seccion of ORDEN_PRIORIDAD) {
+        if (seccionesRequeridas.has(seccion.id)) {
+          seccionDeInicioId = seccion.id;
+          break;
+        }
+      }
+  
+      const esPrimerPeritoDelFlujo = peritoActual.data.id_seccion === seccionDeInicioId;
+  
+      // La Política 3 dice que solo el primer perito puede gestionar muestras en casos de Muestras Remitidas.
+      const permiteEditarMuestras = esMuestrasRemitidas && esPrimerPeritoDelFlujo;
+  
+      return { esPrimerPeritoDelFlujo, permiteEditarMuestras };
+  
+    } catch (error) {
+      console.error('Error en determinarContextoAnalisis:', error);
+      throw new Error('Error al determinar el contexto del análisis.');
+    }
+  }
 }
 
 

@@ -4,6 +4,14 @@ import { MuestraService } from '../services/MuestraService.js';
 import db from '../database/db.js';
 import { WorkflowService } from '../services/workflowService.js';
 
+const normalizeString = (str) => {
+  if (!str) return '';
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+};
+
 export class ProcedimientoController {
   static async getDatosExtraccion(req, res) {
     const { id: id_oficio } = req.params;
@@ -73,7 +81,7 @@ export class ProcedimientoController {
         const codigosGenerados = [];
         // 3. Insertar las nuevas muestras.
         for (const muestra of muestras) {
-          const codigoMuestra = await MuestraService.generarCodigoMuestra(id_oficio, muestra.tipo_muestra);
+          const codigoMuestra = await MuestraService.generarCodigoMuestra(id_oficio, connection);
           const nuevaMuestra = {
             id_oficio,
             tipo_muestra: muestra.tipo_muestra,
@@ -87,17 +95,7 @@ export class ProcedimientoController {
         }
         
         estadoNuevo = requiereAnalisisTM ? 'PENDIENTE_ANALISIS_TM' : 'EXTRACCION_FINALIZADA';
-        
-        // Lógica de sincronización para las observaciones
-        const systemMessage = `Se guardaron ${codigosGenerados.length} muestras con los códigos: ${codigosGenerados.join(', ')}.`;
-        const separator = '\n\nObservaciones del perito:\n';
-        let userObservaciones = observaciones || '';
-
-        if (userObservaciones.includes(separator)) {
-          userObservaciones = userObservaciones.split(separator)[1] || '';
-        }
-
-        finalObservaciones = userObservaciones ? `${systemMessage}${separator}${userObservaciones}` : systemMessage;
+        finalObservaciones = observaciones || null;
 
       } else {
         estadoNuevo = 'EXTRACCION_FALLIDA';
@@ -159,9 +157,8 @@ export class ProcedimientoController {
         estadoNuevo = 'PENDIENTE_ANALISIS_TM';
 
         // 4. Insertar las nuevas muestras
-        const codigosGenerados = [];
         for (const muestra of muestras) {
-          const codigoMuestra = await MuestraService.generarCodigoMuestra(id_oficio, muestra.tipo_muestra);
+          const codigoMuestra = await MuestraService.generarCodigoMuestra(id_oficio, connection);
           await Muestra.create({
             id_oficio,
             tipo_muestra: muestra.tipo_muestra,
@@ -170,12 +167,9 @@ export class ProcedimientoController {
             codigo_muestra: codigoMuestra,
             esta_lacrado: true,
           }, connection);
-          codigosGenerados.push(codigoMuestra);
         }
         
-        // 5. Formatear observaciones para incluir información del sistema
-        const systemMessage = `FASE 1/2: Extracción completada. Se generaron ${codigosGenerados.length} muestras con los códigos: ${codigosGenerados.join(', ')}. El caso está listo para la fase de análisis.`;
-        finalObservaciones = observaciones ? `${systemMessage}\n\nObservaciones del perito:\n${observaciones}` : systemMessage;
+        finalObservaciones = observaciones || null;
 
       } else {
         // Si la extracción no fue exitosa en este flujo, se marca como fallida
@@ -208,57 +202,61 @@ export class ProcedimientoController {
     }
   }
 
-  static async getDatosAnalisisTM(req, res) {
+  static async getDatosAnalisis(req, res) {
     const { id: id_oficio } = req.params;
+    const { id_usuario, seccion_nombre: seccion_usuario } = req.user;
+
     const connection = await db.promise().getConnection();
     try {
-      // Consultas para obtener todos los datos guardados del análisis
-      const [actas] = await connection.query('SELECT * FROM actas_apertura WHERE id_oficio = ? ORDER BY fecha_apertura DESC LIMIT 1', [id_oficio]);
-      const [metadata] = await connection.query('SELECT * FROM oficio_resultados_metadata WHERE id_oficio = ? LIMIT 1', [id_oficio]);
+      let tipoResultadoActual;
+      const seccion_normalizada = normalizeString(seccion_usuario);
+
+      if (seccion_normalizada === 'TOMA DE MUESTRA') tipoResultadoActual = 'Sarro Ungueal';
+      else if (seccion_normalizada === 'LABORATORIO') tipoResultadoActual = 'Toxicológico';
+      else if (seccion_normalizada === 'INSTRUMENTALIZACION') tipoResultadoActual = 'Dosaje Etílico';
+      else return res.status(400).json({ success: false, message: 'Sección de usuario no reconocida.' });
+
+      // Usar el nuevo servicio para determinar el contexto
+      const { esPrimerPeritoDelFlujo, permiteEditarMuestras } = await WorkflowService.determinarContextoAnalisis(id_oficio, id_usuario);
+
+      const [actas] = await connection.query('SELECT * FROM actas_apertura WHERE id_oficio = ?', [id_oficio]);
+      const [metadata] = await connection.query('SELECT * FROM oficio_resultados_metadata WHERE id_oficio = ?', [id_oficio]);
       const [muestras] = await connection.query('SELECT * FROM muestras WHERE id_oficio = ?', [id_oficio]);
-
-      // Si no hay acta, asumimos que el procedimiento no se ha iniciado
-      if (actas.length === 0) {
-        return res.status(200).json({ success: true, data: null });
-      }
-
-      // Procesar y formatear los datos para el frontend
-      const aperturaData = {
-        descripcion_paquete: actas[0].descripcion_paquete,
-        observaciones: actas[0].observaciones,
-      };
-
-      const metadataData = metadata.length > 0 ? {
-        objeto_pericia: metadata[0].objeto_pericia,
-        metodo_utilizado: metadata[0].metodo_utilizado,
-      } : null;
+      const [todosLosResultados] = await connection.query('SELECT * FROM oficio_resultados_perito WHERE id_oficio = ?', [id_oficio]);
       
-      const muestrasAnalizadas = muestras.map(m => {
-        let resultados = {};
-        if (m.resultado_analisis) {
-          try {
-            // Si ya es un objeto, lo usamos, si es string, lo parseamos
-            resultados = typeof m.resultado_analisis === 'object' ? m.resultado_analisis : JSON.parse(m.resultado_analisis);
-          } catch (e) {
-            console.warn(`Resultado de muestra ${m.id_muestra} no es un JSON válido.`, m.resultado_analisis);
-            // Si falla el parseo, se deja como objeto vacío para no romper el front
-          }
+      const tieneResultadosGuardados = todosLosResultados.length > 0;
+      
+      const resultadosAnteriores = [];
+      let resultadosParaEditar = {};
+      
+      todosLosResultados.forEach(res_perito => {
+        const resultadosParseados = typeof res_perito.resultados === 'string' 
+            ? JSON.parse(res_perito.resultados) 
+            : res_perito.resultados;
+
+        if (res_perito.tipo_resultado === tipoResultadoActual) {
+          resultadosParaEditar = resultadosParseados;
+        } else {
+          resultadosAnteriores.push({
+            tipo_resultado: res_perito.tipo_resultado,
+            resultados: resultadosParseados,
+          });
         }
-        return {
+      });
+      
+      const aperturaData = actas.length > 0 ? { descripcion_paquete: actas[0].descripcion_paquete, observaciones: actas[0].observaciones } : null;
+      const metadataData = metadata.length > 0 ? { objeto_pericia: metadata[0].objeto_pericia, metodo_utilizado: metadata[0].metodo_utilizado, observaciones_finales: metadata[0].observaciones_finales } : null;
+      
+      const muestrasAnalizadas = muestras.map(m => ({
           id: m.id_muestra,
           codigo_muestra: m.codigo_muestra,
           tipo_muestra: m.tipo_muestra,
-          descripcion_detallada: m.descripcion_detallada,
-          resultados,
-        };
-      });
+          descripcion: m.descripcion,
+          resultados: resultadosParaEditar[m.id_muestra] || {},
+          descripcion_detallada: resultadosParaEditar[m.id_muestra]?.descripcion_detallada || m.descripcion_detallada || '',
+      }));
       
-      const [seguimiento] = await connection.query(
-        'SELECT observaciones FROM seguimiento_oficio WHERE id_oficio = ? AND estado_nuevo = ? ORDER BY fecha_seguimiento DESC LIMIT 1',
-        [id_oficio, 'ANALISIS_TM_FINALIZADO']
-      );
-
-      const muestrasAgotadas = seguimiento.length > 0 ? (seguimiento[0].observaciones || '').includes('muestras se agotaron') : false;
+      const muestrasAgotadas = metadata.length > 0 ? !!metadata[0].muestras_agotadas : false;
 
       res.status(200).json({
         success: true,
@@ -266,137 +264,130 @@ export class ProcedimientoController {
           aperturaData,
           metadata: metadataData,
           muestrasAnalizadas,
-          muestrasAgotadas
+          resultadosAnteriores,
+          muestrasAgotadas,
+          tieneResultadosGuardados,
+          esPrimerPeritoDelFlujo, // Enviar el flag claro al frontend
+          permiteEditarMuestras, 
         }
       });
 
     } catch (error) {
-      console.error('Error en getDatosAnalisisTM:', error);
+      console.error('Error en getDatosAnalisis:', error);
       res.status(500).json({ success: false, message: 'Error interno del servidor.' });
     } finally {
       connection.release();
     }
   }
 
-  /**
-   * Registra el resultado de un análisis de muestras recibidas.
-   */
   static async registrarAnalisis(req, res) {
     const { id: id_oficio } = req.params;
     const { id_usuario } = req.user;
-    const { apertura_data, muestras_analizadas, metadata } = req.body;
+    const { isCreationMode, apertura_data, muestras, metadata, muestras_agotadas } = req.body;
 
     const connection = await db.promise().getConnection();
     try {
       await connection.beginTransaction();
 
-      // 1. Validar que el oficio pertenece al perito
-      const oficio = await Oficio.findById(id_oficio);
+      const oficio = await Oficio.findById(id_oficio, connection);
       if (!oficio.success || oficio.data.id_usuario_perito_asignado !== id_usuario) {
         await connection.rollback();
         return res.status(403).json({ success: false, message: 'Acceso denegado.' });
       }
-
-      // 2. Guardar el acta de apertura
-      if (!apertura_data || !apertura_data.descripcion_paquete) {
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: 'Los datos del acta de apertura son requeridos.' });
-      }
-      await connection.query('INSERT INTO actas_apertura SET ?', [{
-        id_oficio,
-        id_perito: id_usuario,
-        descripcion_paquete: apertura_data.descripcion_paquete,
-        observaciones: apertura_data.observaciones,
-      }]);
-
-      // 3. Guardar los metadatos del informe
-      if (metadata) {
-        await connection.query('INSERT INTO oficio_resultados_metadata SET ?', [{
-          id_oficio,
-          objeto_pericia: metadata.objeto_pericia,
-          metodo_utilizado: metadata.metodo_utilizado,
-        }]);
-      }
-
-      // 4. Procesar y actualizar las muestras con sus resultados
-      if (!Array.isArray(muestras_analizadas) || muestras_analizadas.length === 0) {
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: 'Se requiere al menos una muestra analizada.' });
-      }
-
-      for (const muestra of muestras_analizadas) {
-        if (!muestra.codigo_muestra || !muestra.resultado_analisis) {
-          if (muestra.resultados && typeof muestra.resultados === 'object') {
-            muestra.resultado_analisis = JSON.stringify(muestra.resultados);
-          } else {
-            throw new Error('Cada muestra analizada debe tener un código y un resultado.');
-          }
+      
+      const { esPrimerPeritoDelFlujo } = await WorkflowService.determinarContextoAnalisis(id_oficio, id_usuario);
+      
+      if (esPrimerPeritoDelFlujo) {
+        if (!apertura_data || !apertura_data.descripcion_paquete) {
+          throw new Error('Debe describir el estado del paquete recibido, ya que es el primer perito en analizar una muestra remitida.');
         }
-
-        const resultadoParaBD = typeof muestra.resultado_analisis === 'object'
-          ? JSON.stringify(muestra.resultado_analisis)
-          : muestra.resultado_analisis;
-
-        const [updateResult] = await connection.query(
-          'UPDATE muestras SET resultado_analisis = ?, descripcion_detallada = ? WHERE codigo_muestra = ? AND id_oficio = ?',
-          [resultadoParaBD, muestra.descripcion_detallada, muestra.codigo_muestra, id_oficio]
+        await connection.query(
+          `INSERT INTO actas_apertura (id_oficio, id_perito, descripcion_paquete, observaciones) VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE id_perito = VALUES(id_perito), descripcion_paquete = VALUES(descripcion_paquete), observaciones = VALUES(observaciones)`,
+          [id_oficio, id_usuario, apertura_data.descripcion_paquete, apertura_data.observaciones]
         );
-
-        if (updateResult.affectedRows === 0) {
-          await connection.query(
-            'INSERT INTO muestras (id_oficio, codigo_muestra, tipo_muestra, descripcion_detallada, resultado_analisis, cantidad) VALUES (?, ?, ?, ?, ?, ?)',
-            [id_oficio, muestra.codigo_muestra, muestra.tipo_muestra || 'Desconocido', muestra.descripcion_detallada, resultadoParaBD, 1]
-          );
-        }
       }
 
-      // 5. Registrar el resultado en oficio_resultados_perito para el WorkflowService
-      const [peritoData] = await connection.query(
-        `SELECT s.nombre as nombre_seccion 
-         FROM usuario_seccion us 
-         JOIN seccion s ON us.id_seccion = s.id_seccion 
-         WHERE us.id_usuario = ?`,
-        [id_usuario]
-      );
-
-      let tipoResultado = 'RESULTADO_GENERICO';
-      let estadoNuevo = 'ANALISIS_FINALIZADO';
-      if (peritoData.length > 0) {
-        const seccion = peritoData[0].nombre_seccion.toUpperCase();
-        if (seccion === 'TOMA DE MUESTRA') {
+      let tipoResultado, estadoNuevo;
+      const seccion_normalizada = normalizeString(req.user.seccion_nombre);
+      switch (seccion_normalizada) {
+        case 'TOMA DE MUESTRA':
           tipoResultado = 'Sarro Ungueal';
           estadoNuevo = 'ANALISIS_TM_FINALIZADO';
-        } else if (seccion === 'LABORATORIO') {
+          break;
+        case 'LABORATORIO':
           tipoResultado = 'Toxicológico';
           estadoNuevo = 'ANALISIS_LAB_FINALIZADO';
-        } else if (seccion === 'INSTRUMENTALIZACION') {
+          break;
+        case 'INSTRUMENTALIZACION':
           tipoResultado = 'Dosaje Etílico';
           estadoNuevo = 'ANALISIS_INST_FINALIZADO';
+          break;
+        default:
+          throw new Error('Sección de usuario no reconocida.');
+      }
+      
+      if (metadata) {
+        await connection.query(
+          `INSERT INTO oficio_resultados_metadata (id_oficio, objeto_pericia, metodo_utilizado, muestras_agotadas, observaciones_finales) VALUES (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE objeto_pericia = VALUES(objeto_pericia), metodo_utilizado = VALUES(metodo_utilizado), muestras_agotadas = VALUES(muestras_agotadas), observaciones_finales = VALUES(observaciones_finales)`,
+          [id_oficio, metadata.objeto_pericia, metadata.metodo_utilizado, !!muestras_agotadas, metadata.observaciones_finales]
+        );
+      }
+
+      const resultadosParaGuardar = {};
+      const idMap = new Map(); // Mapea IDs temporales del frontend a IDs reales de la DB
+
+      for (const muestra of muestras) {
+        let muestraId;
+        if (muestra.isNew) {
+          // Es una muestra nueva, hay que crearla
+          if (!muestra.tipo_muestra || !muestra.descripcion) {
+            throw new Error('Las muestras nuevas deben tener tipo y descripción.');
+          }
+          const codigoMuestra = await MuestraService.generarCodigoMuestra(id_oficio, connection);
+          const nuevoIdMuestra = await Muestra.create({
+            id_oficio,
+            tipo_muestra: muestra.tipo_muestra,
+            descripcion: muestra.descripcion,
+            codigo_muestra: codigoMuestra,
+            esta_lacrado: false, 
+          }, connection);
+          
+          idMap.set(muestra.id, nuevoIdMuestra);
+          muestraId = nuevoIdMuestra;
+        } else {
+          // Es una muestra existente
+          muestraId = muestra.id;
+        }
+
+        // Siempre actualizar descripción detallada si se proporciona
+        if (muestra.descripcion_detallada) {
+          await Muestra.updateDetalle(muestraId, muestra.descripcion_detallada, connection);
+        }
+
+        // Solo procesar resultados si la muestra no está marcada como "no aplicable"
+        if (!muestra.resultados?.no_aplicable) {
+            resultadosParaGuardar[muestraId] = {
+              descripcion_detallada: muestra.descripcion_detallada || '',
+              ...muestra.resultados,
+            };
         }
       }
 
-      const resultadosConsolidados = {};
-      muestras_analizadas.forEach(m => {
-        let val = m.resultado_analisis;
-        if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
-          try { val = JSON.parse(val); } catch (e) { }
-        }
-        resultadosConsolidados[m.codigo_muestra] = val;
-      });
+      if (Object.keys(resultadosParaGuardar).length > 0) {
+        await connection.query(
+          `INSERT INTO oficio_resultados_perito (id_oficio, id_perito_responsable, tipo_resultado, resultados) VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE resultados = VALUES(resultados)`,
+          [id_oficio, id_usuario, tipoResultado, JSON.stringify(resultadosParaGuardar)]
+        );
+      }
 
-      await Oficio.addResultado({
-        id_oficio,
-        id_perito_responsable: id_usuario,
-        tipo_resultado: tipoResultado,
-        resultados: resultadosConsolidados
-      }, connection);
-
-      // 6. Añadir seguimiento de éxito al oficio
       await Oficio.addSeguimiento({
         id_oficio,
         id_usuario,
         estado_nuevo: estadoNuevo,
-        observaciones: `Se registraron los resultados de ${muestras_analizadas.length} muestra(s).`
+        observaciones: `Análisis de ${tipoResultado} finalizado.`
       }, connection);
 
       await connection.commit();
@@ -496,7 +487,6 @@ export class ProcedimientoController {
     try {
       const connection = await db.promise().getConnection();
 
-      // Obtener resultados de oficio_resultados_perito con información del perito
       const [resultadosPerito] = await connection.query(
         `SELECT 
           orp.id_resultado,
@@ -529,20 +519,32 @@ export class ProcedimientoController {
 
       connection.release();
 
-      // Formatear los resultados para el frontend
-      const resultados = resultadosPerito.map(r => {
+      const resultadosFormateados = resultadosPerito.map(r => {
         let resultadosObj = {};
-
-        // Intentar parsear resultados si es JSON
         if (typeof r.resultados === 'string') {
           try {
             resultadosObj = JSON.parse(r.resultados);
           } catch (e) {
-            // Si no es JSON, asumir que es un valor simple
             resultadosObj = { resultado: r.resultados };
           }
-        } else if (typeof r.resultados === 'object') {
+        } else if (r.resultados) {
           resultadosObj = r.resultados;
+        }
+
+        // Filtrar aquí los resultados de muestras marcadas como "no_aplicable"
+        const resultadosFiltrados = {};
+        for (const idMuestra in resultadosObj) {
+          if (resultadosObj.hasOwnProperty(idMuestra)) {
+            const resultadoMuestra = resultadosObj[idMuestra];
+            if (!resultadoMuestra.no_aplicable) {
+              resultadosFiltrados[idMuestra] = resultadoMuestra;
+            }
+          }
+        }
+        
+        // Si después de filtrar no queda ningún resultado, no incluir este procedimiento.
+        if (Object.keys(resultadosFiltrados).length === 0) {
+            return null;
         }
 
         return {
@@ -553,18 +555,72 @@ export class ProcedimientoController {
           perito_cqfp: r.perito_cqfp,
           perito_grado: r.grado_perito,
           fecha_creacion: r.fecha_creacion,
-          resultados: resultadosObj
+          resultados: resultadosFiltrados,
         };
-      });
+      }).filter(Boolean); // Eliminar los nulos
 
       res.status(200).json({
         success: true,
-        data: resultados
+        data: resultadosFormateados,
       });
 
     } catch (error) {
       console.error('Error en obtenerResultadosCompletos:', error);
       res.status(500).json({ success: false, message: 'Error interno al obtener resultados.' });
+    }
+  }
+
+  static async getDatosConsolidacion(req, res) {
+    const { id: id_oficio } = req.params;
+    const connection = await db.promise().getConnection();
+    try {
+      // 1. Obtener detalles completos del oficio (incluye exámenes)
+      const oficioDetalleRes = await Oficio.findDetalleById(id_oficio, connection);
+      if (!oficioDetalleRes.success) {
+        return res.status(404).json({ success: false, message: 'Oficio no encontrado.' });
+      }
+
+      // 2. Obtener todos los resultados de los análisis
+      const [resultadosPerito] = await connection.query(
+        `SELECT 
+          orp.tipo_resultado,
+          orp.resultados,
+          u.nombre_completo as perito_nombre,
+          g.nombre as perito_grado
+         FROM oficio_resultados_perito orp
+         JOIN usuario u ON orp.id_perito_responsable = u.id_usuario
+         LEFT JOIN usuario_grado ug ON u.id_usuario = ug.id_usuario
+         LEFT JOIN grado g ON ug.id_grado = g.id_grado
+         WHERE orp.id_oficio = ?
+         ORDER BY orp.fecha_creacion ASC`,
+        [id_oficio]
+      );
+      
+      // 3. Obtener los metadatos de los informes (objeto y método)
+      const [metadataRows] = await connection.query(
+        'SELECT objeto_pericia, metodo_utilizado, observaciones_finales FROM oficio_resultados_metadata WHERE id_oficio = ?',
+        [id_oficio]
+      );
+      const metadata = metadataRows[0] || {};
+      
+      // Procesar y devolver todo en una sola respuesta
+      res.status(200).json({
+        success: true,
+        data: {
+          oficio: oficioDetalleRes.data,
+          resultados_previos: resultadosPerito.map(r => ({
+            ...r,
+            resultados: typeof r.resultados === 'string' ? JSON.parse(r.resultados) : r.resultados
+          })),
+          metadata: metadata,
+        }
+      });
+
+    } catch (error) {
+      console.error('Error en getDatosConsolidacion:', error);
+      res.status(500).json({ success: false, message: 'Error interno al obtener los datos para la consolidación.' });
+    } finally {
+      connection.release();
     }
   }
 

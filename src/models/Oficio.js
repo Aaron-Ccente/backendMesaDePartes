@@ -254,9 +254,10 @@ export class Oficio {
     }
   }
 
-  static async findById(id_oficio) {
+  static async findById(id_oficio, connection = null) {
+    const conn = connection || db.promise();
     try {
-      const [oficios] = await db.promise().query(
+      const [oficios] = await conn.query(
         `SELECT o.*, tp.nombre_prioridad, td.nombre_departamento as especialidad
          FROM oficio o
          LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
@@ -272,6 +273,7 @@ export class Oficio {
       return { success: true, data: oficios[0] };
     } catch (error) {
       console.error('Error en findById:', error);
+      if (connection) throw error; // Propagate error in transaction
       return { success: false, message: "Error al obtener el oficio" };
     }
   }

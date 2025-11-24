@@ -162,6 +162,15 @@ export class DocumentBuilderService {
   static async build(templateName, id_oficio, extraData = {}) {
     let browser = null;
     try {
+      // Registrar parciales ANTES de cualquier compilación
+      const membretePath = this._getTemplatePath('partials/membrete');
+      const membreteContent = await fs.readFile(membretePath, 'utf-8');
+      handlebars.registerPartial('partials/membrete', membreteContent);
+      
+      const anexoPath = this._getTemplatePath('lab/anexo_informe_pericial');
+      const anexoContent = await fs.readFile(anexoPath, 'utf-8');
+      handlebars.registerPartial('lab/anexo_informe_pericial', anexoContent);
+
       const [oficioResult, assets] = await Promise.all([
         Oficio.findDetalleById(id_oficio),
         this._loadAssets()
@@ -170,10 +179,17 @@ export class DocumentBuilderService {
       if (!oficioResult.success) throw new Error('Oficio no encontrado.');
 
       const peritoData = { ...oficioResult.data, ...extraData.perito };
-      const muestras = extraData.muestrasAnalizadas || [];
+      const muestras = extraData.muestrasAnalizadas || extraData.muestras || [];
 
-      const examenesProcesados = this._processExamResults(muestras);
-      const conclusionDinamica = this._generateDynamicConclusion(muestras, oficioResult.data.examinado_incriminado);
+      // Procesamiento condicional de resultados
+      let examenesProcesados = [];
+      let conclusionDinamica = '';
+
+      // Solo procesar resultados si es una plantilla de informe que los muestra.
+      if (templateName.includes('informe_pericial') || templateName.includes('dictamen_consolidado')) {
+        examenesProcesados = this._processExamResults(muestras);
+        conclusionDinamica = this._generateDynamicConclusion(muestras, oficioResult.data.examinado_incriminado);
+      }
 
       const data = {
         ...extraData, // Spread extraData to be available at root (for dictamen_consolidado)
@@ -181,6 +197,7 @@ export class DocumentBuilderService {
           ...oficioResult.data,
           objeto_pericia: extraData.metadata?.objeto_pericia || 'No especificado.',
           metodo_utilizado: extraData.metadata?.metodo_utilizado || 'No especificado.',
+          observaciones_finales: extraData.metadata?.observaciones_finales,
           muestras_registradas: muestras.map((m, index) => ({ ...m, index: index + 1 })),
           examenes_procesados: examenesProcesados,
           conclusion_dinamica: conclusionDinamica,
@@ -201,15 +218,6 @@ export class DocumentBuilderService {
         html = template(data);
       }
       
-      const membretePath = this._getTemplatePath('partials/membrete');
-      const membreteContent = await fs.readFile(membretePath, 'utf-8');
-      handlebars.registerPartial('partials/membrete', membreteContent);
-      
-      const anexoPath = this._getTemplatePath('lab/anexo_informe_pericial');
-      const anexoContent = await fs.readFile(anexoPath, 'utf-8');
-      handlebars.registerPartial('lab/anexo_informe_pericial', anexoContent);
-
-
       browser = await puppeteer.launch({
         args: ['--no-sandbox', '--disable-setuid-sandbox']
       });

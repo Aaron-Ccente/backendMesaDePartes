@@ -398,7 +398,8 @@ export class PeritoController {
         nombre_usuario: perito.nombre_usuario,
         nombre_completo: perito.nombre_completo,
         role: "perito",
-        id_seccion: perito.id_seccion, // <-- Añadir la sección al payload
+        id_seccion: perito.id_seccion,
+        seccion_nombre: perito.seccion_nombre, // <-- Añadir la sección al payload
       };
       const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
 
