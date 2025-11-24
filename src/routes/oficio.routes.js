@@ -74,8 +74,8 @@ router.get('/casos-asignados', requirePerito, OficioController.getCasosAsignados
 router.get('/alerts', requirePerito, OficioController.getAlertas);
 
 // Solo para admins
-router.get('/all/seguimiento', requireAdmin, OficioController.getAllOficiosForAdminStats);
-router.get('/all/seguimiento/:id', requireAdmin, OficioController.getSeguimientoOficioByIdForAdmin);
+// router.get('/all/seguimiento', requireAdmin, OficioController.getAllOficiosForAdminStats); --oficios comentados, porque no se usan
+// router.get('/all/seguimiento/:id', requireAdmin, OficioController.getSeguimientoOficioByIdForAdmin); --oficios comentados, porque no se usan
 
 // Solo para mesa de partes
 router.post('/', requireMesaDePartes, OficioController.createOficio);
