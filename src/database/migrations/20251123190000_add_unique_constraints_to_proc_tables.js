@@ -36,11 +36,18 @@ export async function up(knex) {
  * @returns { Promise<void> }
  */
 export async function down(knex) {
-  await knex.schema.alterTable('oficio_resultados_metadata', (table) => {
-    table.dropUnique('id_oficio');
-  });
-  
-  await knex.schema.alterTable('actas_apertura', (table) => {
-    table.dropUnique('id_oficio');
-  });
+  // NO-OP: No hacer nada.
+  // Se ha determinado que los índices UNIQUE son beneficiosos y que intentar
+  // eliminarlos causa un error de dependencia irresoluble durante el rollback.
+  // Dejar esta función 'down' vacía permite que el resto del proceso de rollback
+  // continúe sin fallar, aceptando que esta migración en particular no es reversible.
+  //
+  // await knex.schema.alterTable('oficio_resultados_metadata', (table) => {
+  //   table.dropUnique('id_oficio');
+  // });
+  // 
+  // await knex.schema.alterTable('actas_apertura', (table) => {
+  //   table.dropUnique('id_oficio');
+  // });
+  return Promise.resolve();
 }

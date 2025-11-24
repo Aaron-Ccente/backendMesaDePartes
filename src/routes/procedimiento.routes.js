@@ -117,9 +117,9 @@ router.post('/:id/finalizar-extraccion-interna', ProcedimientoController.finaliz
 
 /**
  * @swagger
- * /api/procedimientos/{id}/analisis-tm:
+ * /api/procedimientos/{id}/analisis:
  *   get:
- *     summary: Obtiene los datos guardados de un procedimiento de análisis de TM.
+ *     summary: Obtiene los datos guardados de un procedimiento de análisis para el perito actual.
  *     tags: [Procedimientos]
  *     security:
  *       - bearerAuth: []
@@ -132,11 +132,11 @@ router.post('/:id/finalizar-extraccion-interna', ProcedimientoController.finaliz
  *         description: ID del oficio.
  *     responses:
  *       200:
- *         description: Datos del análisis de TM encontrados.
+ *         description: Datos del análisis encontrados.
  *       404:
  *         description: No se encontraron datos para este procedimiento.
  */
-router.get('/:id/analisis-tm', ProcedimientoController.getDatosAnalisisTM);
+router.get('/:id/analisis', ProcedimientoController.getDatosAnalisis);
 
 
 /**
@@ -260,6 +260,27 @@ router.post('/:id/derivar', ProcedimientoController.derivarCaso);
  *         description: Lista de resultados.
  */
 router.get('/:id/resultados-completos', ProcedimientoController.obtenerResultadosCompletos);
+
+/**
+ * @swagger
+ * /api/procedimientos/{id}/datos-consolidacion:
+ *   get:
+ *     summary: Obtiene todos los datos necesarios para la vista de consolidación.
+ *     tags: [Procedimientos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del oficio.
+ *     responses:
+ *       200:
+ *         description: Datos para la consolidación.
+ */
+router.get('/:id/datos-consolidacion', ProcedimientoController.getDatosConsolidacion);
 
 /**
  * @swagger
