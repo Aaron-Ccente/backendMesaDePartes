@@ -1004,7 +1004,7 @@ export class Perito {
           SELECT 
             CASE
               WHEN so.estado_nuevo = 'CREACION DEL OFICIO' THEN 'ENTRADA'
-              WHEN so.estado_nuevo = 'COMPLETADO' THEN 'COMPLETADO'
+              WHEN so.estado_nuevo = 'LISTO_PARA_RECOJO' THEN 'COMPLETADO'
               ELSE 'PENDIENTE'
             END AS estado_final,
             COUNT(*) AS cantidad
