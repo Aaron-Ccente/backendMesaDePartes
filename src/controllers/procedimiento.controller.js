@@ -4,6 +4,8 @@ import { MuestraService } from '../services/MuestraService.js';
 import db from '../database/db.js';
 import { WorkflowService } from '../services/workflowService.js';
 import { ProcedimientoService } from '../services/ProcedimientoService.js';
+import { DocumentBuilderService } from '../services/DocumentBuilderService.js';
+import path from 'path';
 
 const normalizeString = (str) => {
   if (!str) return '';
@@ -14,6 +16,103 @@ const normalizeString = (str) => {
 };
 
 export class ProcedimientoController {
+
+  static async generarCaratula(req, res) {
+    try {
+      const { pdfBuffer } = await DocumentBuilderService.generarCaratula(req.body);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename=caratula.pdf');
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('Error al generar la carátula:', error);
+      res.status(500).json({ success: false, message: 'Error interno al generar la carátula.' });
+    }
+  }
+
+  static async uploadInformeFirmado(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No se ha subido ningún archivo.' });
+    }
+
+    // Construir una ruta relativa para almacenar en la BD
+    const relativePath = path.join('uploads', 'informes_firmados', req.file.filename).replace(/\\/g, '/');
+
+    const connection = await db.promise().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Guardar la ruta en la metadata
+      await connection.query(
+        `INSERT INTO oficio_resultados_metadata (id_oficio, informe_pericial_firmado_path)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE informe_pericial_firmado_path = VALUES(informe_pericial_firmado_path)`,
+        [id_oficio, relativePath]
+      );
+
+      // Cambiar estado del caso
+      await Oficio.addSeguimiento({
+        id_oficio,
+        id_usuario,
+        estado_nuevo: 'LISTO_PARA_RECOJO',
+        observaciones: 'El perito ha subido el informe firmado digitalmente.'
+      }, connection);
+
+      await connection.commit();
+      res.status(200).json({ success: true, message: 'Informe firmado subido y caso actualizado.', filePath: relativePath });
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error en uploadInformeFirmado:', error);
+      res.status(500).json({ success: false, message: 'Error interno al procesar el archivo.' });
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async uploadDocumentosFinales(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: 'No se han subido archivos.' });
+    }
+
+    const relativePaths = req.files.map(file => 
+      path.join('uploads', 'documentos_finales', file.filename).replace(/\\/g, '/')
+    );
+    const pathsJson = JSON.stringify(relativePaths);
+
+    const connection = await db.promise().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      await connection.query(
+        `INSERT INTO oficio_resultados_metadata (id_oficio, documentos_finales_escaneados_path)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE documentos_finales_escaneados_path = VALUES(documentos_finales_escaneados_path)`,
+        [id_oficio, pathsJson]
+      );
+
+      await Oficio.addSeguimiento({
+        id_oficio,
+        id_usuario,
+        estado_nuevo: 'ENTREGADO_Y_ARCHIVADO',
+        observaciones: 'Mesa de Partes ha subido los documentos escaneados post-entrega.'
+      }, connection);
+
+      await connection.commit();
+      res.status(200).json({ success: true, message: 'Documentos finales archivados exitosamente.', files: relativePaths });
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error en uploadDocumentosFinales:', error);
+      res.status(500).json({ success: false, message: 'Error interno al archivar los documentos.' });
+    } finally {
+      connection.release();
+    }
+  }
+
   static async getDatosExtraccion(req, res) {
     const { id: id_oficio } = req.params;
     try {
@@ -443,6 +542,7 @@ export class ProcedimientoController {
       return res.status(400).json({ success: false, message: 'Se requiere el ID del nuevo perito.' });
     }
 
+    const connection = await db.promise().getConnection();
     try {
       const siguientePaso = await WorkflowService.determinarSiguientePaso(id_oficio);
 
@@ -453,7 +553,6 @@ export class ProcedimientoController {
         });
       }
       
-      // Determinar el nuevo estado basado en la tarea
       let nuevo_estado;
       if (siguientePaso.next_step === 'CONSOLIDATE') {
         nuevo_estado = 'PENDIENTE_CONSOLIDACION';
@@ -461,22 +560,26 @@ export class ProcedimientoController {
         nuevo_estado = `DERIVADO A: ${siguientePaso.section_name.toUpperCase()}`;
       }
 
-      // Reasignar el oficio y establecer el estado específico
       await Oficio.reasignarPerito(
         id_oficio,
         id_nuevo_perito,
         id_perito_actual,
-        nuevo_estado
+        nuevo_estado,
+        connection
       );
 
+      await connection.commit();
       res.status(200).json({
         success: true,
         message: `Caso derivado exitosamente.`
       });
 
     } catch (error) {
+      await connection.rollback();
       console.error('Error al derivar el caso:', error);
       res.status(500).json({ success: false, message: 'Error interno del servidor al derivar el caso.' });
+    } finally {
+      connection.release();
     }
   }
   /**

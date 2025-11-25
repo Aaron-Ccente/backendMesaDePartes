@@ -22,10 +22,20 @@ export class DocumentBuilderService {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const assetsDir = path.join(__dirname, '..', 'assets');
-    const imagePath = path.join(assetsDir, 'escudo.png');
-    const imageBuffer = await fs.readFile(imagePath);
+    
+    const loadAndEncode = async (fileName) => {
+        try {
+            const imagePath = path.join(assetsDir, fileName);
+            const imageBuffer = await fs.readFile(imagePath);
+            return `data:image/png;base64,${imageBuffer.toString('base64')}`;
+        } catch (error) {
+            console.warn(`[DocBuilder] Advertencia: No se pudo cargar el asset '${fileName}'. Se usará un placeholder.`);
+            return 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='; // 1x1 transparent pixel
+        }
+    };
+
     return {
-        escudo: `data:image/png;base64,${imageBuffer.toString('base64')}`
+        escudoUrl: await loadAndEncode('escudo.png'),
     };
   }
   
@@ -38,6 +48,62 @@ export class DocumentBuilderService {
       throw new Error('Intento de acceso a una ruta de plantilla no válida.');
     }
     return resolvedPath;
+  }
+
+  static async generarCaratula(extraData = {}) {
+    let browser = null;
+    let tempHtmlPath = null;
+    try {
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
+
+        // 1. Cargar assets
+        const assets = await this._loadAssets();
+
+        // 2. Unir todos los datos para la plantilla
+        const data = { ...extraData, ...assets };
+
+        // 3. Compilar y renderizar HTML
+        const templatePath = this._getTemplatePath('caratula');
+        const templateContent = await fs.readFile(templatePath, 'utf-8');
+        const template = handlebars.compile(templateContent);
+        const html = template(data);
+
+        // 4. Escribir HTML a un archivo temporal
+        const tempDir = path.join(__dirname, '..', '..', 'temp');
+        await fs.mkdir(tempDir, { recursive: true });
+        tempHtmlPath = path.join(tempDir, `caratula-${Date.now()}.html`);
+        await fs.writeFile(tempHtmlPath, html);
+        console.log(`[DocBuilder] HTML temporal guardado en: ${tempHtmlPath}`);
+        
+        // 5. Generar PDF desde el archivo temporal
+        browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+        const page = await browser.newPage();
+        await page.goto(`file://${tempHtmlPath}`, { waitUntil: 'load' });
+        await page.waitForTimeout(100);
+        
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: { top: '15mm', right: '25mm', bottom: '20mm', left: '25mm' },
+        });
+
+        return { pdfBuffer, type: 'pdf' };
+
+    } catch (error) {
+        console.error(`[DocBuilder] Error generando la carátula:`, error);
+        throw error;
+    } finally {
+        if (browser) await browser.close();
+        // 6. Limpiar el archivo temporal
+        if (tempHtmlPath) {
+            try {
+                await fs.unlink(tempHtmlPath);
+            } catch (cleanupError) {
+                console.error(`[DocBuilder] Error al limpiar archivo temporal ${tempHtmlPath}:`, cleanupError);
+            }
+        }
+    }
   }
 
   static async build(templateName, id_oficio, extraData = {}) {
