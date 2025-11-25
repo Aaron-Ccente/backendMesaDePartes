@@ -3,6 +3,7 @@ import { Muestra } from '../models/Muestra.js';
 import { MuestraService } from '../services/MuestraService.js';
 import db from '../database/db.js';
 import { WorkflowService } from '../services/workflowService.js';
+import { ProcedimientoService } from '../services/ProcedimientoService.js';
 
 const normalizeString = (str) => {
   if (!str) return '';
@@ -572,55 +573,15 @@ export class ProcedimientoController {
 
   static async getDatosConsolidacion(req, res) {
     const { id: id_oficio } = req.params;
-    const connection = await db.promise().getConnection();
     try {
-      // 1. Obtener detalles completos del oficio (incluye exámenes)
-      const oficioDetalleRes = await Oficio.findDetalleById(id_oficio, connection);
-      if (!oficioDetalleRes.success) {
-        return res.status(404).json({ success: false, message: 'Oficio no encontrado.' });
-      }
-
-      // 2. Obtener todos los resultados de los análisis
-      const [resultadosPerito] = await connection.query(
-        `SELECT 
-          orp.tipo_resultado,
-          orp.resultados,
-          u.nombre_completo as perito_nombre,
-          g.nombre as perito_grado
-         FROM oficio_resultados_perito orp
-         JOIN usuario u ON orp.id_perito_responsable = u.id_usuario
-         LEFT JOIN usuario_grado ug ON u.id_usuario = ug.id_usuario
-         LEFT JOIN grado g ON ug.id_grado = g.id_grado
-         WHERE orp.id_oficio = ?
-         ORDER BY orp.fecha_creacion ASC`,
-        [id_oficio]
-      );
-      
-      // 3. Obtener los metadatos de los informes (objeto y método)
-      const [metadataRows] = await connection.query(
-        'SELECT objeto_pericia, metodo_utilizado, observaciones_finales FROM oficio_resultados_metadata WHERE id_oficio = ?',
-        [id_oficio]
-      );
-      const metadata = metadataRows[0] || {};
-      
-      // Procesar y devolver todo en una sola respuesta
+      const data = await ProcedimientoService.getDatosConsolidacion(id_oficio);
       res.status(200).json({
         success: true,
-        data: {
-          oficio: oficioDetalleRes.data,
-          resultados_previos: resultadosPerito.map(r => ({
-            ...r,
-            resultados: typeof r.resultados === 'string' ? JSON.parse(r.resultados) : r.resultados
-          })),
-          metadata: metadata,
-        }
+        data,
       });
-
     } catch (error) {
-      console.error('Error en getDatosConsolidacion:', error);
-      res.status(500).json({ success: false, message: 'Error interno al obtener los datos para la consolidación.' });
-    } finally {
-      connection.release();
+      console.error('Error en getDatosConsolidacion (controller):', error);
+      res.status(500).json({ success: false, message: error.message || 'Error interno al obtener los datos para la consolidación.' });
     }
   }
 

@@ -4,42 +4,17 @@ import handlebars from 'handlebars';
 import puppeteer from 'puppeteer';
 import { Oficio } from '../models/Oficio.js';
 import { fileURLToPath } from 'url';
+import db from '../database/db.js';
+import { ProcedimientoService } from './ProcedimientoService.js';
 
-// --- Helpers de Handlebars ---
-handlebars.registerHelper('json', (context) => JSON.stringify(context, null, 2));
-
-// Helper para formatear fecha a lo grande: "Huancayo, 18 de Noviembre del 2025"
+// --- Handlebars Helpers ---
 handlebars.registerHelper('formatLongDate', (date) => {
-  if (!date) return '';
+  if (!date) return 'No especificada';
   const d = new Date(date);
   const options = { year: 'numeric', month: 'long', day: 'numeric' };
   const dateString = d.toLocaleDateString('es-ES', options);
   return `Huancayo, ${dateString}`;
 });
-
-// Helper para formatear hora
-handlebars.registerHelper('formatTime', (date) => {
-  if (!date) return '';
-  const d = new Date(date);
-  return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-});
-
-// Helper para incrementar índice (para listas 1-based)
-handlebars.registerHelper('inc', (value) => {
-  return parseInt(value) + 1;
-});
-
-const TIPOS_DROGA_LABELS = {
-  cocaina: 'Alcaloide de cocaína',
-  marihuana: 'Cannabinoides (Marihuana)',
-  benzodiacepinas: 'Benzodiacepinas',
-  fenotiacinas: 'Fenotiacinas',
-  barbituricos: 'Barbitúricos',
-  sarro_ungueal: 'Sarro Ungueal',
-  anfetaminas: 'Anfetaminas',
-  organofosforados: 'Compuestos Organofosforados',
-  carbamicos: 'Compuestos Carbámicos',
-};
 
 export class DocumentBuilderService {
 
@@ -47,184 +22,107 @@ export class DocumentBuilderService {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const assetsDir = path.join(__dirname, '..', 'assets');
-
-    const loadImage = async (fileName, placeholder) => {
-      try {
-        const imagePath = path.join(assetsDir, fileName);
-        const imageBuffer = await fs.readFile(imagePath);
-        return `data:image/png;base64,${imageBuffer.toString('base64')}`;
-      } catch (error) {
-        if (placeholder) {
-          const placeholderPath = path.join(assetsDir, placeholder);
-          const placeholderBuffer = await fs.readFile(placeholderPath);
-          return `data:image/png;base64,${placeholderBuffer.toString('base64')}`;
-        }
-        return '';
-      }
+    const imagePath = path.join(assetsDir, 'escudo.png');
+    const imageBuffer = await fs.readFile(imagePath);
+    return {
+        escudo: `data:image/png;base64,${imageBuffer.toString('base64')}`
     };
-
-    const [escudo, sello, firma] = await Promise.all([
-      loadImage('escudo.png'),
-      loadImage('sello.png', 'escudo.png'),
-      loadImage('firma.png', 'escudo.png'),
-    ]);
-
-    return { escudo, sello, firma };
   }
-
-  static _processExamResults(muestras) {
-    const examenes = {};
-    if (!muestras || muestras.length === 0) return [];
-
-    // Inicializar todos los tipos de droga
-    for (const key in TIPOS_DROGA_LABELS) {
-      examenes[key] = {
-        label: TIPOS_DROGA_LABELS[key],
-        positivos: [],
-      };
+  
+  static _getTemplatePath(templateName) {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const templatesDir = path.join(__dirname, '..', 'templates');
+    const resolvedPath = path.join(templatesDir, `${templateName}.hbs`);
+    if (!resolvedPath.startsWith(templatesDir)) {
+      throw new Error('Intento de acceso a una ruta de plantilla no válida.');
     }
-
-    // Recorrer las muestras para encontrar positivos
-    muestras.forEach((muestra, index) => {
-      for (const key in muestra.resultados) {
-        // Ignorar claves que no son drogas (ej. dosaje_etilico) o no están en el mapa
-        if (!examenes[key]) continue;
-
-        if (muestra.resultados[key] === 'POSITIVO') {
-          examenes[key].positivos.push(`M${index + 1}`);
-        }
-      }
-    });
-
-    // Formatear el resultado final
-    return Object.values(examenes).map(examen => {
-      let resultado;
-      if (examen.positivos.length > 0) {
-        resultado = `POSITIVO en (${examen.positivos.join(', ')})`;
-      } else {
-        resultado = 'NEGATIVO';
-      }
-      return { label: examen.label, resultado };
-    });
-  }
-
-  static _generateDynamicConclusion(muestras, examinado) {
-    if (!muestras || muestras.length === 0) return 'No se analizaron muestras.';
-
-    const positivos = {};
-    muestras.forEach((muestra, index) => {
-      Object.entries(muestra.resultados).forEach(([drogaKey, resultado]) => {
-        if (resultado === 'POSITIVO') {
-          if (!positivos[drogaKey]) {
-            positivos[drogaKey] = [];
-          }
-          positivos[drogaKey].push(`M${index + 1}`);
-        }
-      });
-    });
-
-    const drogasPositivas = Object.keys(positivos);
-
-    if (drogasPositivas.length === 0) {
-      return `La(s) muestra(s) analizada(s) de la persona: "${examinado}", dieron resultado NEGATIVO para las drogas investigadas.`;
-    }
-
-    const conclusionText = drogasPositivas.map(drogaKey => {
-      const drogaLabel = TIPOS_DROGA_LABELS[drogaKey] || drogaKey;
-      const muestrasAfectadas = positivos[drogaKey].join(', ');
-      return `${drogaLabel.toUpperCase()} en (${muestrasAfectadas})`;
-    }).join(', ');
-
-    return `La(s) muestra(s) analizada(s) de la persona: "${examinado}", dieron resultado POSITIVO para ${conclusionText}.`;
-  }
-
-  static async generateConsolidatedReportHtml(data) {
-    const coverTemplatePath = this._getTemplatePath('lab/dictamen_consolidado_cover');
-    const coverTemplateContent = await fs.readFile(coverTemplatePath, 'utf-8');
-    const coverTemplate = handlebars.compile(coverTemplateContent);
-    const coverHtml = coverTemplate(data);
-
-    const anexoTemplatePath = this._getTemplatePath('lab/anexo_informe_pericial');
-    const anexoTemplateContent = await fs.readFile(anexoTemplatePath, 'utf-8');
-    const anexoTemplate = handlebars.compile(anexoTemplateContent);
-
-    let anexosHtml = '';
-    if (data.anexos) {
-      for (const anexo of data.anexos) {
-        anexosHtml += `<div class="page-break"></div>`;
-        anexosHtml += anexoTemplate(anexo);
-      }
-    }
-
-    return coverHtml + anexosHtml;
+    return resolvedPath;
   }
 
   static async build(templateName, id_oficio, extraData = {}) {
     let browser = null;
     try {
-      // Registrar parciales ANTES de cualquier compilación
+      // 1. Cargar assets y registrar parciales
+      const assets = await this._loadAssets();
       const membretePath = this._getTemplatePath('partials/membrete');
       const membreteContent = await fs.readFile(membretePath, 'utf-8');
       handlebars.registerPartial('partials/membrete', membreteContent);
       
-      const anexoPath = this._getTemplatePath('lab/anexo_informe_pericial');
-      const anexoContent = await fs.readFile(anexoPath, 'utf-8');
-      handlebars.registerPartial('lab/anexo_informe_pericial', anexoContent);
+      // 2. Obtener todos los datos crudos necesarios
+      const dataConsolidacion = await ProcedimientoService.getDatosConsolidacion(id_oficio);
+      const { oficio, resultados_previos, metadata, muestras, recolector_muestra } = dataConsolidacion;
 
-      const [oficioResult, assets] = await Promise.all([
-        Oficio.findDetalleById(id_oficio),
-        this._loadAssets()
-      ]);
-
-      if (!oficioResult.success) throw new Error('Oficio no encontrado.');
-
-      const peritoData = { ...oficioResult.data, ...extraData.perito };
-      const muestras = extraData.muestrasAnalizadas || extraData.muestras || [];
-
-      // Procesamiento condicional de resultados
-      let examenesProcesados = [];
-      let conclusionDinamica = '';
-
-      // Solo procesar resultados si es una plantilla de informe que los muestra.
-      if (templateName.includes('informe_pericial') || templateName.includes('dictamen_consolidado')) {
-        examenesProcesados = this._processExamResults(muestras);
-        conclusionDinamica = this._generateDynamicConclusion(muestras, oficioResult.data.examinado_incriminado);
-      }
-
-      const data = {
-        ...extraData, // Spread extraData to be available at root (for dictamen_consolidado)
-        oficio: {
-          ...oficioResult.data,
-          objeto_pericia: extraData.metadata?.objeto_pericia || 'No especificado.',
-          metodo_utilizado: extraData.metadata?.metodo_utilizado || 'No especificado.',
-          observaciones_finales: extraData.metadata?.observaciones_finales,
-          muestras_registradas: muestras.map((m, index) => ({ ...m, index: index + 1 })),
-          examenes_procesados: examenesProcesados,
-          conclusion_dinamica: conclusionDinamica,
-          muestras_agotadas: extraData.muestrasAgotadas,
-          anio_actual: new Date().getFullYear(),
-        },
-        perito: peritoData,
-        imagenes: assets,
+      // 3. Preparar datos del INFORME (lógica de consolidación)
+      const examenesConsolidados = {};
+      const metodosConsolidados = {};
+      const examenMetodoMap = {
+        'Sarro Ungueal': { nombre: 'Análisis de Sarro Ungueal', metodo: 'Químico - colorimétrico' },
+        'Toxicológico': { nombre: 'Análisis Toxicológico', metodo: 'Cromatografía en capa fina, Inmunoensayo' },
+        'Dosaje Etílico': { nombre: 'Análisis de Dosaje Etílico', metodo: 'Espectrofotometría – UV VIS' }
       };
 
-      let html;
-      if (templateName === 'lab/dictamen_consolidado') {
-        html = await this.generateConsolidatedReportHtml(data);
-      } else {
-        const templatePath = this._getTemplatePath(templateName);
-        const templateContent = await fs.readFile(templatePath, 'utf-8');
-        const template = handlebars.compile(templateContent);
-        html = template(data);
-      }
-      
-      browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      resultados_previos.forEach(res => {
+        const examenInfo = examenMetodoMap[res.tipo_resultado] || { nombre: res.tipo_resultado, metodo: 'No especificado' };
+        if (!examenesConsolidados[res.tipo_resultado]) {
+          examenesConsolidados[res.tipo_resultado] = { nombre: examenInfo.nombre, resultados: [] };
+          metodosConsolidados[res.tipo_resultado] = { examen: res.tipo_resultado, metodo: examenInfo.metodo };
+        }
+        muestras.forEach((muestra, index) => {
+          const idMuestra = muestra.id_muestra;
+          const codigoMuestra = `M${index + 1}`;
+          if (res.resultados && res.resultados[idMuestra]) {
+            for (const analito in res.resultados[idMuestra]) {
+              if (analito !== 'descripcion_detallada' && analito !== 'no_aplicable') {
+                let resultadoFormateado = res.resultados[idMuestra][analito];
+                let analitoFormateado = analito === 'resultado_sarro_ungueal' ? 'Sarro Ungueal' : analito.charAt(0).toUpperCase() + analito.slice(1).replace(/_/g, ' ');
+                resultadoFormateado = `: ${resultadoFormateado} en (${codigoMuestra})`;
+                if (analito === 'resultado_sarro_ungueal') {
+                   resultadoFormateado = `: ${res.resultados[idMuestra][analito]}`;
+                }
+                examenesConsolidados[res.tipo_resultado].resultados.push({ analito: analitoFormateado, resultado: resultadoFormateado });
+              }
+            }
+          }
+        });
       });
 
+      const informeData = {
+        objeto_pericia: extraData.informe?.objeto_pericia || metadata.objeto_pericia,
+        conclusion_principal: extraData.informe?.conclusion_principal,
+        recolector_muestra: extraData.informe?.recolector_muestra || recolector_muestra,
+        muestras: muestras.map((m, index) => ({
+            codigo: `M${index + 1}`,
+            descripcion_completa: `UN (01) ${m.tipo_muestra || 'frasco'} ${m.cantidad ? `conteniendo ${m.cantidad}` : ''} de ${m.descripcion || 'muestra sin descripción'}`
+        })),
+        examenes: Object.values(examenesConsolidados),
+        metodos: Object.values(metodosConsolidados),
+      };
+
+      // 4. Unir todos los datos para la plantilla final
+      const formatDate = (date) => date ? new Date(date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase() : 'No especificada';
+      const finalOficioData = { ...oficio, ...extraData.informe };
+      finalOficioData.fecha_incidente_formateada = formatDate(finalOficioData.fecha_incidente);
+      finalOficioData.fecha_toma_muestra_formateada = formatDate(finalOficioData.fecha_toma_muestra);
+      finalOficioData.fecha_oficio_formateada = formatDate(finalOficioData.fecha_documento);
+
+      const data = {
+        oficio: finalOficioData,
+        perito: { ...oficio.perito_asignado, ...extraData.perito },
+        imagenes: assets,
+        informe: informeData
+      };
+
+      // 5. Compilar y renderizar HTML
+      const templatePath = this._getTemplatePath(templateName);
+      const templateContent = await fs.readFile(templatePath, 'utf-8');
+      const template = handlebars.compile(templateContent);
+      const html = template(data);
+
+      // 6. Generar PDF
+      browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
       const page = await browser.newPage();
       await page.setContent(html, { waitUntil: 'networkidle0' });
-
       const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
@@ -237,23 +135,7 @@ export class DocumentBuilderService {
       console.error(`[DocBuilder] Error generando el documento con plantilla ${templateName}:`, error);
       throw error;
     } finally {
-      if (browser) {
-        await browser.close();
-      }
+      if (browser) await browser.close();
     }
-  }
-
-  static _getTemplatePath(templateName) {
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    const templatesDir = path.join(__dirname, '..', 'templates');
-
-    const resolvedPath = path.join(templatesDir, `${templateName}.hbs`);
-
-    if (!resolvedPath.startsWith(templatesDir)) {
-      throw new Error('Intento de acceso a una ruta de plantilla no válida.');
-    }
-
-    return resolvedPath;
   }
 }
