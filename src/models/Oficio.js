@@ -258,11 +258,19 @@ export class Oficio {
     const conn = connection || db.promise();
     try {
       const [oficios] = await conn.query(
-        `SELECT o.*, tp.nombre_prioridad, td.nombre_departamento as especialidad
-         FROM oficio o
-         LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
-         LEFT JOIN tipo_departamento td ON o.id_especialidad_requerida = td.id_tipo_departamento
-         WHERE o.id_oficio = ?`,
+        `SELECT 
+            o.*, 
+            tp.nombre_prioridad, 
+            td.nombre_departamento AS especialidad,
+            GROUP_CONCAT(te.nombre SEPARATOR ', ') AS tipos_de_examenes
+        FROM oficio o
+        LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
+        LEFT JOIN tipo_departamento td ON o.id_especialidad_requerida = td.id_tipo_departamento
+        LEFT JOIN oficio_examen oe ON o.id_oficio = oe.id_oficio
+        LEFT JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen
+        WHERE o.id_oficio = ?
+        GROUP BY o.id_oficio;
+        `,
         [id_oficio]
       );
 
@@ -273,10 +281,11 @@ export class Oficio {
       return { success: true, data: oficios[0] };
     } catch (error) {
       console.error('Error en findById:', error);
-      if (connection) throw error; // Propagate error in transaction
+      if (connection) throw error;
       return { success: false, message: "Error al obtener el oficio" };
     }
   }
+
 
   static async create(oficioData) {
     const connection = await db.promise().getConnection();
