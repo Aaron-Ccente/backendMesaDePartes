@@ -18,11 +18,14 @@ const normalizeString = (str) => {
 export class ProcedimientoController {
 
   static async generarCaratula(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
     try {
-      const { pdfBuffer } = await DocumentBuilderService.generarCaratula(req.body);
+      const { pdfBuffer } = await DocumentBuilderService.generarCaratula(id_oficio, id_usuario, req.body);
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'inline; filename=caratula.pdf');
-      res.send(pdfBuffer);
+      res.end(pdfBuffer);
     } catch (error) {
       console.error('Error al generar la carátula:', error);
       res.status(500).json({ success: false, message: 'Error interno al generar la carátula.' });
@@ -79,7 +82,7 @@ export class ProcedimientoController {
       return res.status(400).json({ success: false, message: 'No se han subido archivos.' });
     }
 
-    const relativePaths = req.files.map(file => 
+    const relativePaths = req.files.map(file =>
       path.join('uploads', 'documentos_finales', file.filename).replace(/\\/g, '/')
     );
     const pathsJson = JSON.stringify(relativePaths);
@@ -118,8 +121,8 @@ export class ProcedimientoController {
     try {
       const muestras = await Muestra.findByOficioId(id_oficio);
       const seguimiento = await Oficio.getSeguimientoDeProcedimiento(id_oficio, [
-        'EXTRACCION_FINALIZADA', 
-        'PENDIENTE_ANALISIS_TM', 
+        'EXTRACCION_FINALIZADA',
+        'PENDIENTE_ANALISIS_TM',
         'EXTRACCION_FALLIDA'
       ]);
 
@@ -129,7 +132,7 @@ export class ProcedimientoController {
       }
 
       const fueExitosa = seguimiento ? seguimiento.estado_nuevo !== 'EXTRACCION_FALLIDA' : true;
-      
+
       res.status(200).json({
         success: true,
         data: {
@@ -193,7 +196,7 @@ export class ProcedimientoController {
           await Muestra.create(nuevaMuestra, connection);
           codigosGenerados.push(codigoMuestra);
         }
-        
+
         estadoNuevo = requiereAnalisisTM ? 'PENDIENTE_ANALISIS_TM' : 'EXTRACCION_FINALIZADA';
         finalObservaciones = observaciones || null;
 
@@ -268,7 +271,7 @@ export class ProcedimientoController {
             esta_lacrado: true,
           }, connection);
         }
-        
+
         finalObservaciones = observaciones || null;
 
       } else {
@@ -286,7 +289,7 @@ export class ProcedimientoController {
       }, connection);
 
       await connection.commit();
-      
+
       res.status(200).json({
         success: true,
         message: 'Fase de extracción finalizada. El caso ha sido actualizado para análisis.',
@@ -323,16 +326,16 @@ export class ProcedimientoController {
       const [metadata] = await connection.query('SELECT * FROM oficio_resultados_metadata WHERE id_oficio = ?', [id_oficio]);
       const [muestras] = await connection.query('SELECT * FROM muestras WHERE id_oficio = ?', [id_oficio]);
       const [todosLosResultados] = await connection.query('SELECT * FROM oficio_resultados_perito WHERE id_oficio = ?', [id_oficio]);
-      
+
       const tieneResultadosGuardados = todosLosResultados.length > 0;
-      
+
       const resultadosAnteriores = [];
       let resultadosParaEditar = {};
-      
+
       todosLosResultados.forEach(res_perito => {
-        const resultadosParseados = typeof res_perito.resultados === 'string' 
-            ? JSON.parse(res_perito.resultados) 
-            : res_perito.resultados;
+        const resultadosParseados = typeof res_perito.resultados === 'string'
+          ? JSON.parse(res_perito.resultados)
+          : res_perito.resultados;
 
         if (res_perito.tipo_resultado === tipoResultadoActual) {
           resultadosParaEditar = resultadosParseados;
@@ -343,19 +346,19 @@ export class ProcedimientoController {
           });
         }
       });
-      
+
       const aperturaData = actas.length > 0 ? { descripcion_paquete: actas[0].descripcion_paquete, observaciones: actas[0].observaciones } : null;
       const metadataData = metadata.length > 0 ? { objeto_pericia: metadata[0].objeto_pericia, metodo_utilizado: metadata[0].metodo_utilizado, observaciones_finales: metadata[0].observaciones_finales } : null;
-      
+
       const muestrasAnalizadas = muestras.map(m => ({
-          id: m.id_muestra,
-          codigo_muestra: m.codigo_muestra,
-          tipo_muestra: m.tipo_muestra,
-          descripcion: m.descripcion,
-          resultados: resultadosParaEditar[m.id_muestra] || {},
-          descripcion_detallada: resultadosParaEditar[m.id_muestra]?.descripcion_detallada || m.descripcion_detallada || '',
+        id: m.id_muestra,
+        codigo_muestra: m.codigo_muestra,
+        tipo_muestra: m.tipo_muestra,
+        descripcion: m.descripcion,
+        resultados: resultadosParaEditar[m.id_muestra] || {},
+        descripcion_detallada: resultadosParaEditar[m.id_muestra]?.descripcion_detallada || m.descripcion_detallada || '',
       }));
-      
+
       const muestrasAgotadas = metadata.length > 0 ? !!metadata[0].muestras_agotadas : false;
 
       res.status(200).json({
@@ -368,7 +371,7 @@ export class ProcedimientoController {
           muestrasAgotadas,
           tieneResultadosGuardados,
           esPrimerPeritoDelFlujo, // Enviar el flag claro al frontend
-          permiteEditarMuestras, 
+          permiteEditarMuestras,
         }
       });
 
@@ -394,9 +397,9 @@ export class ProcedimientoController {
         await connection.rollback();
         return res.status(403).json({ success: false, message: 'Acceso denegado.' });
       }
-      
+
       const { esPrimerPeritoDelFlujo } = await WorkflowService.determinarContextoAnalisis(id_oficio, id_usuario);
-      
+
       if (esPrimerPeritoDelFlujo) {
         if (!apertura_data || !apertura_data.descripcion_paquete) {
           throw new Error('Debe describir el estado del paquete recibido, ya que es el primer perito en analizar una muestra remitida.');
@@ -426,7 +429,7 @@ export class ProcedimientoController {
         default:
           throw new Error('Sección de usuario no reconocida.');
       }
-      
+
       if (metadata) {
         await connection.query(
           `INSERT INTO oficio_resultados_metadata (id_oficio, objeto_pericia, metodo_utilizado, muestras_agotadas, observaciones_finales) VALUES (?, ?, ?, ?, ?)
@@ -451,9 +454,9 @@ export class ProcedimientoController {
             tipo_muestra: muestra.tipo_muestra,
             descripcion: muestra.descripcion,
             codigo_muestra: codigoMuestra,
-            esta_lacrado: false, 
+            esta_lacrado: false,
           }, connection);
-          
+
           idMap.set(muestra.id, nuevoIdMuestra);
           muestraId = nuevoIdMuestra;
         } else {
@@ -468,10 +471,10 @@ export class ProcedimientoController {
 
         // Solo procesar resultados si la muestra no está marcada como "no aplicable"
         if (!muestra.resultados?.no_aplicable) {
-            resultadosParaGuardar[muestraId] = {
-              descripcion_detallada: muestra.descripcion_detallada || '',
-              ...muestra.resultados,
-            };
+          resultadosParaGuardar[muestraId] = {
+            descripcion_detallada: muestra.descripcion_detallada || '',
+            ...muestra.resultados,
+          };
         }
       }
 
@@ -552,7 +555,7 @@ export class ProcedimientoController {
           message: 'No se pudo determinar la sección de destino para la derivación.'
         });
       }
-      
+
       let nuevo_estado;
       if (siguientePaso.next_step === 'CONSOLIDATE') {
         nuevo_estado = 'PENDIENTE_CONSOLIDACION';
@@ -645,10 +648,10 @@ export class ProcedimientoController {
             }
           }
         }
-        
+
         // Si después de filtrar no queda ningún resultado, no incluir este procedimiento.
         if (Object.keys(resultadosFiltrados).length === 0) {
-            return null;
+          return null;
         }
 
         return {

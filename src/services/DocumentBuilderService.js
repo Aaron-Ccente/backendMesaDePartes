@@ -22,23 +22,23 @@ export class DocumentBuilderService {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const assetsDir = path.join(__dirname, '..', 'assets');
-    
+
     const loadAndEncode = async (fileName) => {
-        try {
-            const imagePath = path.join(assetsDir, fileName);
-            const imageBuffer = await fs.readFile(imagePath);
-            return `data:image/png;base64,${imageBuffer.toString('base64')}`;
-        } catch (error) {
-            console.warn(`[DocBuilder] Advertencia: No se pudo cargar el asset '${fileName}'. Se usará un placeholder.`);
-            return 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='; // 1x1 transparent pixel
-        }
+      try {
+        const imagePath = path.join(assetsDir, fileName);
+        const imageBuffer = await fs.readFile(imagePath);
+        return `data:image/png;base64,${imageBuffer.toString('base64')}`;
+      } catch (error) {
+        console.warn(`[DocBuilder] Advertencia: No se pudo cargar el asset '${fileName}'. Se usará un placeholder.`);
+        return 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='; // 1x1 transparent pixel
+      }
     };
 
     return {
-        escudoUrl: await loadAndEncode('escudo.png'),
+      escudoUrl: await loadAndEncode('escudo.png'),
     };
   }
-  
+
   static _getTemplatePath(templateName) {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
@@ -50,59 +50,114 @@ export class DocumentBuilderService {
     return resolvedPath;
   }
 
-  static async generarCaratula(extraData = {}) {
+  static async generarCaratula(id_oficio, id_usuario, extraData = {}) {
     let browser = null;
-    let tempHtmlPath = null;
+    const connection = await db.promise().getConnection();
     try {
-        const __filename = fileURLToPath(import.meta.url);
-        const __dirname = path.dirname(__filename);
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = path.dirname(__filename);
 
-        // 1. Cargar assets
-        const assets = await this._loadAssets();
+      // 1. Cargar assets
+      const assets = await this._loadAssets();
 
-        // 2. Unir todos los datos para la plantilla
-        const data = { ...extraData, ...assets };
+      // 2. Obtener datos del caso
+      const dataConsolidacion = await ProcedimientoService.getDatosConsolidacion(id_oficio);
+      const { oficio } = dataConsolidacion;
 
-        // 3. Compilar y renderizar HTML
-        const templatePath = this._getTemplatePath('caratula');
-        const templateContent = await fs.readFile(templatePath, 'utf-8');
-        const template = handlebars.compile(templateContent);
-        const html = template(data);
+      // 3. Obtener datos del firmante (Usuario actual)
+      const [signerRows] = await connection.query(
+        `SELECT 
+                u.nombre_completo, 
+                u.CIP, 
+                g.nombre as grado,
+                s.nombre as seccion,
+                p.dni
+             FROM usuario u
+             LEFT JOIN usuario_grado ug ON u.id_usuario = ug.id_usuario
+             LEFT JOIN grado g ON ug.id_grado = g.id_grado
+             LEFT JOIN usuario_seccion us ON u.id_usuario = us.id_usuario
+             LEFT JOIN seccion s ON us.id_seccion = s.id_seccion
+             LEFT JOIN perito p ON u.id_usuario = p.id_usuario
+             WHERE u.id_usuario = ?`,
+        [id_usuario]
+      );
+      const signer = signerRows[0] || {};
 
-        // 4. Escribir HTML a un archivo temporal
-        const tempDir = path.join(__dirname, '..', '..', 'temp');
-        await fs.mkdir(tempDir, { recursive: true });
-        tempHtmlPath = path.join(tempDir, `caratula-${Date.now()}.html`);
-        await fs.writeFile(tempHtmlPath, html);
-        console.log(`[DocBuilder] HTML temporal guardado en: ${tempHtmlPath}`);
-        
-        // 5. Generar PDF desde el archivo temporal
-        browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-        const page = await browser.newPage();
-        await page.goto(`file://${tempHtmlPath}`, { waitUntil: 'load' });
-        await page.waitForTimeout(100);
-        
-        const pdfBuffer = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            margin: { top: '15mm', right: '25mm', bottom: '20mm', left: '25mm' },
-        });
+      // 4. Preparar datos para la plantilla
+      const formatDate = (date) => {
+        if (!date) return 'No especificada';
+        const d = new Date(date);
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        return `Huancayo, ${d.toLocaleDateString('es-ES', options)}`;
+      };
 
-        return { pdfBuffer, type: 'pdf' };
+      const templateData = {
+        ...assets,
+        lugarFecha: formatDate(new Date()),
+        numOficio: oficio.numero_oficio, // O generar uno nuevo si es necesario
+
+        // Membrete (Hardcoded por ahora o configurable)
+        membreteComando: 'IV MACRO REGION POLICIAL JUNIN',
+        membreteDireccion: 'REGPOL-JUNIN',
+        membreteRegion: 'DIVINCRI-HYO/OFICRI',
+
+        // Destinatario
+        destCargo: `SEÑOR ${oficio.grado_destinatario || 'JEFE'}`, // Ajustar según lógica real
+        destNombre: oficio.unidad_solicitante || 'UNIDAD SOLICITANTE',
+        destPuesto: oficio.region_fiscalia || 'HUANCAYO',
+
+        // Asunto y Referencia
+        asuntoBase: 'REMITO DICTAMEN PERICIAL DE ',
+        asuntoRemite: (oficio.tipos_de_examen || []).join(' Y '),
+        referencia: `Oficio N° ${oficio.numero_oficio} - ${oficio.unidad_solicitante}`,
+
+        // Cuerpo
+        cuerpoP1_1: 'Tengo el honor de dirigirme a Ud., en atención al documento de la referencia, remitiendo adjunto al presente el ',
+        cuerpoP1_2: 'DICTAMEN PERICIAL DE ' + (oficio.tipos_de_examen || []).join(' Y '),
+        cuerpoP1_3: ', practicado en la muestra de ',
+        cuerpoP1_4: oficio.examinado_incriminado || 'PERSONA NO IDENTIFICADA',
+        cuerpoP1_5: '; solicitado por su Despacho, para los fines del caso.',
+
+        // Firmante
+        regNum: oficio.id_oficio, // O número de registro interno
+        regIniciales: `${(signer.grado || '').substring(0, 3)} - ${(signer.nombre_completo || '').split(' ').map(n => n[0]).join('')}`.toUpperCase(),
+        firmanteQS: signer.grado ? `${signer.grado} PNP` : 'PERITO PNP',
+        firmanteNombre: signer.nombre_completo,
+        firmanteCargo: 'PERITO QUIMICO FORENSE', // O dinámico según sección
+        firmanteDependencia: 'OFICRI-PNP-HYO'
+      };
+
+      // 5. Compilar y renderizar HTML
+      console.log('[DocBuilder] Compilando template Caratula...');
+      const templatePath = this._getTemplatePath('caratula');
+      const templateContent = await fs.readFile(templatePath, 'utf-8');
+      const template = handlebars.compile(templateContent);
+      const html = template(templateData);
+
+      // 6. Generar PDF (Usando setContent como en el método build)
+      console.log('[DocBuilder] Iniciando Puppeteer para Caratula...');
+      browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+      const page = await browser.newPage();
+
+      console.log('[DocBuilder] Seteando contenido HTML...');
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+
+      console.log('[DocBuilder] Generando buffer PDF...');
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' }, // Márgenes controlados por CSS
+      });
+      console.log(`[DocBuilder] PDF Caratula generado. Tamaño: ${pdfBuffer.length} bytes`);
+
+      return { pdfBuffer, type: 'pdf' };
 
     } catch (error) {
-        console.error(`[DocBuilder] Error generando la carátula:`, error);
-        throw error;
+      console.error(`[DocBuilder] Error generando la carátula:`, error);
+      throw error;
     } finally {
-        if (browser) await browser.close();
-        // 6. Limpiar el archivo temporal
-        if (tempHtmlPath) {
-            try {
-                await fs.unlink(tempHtmlPath);
-            } catch (cleanupError) {
-                console.error(`[DocBuilder] Error al limpiar archivo temporal ${tempHtmlPath}:`, cleanupError);
-            }
-        }
+      if (connection) connection.release();
+      if (browser) await browser.close();
     }
   }
 
@@ -114,7 +169,7 @@ export class DocumentBuilderService {
       const membretePath = this._getTemplatePath('partials/membrete');
       const membreteContent = await fs.readFile(membretePath, 'utf-8');
       handlebars.registerPartial('partials/membrete', membreteContent);
-      
+
       // 2. Obtener todos los datos crudos necesarios
       const dataConsolidacion = await ProcedimientoService.getDatosConsolidacion(id_oficio);
       const { oficio, resultados_previos, metadata, muestras, recolector_muestra } = dataConsolidacion;
@@ -144,7 +199,7 @@ export class DocumentBuilderService {
                 let analitoFormateado = analito === 'resultado_sarro_ungueal' ? 'Sarro Ungueal' : analito.charAt(0).toUpperCase() + analito.slice(1).replace(/_/g, ' ');
                 resultadoFormateado = `: ${resultadoFormateado} en (${codigoMuestra})`;
                 if (analito === 'resultado_sarro_ungueal') {
-                   resultadoFormateado = `: ${res.resultados[idMuestra][analito]}`;
+                  resultadoFormateado = `: ${res.resultados[idMuestra][analito]}`;
                 }
                 examenesConsolidados[res.tipo_resultado].resultados.push({ analito: analitoFormateado, resultado: resultadoFormateado });
               }
@@ -158,8 +213,8 @@ export class DocumentBuilderService {
         conclusion_principal: extraData.informe?.conclusion_principal,
         recolector_muestra: extraData.informe?.recolector_muestra || recolector_muestra,
         muestras: muestras.map((m, index) => ({
-            codigo: `M${index + 1}`,
-            descripcion_completa: `UN (01) ${m.tipo_muestra || 'frasco'} ${m.cantidad ? `conteniendo ${m.cantidad}` : ''} de ${m.descripcion || 'muestra sin descripción'}`
+          codigo: `M${index + 1}`,
+          descripcion_completa: `UN (01) ${m.tipo_muestra || 'frasco'} ${m.cantidad ? `conteniendo ${m.cantidad}` : ''} de ${m.descripcion || 'muestra sin descripción'}`
         })),
         examenes: Object.values(examenesConsolidados),
         metodos: Object.values(metodosConsolidados),
