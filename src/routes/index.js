@@ -13,6 +13,7 @@ import seguimientoRoutes from './seguimiento.routes.js'
 import mesaDePartesDashboardRoutes from './mesadepartes.dashboard.routes.js';
 import procedimientoRoutes from './procedimiento.routes.js';
 import documentoRoutes from './documento.routes.js';
+import dictamenRoutes from './dictamen.routes.js';
 
 const router = express.Router();
 
@@ -70,5 +71,8 @@ router.use('/api/procedimientos', procedimientoRoutes);
 
 // Rutas para la generación de documentos
 router.use('/api/documentos', documentoRoutes);
+
+// Rutas para la generación de dictamenes
+router.use('/api/dictamen', dictamenRoutes);
 
 export default router;

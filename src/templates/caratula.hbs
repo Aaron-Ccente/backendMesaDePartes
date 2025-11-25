@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            margin: 0;
+            padding: 15mm 25mm 20mm 25mm;
+            width: 210mm;
+            height: 297mm;
+            box-sizing: border-box;
+        }
+        .header-block-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 16mm;
+            margin-bottom: 2mm;
+        }
+        .escudo {
+            width: 12mm;
+            height: 14mm;
+        }
+        .header-block {
+            display: flex;
+            color: white;
+            font-size: 7pt;
+            text-align: center;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 0 5px;
+            flex-grow: 1;
+        }
+        /* ... Specific widths for blocks ... */
+        .block-1 { background-color: #D32F2F; width: 17mm; }
+        .block-2 { background-color: #424242; width: 25mm; }
+        .block-3 { background-color: #616161; width: 25mm; }
+        .block-4 { background-color: #757575; width: 29mm; }
+        .block-5 { background-color: #9E9E9E; width: 29mm; }
+        .block-6 { background-color: #BDBDBD; width: 22mm; }
+
+        .divider {
+            border-top: 1.5px solid black;
+            margin-top: 2mm;
+            margin-bottom: 5mm;
+        }
+        .lema {
+            text-align: center;
+            font-style: italic;
+            font-size: 9pt;
+            margin-bottom: 10mm;
+        }
+        .oficio-header {
+            position: relative;
+            height: 20mm;
+        }
+        .lugar-fecha {
+            text-align: right;
+        }
+        .oficio-numero {
+            margin-top: 2mm;
+        }
+        .oficio-numero b {
+            font-weight: bold;
+        }
+        .seccion {
+            display: flex;
+            margin-bottom: 5mm;
+        }
+        .seccion-label {
+            font-weight: bold;
+            width: 25mm;
+        }
+        .seccion-content {
+            width: 135mm;
+        }
+        .cuerpo {
+            text-align: justify;
+            margin-bottom: 5mm;
+        }
+        .despedida {
+            text-align: right;
+            margin-top: 10mm;
+        }
+        .footer {
+            position: absolute;
+            bottom: 30mm;
+            width: calc(100% - 50mm); /* Page width - left/right margin */
+        }
+        .firma-container {
+            position: relative;
+            height: 40mm;
+        }
+        .registros {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            font-size: 9pt;
+        }
+        .sello {
+            position: absolute;
+            left: 85mm;
+            bottom: 0;
+            width: 30mm;
+            height: 30mm;
+        }
+        .firma-block {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            text-align: left;
+        }
+        .firma-img {
+            width: 40mm;
+            height: 15mm;
+        }
+        .contacto-footer {
+            position: absolute;
+            bottom: 10mm;
+            width: calc(100% - 50mm);
+            text-align: center;
+            font-size: 8pt;
+            border-top: 1.5px solid black;
+            padding-top: 2mm;
+        }
+        b, strong { font-weight: bold; }
+        u { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div class="header-block-container">
+        <img src="{{escudoUrl}}" alt="Escudo" class="escudo">
+        <div class="header-block block-1">PERÚ</div>
+        <div class="header-block block-2">Ministerio<br>del Interior</div>
+        <div class="header-block block-3">Policía Nacional<br>del Perú</div>
+        <div class="header-block block-4">{{membreteComando}}</div>
+        <div class="header-block block-5">{{membreteDireccion}}</div>
+        <div class="header-block block-6">{{membreteRegion}}</div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="lema">"Año de la Recuperación y Consolidación de la Economía Peruana"</div>
+
+    <div class="oficio-header">
+        <div class="lugar-fecha">{{lugarFecha}}</div>
+        <div class="oficio-numero">
+            OF. N° <b>{{numOficio}}</b>
+        </div>
+    </div>
+
+    <div class="seccion">
+        <div class="seccion-label">SEÑOR:</div>
+        <div class="seccion-content">
+            {{destCargo}}<br>
+            {{destNombre}}<br>
+            {{destPuesto}}
+        </div>
+    </div>
+
+    <div class="seccion">
+        <div class="seccion-label">ASUNTO:</div>
+        <div class="seccion-content">
+            {{asuntoBase}} <b><u>{{asuntoRemite}}</u></b>
+        </div>
+    </div>
+
+    <div class="seccion">
+        <div class="seccion-label">REF.:</div>
+        <div class="seccion-content">
+            {{referencia}}
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="cuerpo">
+        {{cuerpoP1_1}}<b>{{cuerpoP1_2}}</b>{{cuerpoP1_3}}<b><u>{{cuerpoP1_4}}</u></b>{{cuerpoP1_5}}
+    </div>
+
+    <div class="cuerpo">
+        Le recordamos que los informes periciales constituyen el sustento científico de toda la investigación policial, por consiguiente, su omisión en la remisión a la autoridad competente, infringe normas vigentes que conllevan responsabilidad administrativa, disciplinaria y penal.
+    </div>
+
+    <div class="cuerpo">
+        Es propicia la oportunidad para reiterarle los sentimientos de mi especial consideración y deferente estima
+    </div>
+
+    <div class="despedida">
+        Dios guarde a Ud.
+    </div>
+
+    <div class="footer">
+        <div class="firma-container">
+            <div class="registros">
+                REG: {{regNum}}<br>
+                {{regIniciales}}
+            </div>
+            <div class="firma-block">
+                <br>
+                <b>{{firmanteQS}}</b><br>
+                <b>{{firmanteNombre}}</b><br>
+                {{firmanteCargo}}<br>
+                {{firmanteDependencia}}
+            </div>
+        </div>
+    </div>
+
+    <div class="contacto-footer">
+        Oficina de Criminalística Huancayo<br>
+        Jr. Cuzco N° 666- Teléfono: 064212453 – Cel: 980122629 – email: rpi.dic.ificri@policia.gob.pe
+    </div>
+
+</body>
+</html>

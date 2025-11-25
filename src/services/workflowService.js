@@ -200,7 +200,8 @@ export class WorkflowService {
   
     } catch (error) {
       console.error('Error en determinarContextoAnalisis:', error);
-      throw new Error('Error al determinar el contexto del análisis.');
+      // En caso de cualquier error, devolvemos un contexto conservador y seguro.
+      return { esPrimerPeritoDelFlujo: false, permiteEditarMuestras: false };
     }
   }
 }

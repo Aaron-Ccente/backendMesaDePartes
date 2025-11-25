@@ -1,256 +1,124 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <title>Dictamen Pericial Consolidado</title>
     <style>
+        @page {
+            size: A4;
+            margin: 15mm 25mm 20mm 25mm;
+        }
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Helvetica', 'Arial', sans-serif;
             font-size: 11pt;
             line-height: 1.5;
-            margin: 0;
-            padding: 0;
-            /* Puppeteer handles margins */
+            color: #000;
         }
-
-        .page-break {
-            page-break-before: always;
-        }
-
-        .text-center {
-            text-align: center;
-        }
-
-        .text-right {
-            text-align: right;
-        }
-
-        .text-justify {
-            text-align: justify;
-        }
-
-        .font-bold {
-            font-weight: bold;
-        }
-
-        .underline {
-            text-decoration: underline;
-        }
-
-        .italic {
-            font-style: italic;
-        }
-
-        .header-section {
-            margin-bottom: 20px;
-        }
-
-        .oficio-info {
-            margin-bottom: 20px;
-        }
-
-        .destinatario-section {
-            margin-bottom: 20px;
-            padding-left: 25mm;
-        }
-
-        .label-col {
-            display: inline-block;
-            width: 25mm;
-            font-weight: bold;
-            vertical-align: top;
-        }
-
-        .content-col {
-            display: inline-block;
-            width: calc(100% - 30mm);
-            vertical-align: top;
-        }
-
-        .body-paragraph {
-            margin-bottom: 15px;
-            text-indent: 0;
-            /* x.html doesn't seem to indent */
-        }
-
-        .footer-section {
+        .page-break { page-break-before: always; }
+        .text-justify { text-align: justify; }
+        .text-right { text-align: right; }
+        .bold { font-weight: bold; }
+        .underline { text-decoration: underline; }
+        .seccion { display: flex; margin-bottom: 5mm; }
+        .seccion-label { font-weight: bold; width: 25mm; flex-shrink: 0; }
+        .seccion-contenido { flex: 1; }
+        .cuerpo { margin-bottom: 5mm; }
+        .pie-pagina {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 50mm;
-            /* Adjust as needed */
+            bottom: 25mm;
+            width: 100%;
         }
-
-        /* Styles for Appendices (mimicking informe_pericial_lab.hbs) */
-        .anexo-container {
-            margin-top: 20px;
-        }
-
-        .anexo-title {
+        .pie-derecha {
             text-align: center;
-            font-weight: bold;
-            text-decoration: underline;
-            margin-bottom: 15px;
+            width: 50%;
+            margin-left: 50%;
         }
-
-        .anexo-row {
-            display: flex;
-            margin-bottom: 5px;
+        .firmante-info { font-size: 9pt; line-height: 1.3; }
+        .contacto {
+            position: fixed;
+            bottom: 0mm;
+            left: 25mm;
+            right: 25mm;
+            border-top: 0.5mm solid #000;
+            padding-top: 2mm;
+            font-size: 8pt;
+            text-align: center;
+            line-height: 1.3;
         }
-
-        .anexo-label {
-            min-width: 40mm;
-            font-weight: bold;
-        }
+        .anexo-container h2 { font-size: 12pt; }
+        .anexo-container p, .anexo-container table { font-size: 10pt; }
     </style>
 </head>
-
 <body>
-    <!-- PÁGINA 1: DICTAMEN PERICIAL (x.html structure) -->
-
-    {{> partials/membrete }}
-
-    <div class="header-section">
-        <div class="text-center italic" style="font-size: 9pt; margin-bottom: 10px;">
-            "Año de la Recuperación y Consolidación de la Economía Peruana"
-        </div>
-        <div class="text-right">
-            {{lugarFecha}}
+    <!-- Página 1: Carátula -->
+    <div style="border-top: 0.5mm solid #000; margin: 5mm 0;"></div>
+    <div style="text-align: center; font-size: 9pt; font-style: italic; margin: 5mm 0 10mm 0;">
+        "Año del Bicentenario, de la consolidación de nuestra Independencia, y de la conmemoración de las heroicas batallas de Junín y Ayacucho"
+    </div>
+    
+    <div class="text-right">{{formatLongDate oficio.fecha_creacion}}</div>
+    
+    <div style="margin-bottom: 12mm;">
+        <span class="bold">OF. N° {{oficio.nro_oficio}}-{{oficio.anio_actual}}-DIRCRI-PNP/OFICRI-HYO.</span>
+    </div>
+    
+    <div class="seccion">
+        <div class="seccion-label">SEÑOR:</div>
+        <div class="seccion-contenido">
+            <span class="bold">{{destinatario_cargo}}</span><br>
+            <span>{{destinatario_nombre}}</span>
         </div>
     </div>
-
-    <div class="oficio-info">
-        <div>
-            <span class="font-bold">OF. N°</span>
-            <span class="font-bold" style="margin-left: 10px;">{{numero_oficio}}</span>
+    
+    <div class="seccion">
+        <div class="seccion-label">ASUNTO:</div>
+        <div class="seccion-contenido">
+            {{asunto}} <span class="bold underline">REMITE DICTAMEN PERICIAL CONSOLIDADO.</span>
         </div>
     </div>
+    
+    <div class="seccion" style="margin-bottom: 10mm;">
+        <div class="seccion-label">REF.:</div>
+        <div class="seccion-contenido">{{oficio.documento_referencia}}</div>
+    </div>
+    
+    <div class="cuerpo text-justify">
+        Me dirijo a Ud. con la finalidad de remitir adjunto al presente el <span class="bold">Dictamen Pericial Consolidado</span>, 
+        practicado a las muestras remitidas de conformidad al documento de la referencia.
+    </div>
 
-    <div class="destinatario-section">
-        <div>
-            <span class="label-col">SEÑOR</span>:
-            <div class="content-col">
-                {{#if destinatario.cargo}}{{destinatario.cargo}}<br>{{/if}}
-                {{#if destinatario.nombre}}{{destinatario.nombre}}<br>{{/if}}
-                {{#if destinatario.puesto}}{{destinatario.puesto}}{{/if}}
-                {{#unless destinatario.nombre}}
-                JEFE DE LA {{unidad_solicitante}}
-                {{/unless}}
+    <div class="cuerpo text-justify">
+        <span class="bold underline">CONCLUSIONES:</span><br>
+        {{conclusiones_finales}}
+    </div>
+    
+    {{#if observaciones_finales}}
+    <div class="cuerpo text-justify">
+        <span class="bold underline">OBSERVACIONES:</span><br>
+        {{observaciones_finales}}
+    </div>
+    {{/if}}
+
+    <div class="cuerpo text-justify">
+        Es propicia la oportunidad para reiterarle los sentimientos de mi especial consideración y deferente estima.
+    </div>
+    
+    <div class="text-right" style="margin-top: 10mm;">Dios guarde a Ud.</div>
+    
+    <div class="pie-pagina">
+        <div class="pie-derecha">
+            <div style="height: 40px;"></div> <!-- Espacio para firma -->
+            <div class="firmante-info">
+                <div class="bold">{{perito.grado}} {{perito.nombre_completo}}</div>
+                <div>PERITO QUIMICO FARMACEUTICO</div>
+                <div>CIP: {{perito.cip}}</div>
             </div>
         </div>
-        <div style="margin-top: 10px;">
-            <span class="label-col">ASUNTO</span>:
-            <div class="content-col">
-                {{asunto}} <span class="font-bold underline">REMITE</span>
-            </div>
-        </div>
-        <div style="margin-top: 10px;">
-            <span class="label-col">REF.</span>:
-            <div class="content-col">
-                {{referencia}}
-            </div>
-        </div>
     </div>
 
-    <div class="body-section text-justify">
-        <div class="body-paragraph">
-            Me dirijo a Usted, con la finalidad de remitir adjunto al presente el
-            <span class="font-bold">Dictamen Pericial Consolidado</span>, practicado en las muestras remitidas
-            <span class="font-bold underline">({{muestras_resumen}})</span>, de conformidad al documento de la
-            referencia.
-        </div>
-
-        <div class="body-paragraph">
-            <span class="font-bold underline">CONCLUSIONES:</span><br>
-            {{conclusiones_finales}}
-        </div>
-
-        {{#if observaciones_finales}}
-        <div class="body-paragraph">
-            <span class="font-bold underline">OBSERVACIONES:</span><br>
-            {{observaciones_finales}}
-        </div>
-        {{/if}}
-
-        <div class="body-paragraph">
-            Le recordamos que los informes periciales constituyen el sustento científico de toda la investigación
-            policial,
-            por consiguiente, su omisión en la remisión a la autoridad competente, infringe normas vigentes que
-            conllevan
-            responsabilidad administrativa, disciplinaria y penal.
-        </div>
-
-        <div class="body-paragraph">
-            Es propicia la oportunidad para reiterarle los sentimientos de mi especial consideración y deferente estima.
-        </div>
-
-        <div class="text-right" style="margin-top: 20px;">
-            Dios guarde a Ud.
-        </div>
-    </div>
-
-    <!-- Footer with Signatures (Page 1) -->
-    <div style="margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end;">
-        <div style="font-size: 9pt;">
-            REG: {{reg_num}}<br>
-            {{reg_iniciales}}
-        </div>
-        <div class="text-center">
-            {{#if firma_perito}}
-            <img src="{{firma_perito}}" alt="Firma" style="height: 40px;"><br>
-            {{else}}
-            <div style="height: 40px;"></div>
-            {{/if}}
-            <span class="font-bold">{{perito.nombre_completo}}</span><br>
-            {{perito.grado_perito}} - {{perito.cip}}<br>
-            {{perito.cargo}}
-        </div>
-    </div>
-
-    <!-- ANEXOS (Resultados Técnicos) -->
+    <!-- Anexos (Resultados Técnicos de cada Perito) -->
     {{#each anexos}}
-    <div class="page-break"></div>
-
-    {{> partials/membrete }}
-
-    <div class="anexo-container">
-        <div class="anexo-title">ANEXO {{inc @index}}: {{titulo_anexo}}</div>
-
-        <!-- Reusing structure similar to informe_pericial_lab -->
-        <div style="font-size: 10pt; line-height: 1.4;">
-            <div class="anexo-row">
-                <span class="anexo-label">A. PROCEDENCIA:</span>
-                <span>{{../unidad_solicitante}}</span>
-            </div>
-            <div class="anexo-row">
-                <span class="anexo-label">B. PERITO:</span>
-                <span>{{perito_nombre}}</span>
-            </div>
-            <div class="anexo-row">
-                <span class="anexo-label">C. MUESTRAS:</span>
-                <div>
-                    {{#each muestras}}
-                    <div>- {{descripcion}} ({{codigo}})</div>
-                    {{/each}}
-                </div>
-            </div>
-            <div class="anexo-row">
-                <span class="anexo-label">D. RESULTADOS:</span>
-                <div style="width: 100%;">
-                    {{#each resultados_detalle}}
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dotted #ccc;">
-                        <span>{{label}}</span>
-                        <span class="font-bold">{{valor}}</span>
-                    </div>
-                    {{/each}}
-                </div>
-            </div>
-        </div>
-    </div>
+        {{> partials/_anexo_informe }}
     {{/each}}
-
 </body>
-
 </html>

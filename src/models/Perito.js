@@ -509,12 +509,14 @@ export class Perito {
       const [rows] = await db.promise().query(
         `SELECT 
           us.id_usuario, us.CIP, us.nombre_completo, us.nombre_usuario,
+          p.dni as dni_perito,
           r.nombre_rol, 
           td.nombre_departamento, 
           g.nombre AS nombre_grado,
           s.id_seccion,
           s.nombre as seccion_nombre
          FROM usuario AS us
+         INNER JOIN perito AS p ON us.id_usuario = p.id_usuario
          INNER JOIN usuario_grado as ug ON ug.id_usuario = us.id_usuario
          INNER JOIN grado as g ON g.id_grado = ug.id_grado
          INNER JOIN usuario_rol AS ur ON us.id_usuario = ur.id_usuario

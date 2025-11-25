@@ -1,0 +1,76 @@
+{{!-- 
+  Partial: _anexo_informe
+  Contexto esperado: un objeto "anexo" con la siguiente estructura:
+  {
+    seccion_nombre: "Toma de Muestra",
+    perito_nombre: "S.O.S PNP JUAN PEREZ",
+    objeto_pericia: "...",
+    metodo_utilizado: "...",
+    resultados: [
+      {
+        codigo: "M1",
+        tipo: "Orina",
+        descripcion: "...",
+        resultado: { cocaina: "POSITIVO", marihuana: "NEGATIVO" }
+      }
+    ]
+  }
+--}}
+<div class="page-break"></div>
+
+<div class="anexo-container" style="font-size: 10pt; line-height: 1.4;">
+    <h2 style="text-align: center; font-size: 12pt; text-decoration: underline; margin-bottom: 15px;">
+        ANEXO: INFORME PERICIAL DE {{seccion_nombre}}
+    </h2>
+
+    <div style="margin-bottom: 8px;">
+        <span style="font-weight: bold; min-width: 40mm; display: inline-block;">A. PERITO RESPONSABLE:</span>
+        <span>{{perito_nombre}}</span>
+    </div>
+
+    <div style="margin-bottom: 8px;">
+        <span style="font-weight: bold; min-width: 40mm; display: inline-block;">B. OBJETO DE LA PERICIA:</span>
+        <span>{{objeto_pericia}}</span>
+    </div>
+
+    <div style="margin-bottom: 8px;">
+        <span style="font-weight: bold; min-width: 40mm; display: inline-block;">C. MÉTODO UTILIZADO:</span>
+        <span>{{metodo_utilizado}}</span>
+    </div>
+    
+    <div style="margin-bottom: 8px;">
+        <span style="font-weight: bold; min-width: 40mm; display: inline-block;">D. MUESTRAS Y RESULTADOS:</span>
+    </div>
+
+    {{#each resultados}}
+    <div style="margin-left: 10mm; margin-bottom: 10px; border-bottom: 1px dotted #ccc; padding-bottom: 5px;">
+        <p style="margin: 0; padding: 0;">
+            <strong style="text-decoration: underline;">Muestra {{codigo}} ({{tipo}}):</strong> {{descripcion}}
+        </p>
+        <table style="width: 100%; margin-top: 5px; border-collapse: collapse; font-size: 9pt;">
+            <thead>
+                <tr>
+                    <th style="text-align: left; padding: 2px; border-bottom: 1px solid #000;">Análisis</th>
+                    <th style="text-align: right; padding: 2px; border-bottom: 1px solid #000;">Resultado</th>
+                </tr>
+            </thead>
+            <tbody>
+            {{#each resultado}}
+                {{#if @key '==' 'no_aplicable'}}{{else}}
+                {{#if @key '==' 'descripcion_detallada'}}{{else}}
+                <tr>
+                    <td style="padding: 2px;">{{@key}}</td>
+                    <td style="text-align: right; padding: 2px; font-weight: bold;">{{this}}</td>
+                </tr>
+                {{/if}}
+                {{/if}}
+            {{/each}}
+            </tbody>
+        </table>
+    </div>
+    {{/each}}
+    
+    <div style="position: fixed; bottom: 15mm; width: 100%; text-align: center; font-size: 9pt;">
+        Página <span class="pageNumber"></span> de <span class="totalPages"></span>
+    </div>
+</div>

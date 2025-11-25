@@ -3,6 +3,9 @@ import { Muestra } from '../models/Muestra.js';
 import { MuestraService } from '../services/MuestraService.js';
 import db from '../database/db.js';
 import { WorkflowService } from '../services/workflowService.js';
+import { ProcedimientoService } from '../services/ProcedimientoService.js';
+import { DocumentBuilderService } from '../services/DocumentBuilderService.js';
+import path from 'path';
 
 const normalizeString = (str) => {
   if (!str) return '';
@@ -13,13 +16,113 @@ const normalizeString = (str) => {
 };
 
 export class ProcedimientoController {
+
+  static async generarCaratula(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
+    try {
+      const { pdfBuffer } = await DocumentBuilderService.generarCaratula(id_oficio, id_usuario, req.body);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename=caratula.pdf');
+      res.end(pdfBuffer);
+    } catch (error) {
+      console.error('Error al generar la carátula:', error);
+      res.status(500).json({ success: false, message: 'Error interno al generar la carátula.' });
+    }
+  }
+
+  static async uploadInformeFirmado(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No se ha subido ningún archivo.' });
+    }
+
+    // Construir una ruta relativa para almacenar en la BD
+    const relativePath = path.join('uploads', 'informes_firmados', req.file.filename).replace(/\\/g, '/');
+
+    const connection = await db.promise().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Guardar la ruta en la metadata
+      await connection.query(
+        `INSERT INTO oficio_resultados_metadata (id_oficio, informe_pericial_firmado_path)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE informe_pericial_firmado_path = VALUES(informe_pericial_firmado_path)`,
+        [id_oficio, relativePath]
+      );
+
+      // Cambiar estado del caso
+      await Oficio.addSeguimiento({
+        id_oficio,
+        id_usuario,
+        estado_nuevo: 'LISTO_PARA_RECOJO',
+        observaciones: 'El perito ha subido el informe firmado digitalmente.'
+      }, connection);
+
+      await connection.commit();
+      res.status(200).json({ success: true, message: 'Informe firmado subido y caso actualizado.', filePath: relativePath });
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error en uploadInformeFirmado:', error);
+      res.status(500).json({ success: false, message: 'Error interno al procesar el archivo.' });
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async uploadDocumentosFinales(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: 'No se han subido archivos.' });
+    }
+
+    const relativePaths = req.files.map(file =>
+      path.join('uploads', 'documentos_finales', file.filename).replace(/\\/g, '/')
+    );
+    const pathsJson = JSON.stringify(relativePaths);
+
+    const connection = await db.promise().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      await connection.query(
+        `INSERT INTO oficio_resultados_metadata (id_oficio, documentos_finales_escaneados_path)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE documentos_finales_escaneados_path = VALUES(documentos_finales_escaneados_path)`,
+        [id_oficio, pathsJson]
+      );
+
+      await Oficio.addSeguimiento({
+        id_oficio,
+        id_usuario,
+        estado_nuevo: 'ENTREGADO_Y_ARCHIVADO',
+        observaciones: 'Mesa de Partes ha subido los documentos escaneados post-entrega.'
+      }, connection);
+
+      await connection.commit();
+      res.status(200).json({ success: true, message: 'Documentos finales archivados exitosamente.', files: relativePaths });
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error en uploadDocumentosFinales:', error);
+      res.status(500).json({ success: false, message: 'Error interno al archivar los documentos.' });
+    } finally {
+      connection.release();
+    }
+  }
+
   static async getDatosExtraccion(req, res) {
     const { id: id_oficio } = req.params;
     try {
       const muestras = await Muestra.findByOficioId(id_oficio);
       const seguimiento = await Oficio.getSeguimientoDeProcedimiento(id_oficio, [
-        'EXTRACCION_FINALIZADA', 
-        'PENDIENTE_ANALISIS_TM', 
+        'EXTRACCION_FINALIZADA',
+        'PENDIENTE_ANALISIS_TM',
         'EXTRACCION_FALLIDA'
       ]);
 
@@ -29,7 +132,7 @@ export class ProcedimientoController {
       }
 
       const fueExitosa = seguimiento ? seguimiento.estado_nuevo !== 'EXTRACCION_FALLIDA' : true;
-      
+
       res.status(200).json({
         success: true,
         data: {
@@ -93,7 +196,7 @@ export class ProcedimientoController {
           await Muestra.create(nuevaMuestra, connection);
           codigosGenerados.push(codigoMuestra);
         }
-        
+
         estadoNuevo = requiereAnalisisTM ? 'PENDIENTE_ANALISIS_TM' : 'EXTRACCION_FINALIZADA';
         finalObservaciones = observaciones || null;
 
@@ -168,7 +271,7 @@ export class ProcedimientoController {
             esta_lacrado: true,
           }, connection);
         }
-        
+
         finalObservaciones = observaciones || null;
 
       } else {
@@ -186,7 +289,7 @@ export class ProcedimientoController {
       }, connection);
 
       await connection.commit();
-      
+
       res.status(200).json({
         success: true,
         message: 'Fase de extracción finalizada. El caso ha sido actualizado para análisis.',
@@ -223,16 +326,16 @@ export class ProcedimientoController {
       const [metadata] = await connection.query('SELECT * FROM oficio_resultados_metadata WHERE id_oficio = ?', [id_oficio]);
       const [muestras] = await connection.query('SELECT * FROM muestras WHERE id_oficio = ?', [id_oficio]);
       const [todosLosResultados] = await connection.query('SELECT * FROM oficio_resultados_perito WHERE id_oficio = ?', [id_oficio]);
-      
+
       const tieneResultadosGuardados = todosLosResultados.length > 0;
-      
+
       const resultadosAnteriores = [];
       let resultadosParaEditar = {};
-      
+
       todosLosResultados.forEach(res_perito => {
-        const resultadosParseados = typeof res_perito.resultados === 'string' 
-            ? JSON.parse(res_perito.resultados) 
-            : res_perito.resultados;
+        const resultadosParseados = typeof res_perito.resultados === 'string'
+          ? JSON.parse(res_perito.resultados)
+          : res_perito.resultados;
 
         if (res_perito.tipo_resultado === tipoResultadoActual) {
           resultadosParaEditar = resultadosParseados;
@@ -243,19 +346,19 @@ export class ProcedimientoController {
           });
         }
       });
-      
+
       const aperturaData = actas.length > 0 ? { descripcion_paquete: actas[0].descripcion_paquete, observaciones: actas[0].observaciones } : null;
       const metadataData = metadata.length > 0 ? { objeto_pericia: metadata[0].objeto_pericia, metodo_utilizado: metadata[0].metodo_utilizado, observaciones_finales: metadata[0].observaciones_finales } : null;
-      
+
       const muestrasAnalizadas = muestras.map(m => ({
-          id: m.id_muestra,
-          codigo_muestra: m.codigo_muestra,
-          tipo_muestra: m.tipo_muestra,
-          descripcion: m.descripcion,
-          resultados: resultadosParaEditar[m.id_muestra] || {},
-          descripcion_detallada: resultadosParaEditar[m.id_muestra]?.descripcion_detallada || m.descripcion_detallada || '',
+        id: m.id_muestra,
+        codigo_muestra: m.codigo_muestra,
+        tipo_muestra: m.tipo_muestra,
+        descripcion: m.descripcion,
+        resultados: resultadosParaEditar[m.id_muestra] || {},
+        descripcion_detallada: resultadosParaEditar[m.id_muestra]?.descripcion_detallada || m.descripcion_detallada || '',
       }));
-      
+
       const muestrasAgotadas = metadata.length > 0 ? !!metadata[0].muestras_agotadas : false;
 
       res.status(200).json({
@@ -268,7 +371,7 @@ export class ProcedimientoController {
           muestrasAgotadas,
           tieneResultadosGuardados,
           esPrimerPeritoDelFlujo, // Enviar el flag claro al frontend
-          permiteEditarMuestras, 
+          permiteEditarMuestras,
         }
       });
 
@@ -294,9 +397,9 @@ export class ProcedimientoController {
         await connection.rollback();
         return res.status(403).json({ success: false, message: 'Acceso denegado.' });
       }
-      
+
       const { esPrimerPeritoDelFlujo } = await WorkflowService.determinarContextoAnalisis(id_oficio, id_usuario);
-      
+
       if (esPrimerPeritoDelFlujo) {
         if (!apertura_data || !apertura_data.descripcion_paquete) {
           throw new Error('Debe describir el estado del paquete recibido, ya que es el primer perito en analizar una muestra remitida.');
@@ -326,7 +429,7 @@ export class ProcedimientoController {
         default:
           throw new Error('Sección de usuario no reconocida.');
       }
-      
+
       if (metadata) {
         await connection.query(
           `INSERT INTO oficio_resultados_metadata (id_oficio, objeto_pericia, metodo_utilizado, muestras_agotadas, observaciones_finales) VALUES (?, ?, ?, ?, ?)
@@ -351,9 +454,9 @@ export class ProcedimientoController {
             tipo_muestra: muestra.tipo_muestra,
             descripcion: muestra.descripcion,
             codigo_muestra: codigoMuestra,
-            esta_lacrado: false, 
+            esta_lacrado: false,
           }, connection);
-          
+
           idMap.set(muestra.id, nuevoIdMuestra);
           muestraId = nuevoIdMuestra;
         } else {
@@ -368,10 +471,10 @@ export class ProcedimientoController {
 
         // Solo procesar resultados si la muestra no está marcada como "no aplicable"
         if (!muestra.resultados?.no_aplicable) {
-            resultadosParaGuardar[muestraId] = {
-              descripcion_detallada: muestra.descripcion_detallada || '',
-              ...muestra.resultados,
-            };
+          resultadosParaGuardar[muestraId] = {
+            descripcion_detallada: muestra.descripcion_detallada || '',
+            ...muestra.resultados,
+          };
         }
       }
 
@@ -442,6 +545,7 @@ export class ProcedimientoController {
       return res.status(400).json({ success: false, message: 'Se requiere el ID del nuevo perito.' });
     }
 
+    const connection = await db.promise().getConnection();
     try {
       const siguientePaso = await WorkflowService.determinarSiguientePaso(id_oficio);
 
@@ -451,8 +555,7 @@ export class ProcedimientoController {
           message: 'No se pudo determinar la sección de destino para la derivación.'
         });
       }
-      
-      // Determinar el nuevo estado basado en la tarea
+
       let nuevo_estado;
       if (siguientePaso.next_step === 'CONSOLIDATE') {
         nuevo_estado = 'PENDIENTE_CONSOLIDACION';
@@ -460,22 +563,26 @@ export class ProcedimientoController {
         nuevo_estado = `DERIVADO A: ${siguientePaso.section_name.toUpperCase()}`;
       }
 
-      // Reasignar el oficio y establecer el estado específico
       await Oficio.reasignarPerito(
         id_oficio,
         id_nuevo_perito,
         id_perito_actual,
-        nuevo_estado
+        nuevo_estado,
+        connection
       );
 
+      await connection.commit();
       res.status(200).json({
         success: true,
         message: `Caso derivado exitosamente.`
       });
 
     } catch (error) {
+      await connection.rollback();
       console.error('Error al derivar el caso:', error);
       res.status(500).json({ success: false, message: 'Error interno del servidor al derivar el caso.' });
+    } finally {
+      connection.release();
     }
   }
   /**
@@ -541,10 +648,10 @@ export class ProcedimientoController {
             }
           }
         }
-        
+
         // Si después de filtrar no queda ningún resultado, no incluir este procedimiento.
         if (Object.keys(resultadosFiltrados).length === 0) {
-            return null;
+          return null;
         }
 
         return {
@@ -572,55 +679,15 @@ export class ProcedimientoController {
 
   static async getDatosConsolidacion(req, res) {
     const { id: id_oficio } = req.params;
-    const connection = await db.promise().getConnection();
     try {
-      // 1. Obtener detalles completos del oficio (incluye exámenes)
-      const oficioDetalleRes = await Oficio.findDetalleById(id_oficio, connection);
-      if (!oficioDetalleRes.success) {
-        return res.status(404).json({ success: false, message: 'Oficio no encontrado.' });
-      }
-
-      // 2. Obtener todos los resultados de los análisis
-      const [resultadosPerito] = await connection.query(
-        `SELECT 
-          orp.tipo_resultado,
-          orp.resultados,
-          u.nombre_completo as perito_nombre,
-          g.nombre as perito_grado
-         FROM oficio_resultados_perito orp
-         JOIN usuario u ON orp.id_perito_responsable = u.id_usuario
-         LEFT JOIN usuario_grado ug ON u.id_usuario = ug.id_usuario
-         LEFT JOIN grado g ON ug.id_grado = g.id_grado
-         WHERE orp.id_oficio = ?
-         ORDER BY orp.fecha_creacion ASC`,
-        [id_oficio]
-      );
-      
-      // 3. Obtener los metadatos de los informes (objeto y método)
-      const [metadataRows] = await connection.query(
-        'SELECT objeto_pericia, metodo_utilizado, observaciones_finales FROM oficio_resultados_metadata WHERE id_oficio = ?',
-        [id_oficio]
-      );
-      const metadata = metadataRows[0] || {};
-      
-      // Procesar y devolver todo en una sola respuesta
+      const data = await ProcedimientoService.getDatosConsolidacion(id_oficio);
       res.status(200).json({
         success: true,
-        data: {
-          oficio: oficioDetalleRes.data,
-          resultados_previos: resultadosPerito.map(r => ({
-            ...r,
-            resultados: typeof r.resultados === 'string' ? JSON.parse(r.resultados) : r.resultados
-          })),
-          metadata: metadata,
-        }
+        data,
       });
-
     } catch (error) {
-      console.error('Error en getDatosConsolidacion:', error);
-      res.status(500).json({ success: false, message: 'Error interno al obtener los datos para la consolidación.' });
-    } finally {
-      connection.release();
+      console.error('Error en getDatosConsolidacion (controller):', error);
+      res.status(500).json({ success: false, message: error.message || 'Error interno al obtener los datos para la consolidación.' });
     }
   }
 
