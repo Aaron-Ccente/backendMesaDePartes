@@ -21,12 +21,44 @@ export class Muestra {
     return rows;
   }
 
-  // Contar muestras de un tipo para un oficio específico
-  static async countByType(id_oficio, tipo_muestra) {
-    const [rows] = await db.promise().query(
-      'SELECT COUNT(*) as count FROM muestras WHERE id_oficio = ? AND tipo_muestra = ?',
-      [id_oficio, tipo_muestra]
+  // Método para actualizar la descripción detallada de una muestra
+  static async updateDetalle(id_muestra, descripcion_detallada, connection) {
+    const conn = connection || db.promise();
+    await conn.query(
+      'UPDATE muestras SET descripcion_detallada = ? WHERE id_muestra = ?',
+      [descripcion_detallada, id_muestra]
     );
-    return rows[0].count;
+  }
+
+  // Contar muestras de un tipo para un oficio específico
+  static async countByType(id_oficio, tipo_muestra, connection = null) {
+    const conn = connection || db.promise();
+    try {
+      const [rows] = await conn.query(
+        'SELECT COUNT(*) as count FROM muestras WHERE id_oficio = ? AND tipo_muestra = ?',
+        [id_oficio, tipo_muestra]
+      );
+      return rows[0].count;
+    } catch (error) {
+      console.error('Error en countByType:', error);
+      if (connection) throw error;
+      return 0;
+    }
+  }
+
+  // Contar TODAS las muestras para un oficio específico
+  static async countAllByOficio(id_oficio, connection = null) {
+    const conn = connection || db.promise();
+    try {
+      const [rows] = await conn.query(
+        'SELECT COUNT(*) as count FROM muestras WHERE id_oficio = ?',
+        [id_oficio]
+      );
+      return rows[0].count;
+    } catch (error) {
+      console.error('Error en countAllByOficio:', error);
+      if (connection) throw error;
+      return 0;
+    }
   }
 }

@@ -504,6 +504,40 @@ export class Perito {
     }
   }
 
+  static async findByIdUsuario(id_usuario) {
+    try {
+      const [rows] = await db.promise().query(
+        `SELECT 
+          us.id_usuario, us.CIP, us.nombre_completo, us.nombre_usuario,
+          r.nombre_rol, 
+          td.nombre_departamento, 
+          g.nombre AS nombre_grado,
+          s.id_seccion,
+          s.nombre as seccion_nombre
+         FROM usuario AS us
+         INNER JOIN usuario_grado as ug ON ug.id_usuario = us.id_usuario
+         INNER JOIN grado as g ON g.id_grado = ug.id_grado
+         INNER JOIN usuario_rol AS ur ON us.id_usuario = ur.id_usuario
+         INNER JOIN rol AS r ON ur.id_rol = r.id_rol
+         INNER JOIN usuario_tipo_departamento AS utp ON utp.id_usuario = us.id_usuario
+         INNER JOIN tipo_departamento AS td ON td.id_tipo_departamento = utp.id_tipo_departamento
+         LEFT JOIN usuario_seccion as usec ON us.id_usuario = usec.id_usuario
+         LEFT JOIN seccion as s ON usec.id_seccion = s.id_seccion
+         WHERE us.id_usuario = ? AND r.nombre_rol = 'PERITO'
+         LIMIT 1
+         `,
+        [id_usuario]
+      );
+      if (rows.length > 0) {
+        return { success: true, data: rows[0] };
+      }
+      return { success: false, message: 'Perito no encontrado' };
+    } catch (error) {
+      console.error("Error buscando perito por ID de usuario:", error);
+      throw error;
+    }
+  }
+
   // Obtener todos los peritos
   static async findAll(limit = 10, offset = 0) {
     try {
@@ -941,13 +975,76 @@ export class Perito {
         ORDER BY dia_semana_num;
       `);
 
+      // Oficios por especialidad
+      const [oficiosPorEspecialidad] = await db.promise().query(`
+        SELECT 
+          o.especialidad_requerida AS especialidad,
+          COUNT(o.id_oficio) AS cantidad_oficios
+        FROM oficio o
+        GROUP BY o.especialidad_requerida;
+        SELECT td.nombre_departamento AS especialidad
+        FROM tipo_departamento td;
+      `);
+
+      // Traer oficios con estados de CREACION DEL OFICIO, PENDIENTE (se toma cualquier otro ultimo estado que tenga el oficio), COMPLETADO
+      const [estadosDeOficios] = await db.promise().query(`
+        SELECT 
+          e.estado_final,
+          COALESCE(r.cantidad, 0) AS cantidad
+        FROM (
+          SELECT 'ENTRADA' AS estado_final
+          UNION ALL
+          SELECT 'PENDIENTE'
+          UNION ALL
+          SELECT 'COMPLETADO'
+        ) e
+        LEFT JOIN (
+          SELECT 
+            CASE
+              WHEN so.estado_nuevo = 'CREACION DEL OFICIO' THEN 'ENTRADA'
+              WHEN so.estado_nuevo = 'COMPLETADO' THEN 'COMPLETADO'
+              ELSE 'PENDIENTE'
+            END AS estado_final,
+            COUNT(*) AS cantidad
+          FROM seguimiento_oficio so
+          INNER JOIN (
+            SELECT 
+              id_oficio,
+              MAX(fecha_seguimiento) AS ultima_fecha
+            FROM seguimiento_oficio
+            GROUP BY id_oficio
+          ) ult 
+            ON so.id_oficio = ult.id_oficio 
+          AND so.fecha_seguimiento = ult.ultima_fecha
+          GROUP BY estado_final
+        ) r ON e.estado_final = r.estado_final;
+      `);
+
+      // Productividad por perito
+      const [productividadPorPerito] = await db.promise().query(`
+       SELECT 
+            u.id_usuario,
+            u.nombre_completo,
+            COUNT(so.id_seguimiento) AS acciones_realizadas
+        FROM usuario u
+        INNER JOIN usuario_rol ur ON u.id_usuario = ur.id_usuario
+        LEFT JOIN seguimiento_oficio so 
+            ON u.id_usuario = so.id_usuario
+        WHERE ur.id_rol = 2
+        GROUP BY u.id_usuario, u.nombre_completo
+        ORDER BY acciones_realizadas DESC;
+      `);
+
       return {
         totalPeritos: totalPeritos[0].total,
         usersEnable,
         usersDisable,
         usuariosActivos,
         prioridadOficios,
-        oficiosDeLaSemana
+        oficiosDeLaSemana,
+        oficiosPorEspecialidad,
+        estadosDeOficios,
+        productividadPorPerito
       };
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
