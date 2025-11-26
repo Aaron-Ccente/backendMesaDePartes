@@ -56,4 +56,17 @@ export class MesaDePartesDashboardController {
       return res.status(500).json({ success: false, message: 'Error interno al obtener casos culminados.' });
     }
   }
+
+  static async getCasosParaRecojo(req, res) {
+    try {
+      const result = await Oficio.getCasosParaRecojo();
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+      return res.json(result);
+    } catch (error) {
+      console.error('Error en getCasosParaRecojo:', error);
+      return res.status(500).json({ success: false, message: 'Error interno al obtener los casos listos para recojo.' });
+    }
+  }
 }

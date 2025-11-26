@@ -1,0 +1,5 @@
+ERROR: page.waitForTimeout is not a function
+STACK: TypeError: page.waitForTimeout is not a function
+    at DocumentBuilderService.generarCaratula (file:///C:/Users/USUARIO/Documents/PNPHYO/backend-mesa-de-partes/src/services/DocumentBuilderService.js:156:18)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async test (file:///C:/Users/USUARIO/Documents/PNPHYO/backend-mesa-de-partes/test_gen_caratula.js:10:24)

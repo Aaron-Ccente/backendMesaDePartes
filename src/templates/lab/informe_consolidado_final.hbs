@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe Pericial Consolidado</title>
+</head>
+<body>
+    {{> partials/membrete }}
+
+    <div class="content-body" style="font-size: 10pt; line-height: 1.6;">
+        <h3 class="text-center font-bold underline uppercase" style="font-size: 12pt;">
+            INFORME PERICIAL CONSOLIDADO N° {{oficio.nro_oficio}}-{{oficio.anio_actual}}-DIRCRI-PNP/OFICRI-HYO
+        </h3>
+        <br>
+
+        <div style="display: flex;">
+            <div style="width: 5%;" class="font-bold">A.</div>
+            <div style="width: 35%;" class="font-bold">PROCEDENCIA:</div>
+            <div style="width: 60%;">{{oficio.unidad_solicitante}}</div>
+        </div>
+        <div style="display: flex;">
+            <div style="width: 5%;" class="font-bold">B.</div>
+            <div style="width: 35%;" class="font-bold">ANTECEDENTE:</div>
+            <div style="width: 60%;">{{oficio.documento_referencia}}.</div>
+        </div>
+        <div style="display: flex;">
+            <div style="width: 5%;" class="font-bold">C.</div>
+            <div style="width: 35%;" class="font-bold">DATOS DEL PERITO QUE CONSOLIDA:</div>
+            <div style="width: 60%;">
+                {{perito.grado}} {{perito.nombre_completo}}, identificado con CIP: {{perito.cip}} y DNI: {{perito.dni_perito}}, 
+                Químico Farmacéutico C.Q.F.P N°{{perito.cqfp}}, con domicilio laboral en Jirón Cuzco N° 666- Huancayo.
+            </div>
+        </div>
+        <div style="display: flex;">
+            <div style="width: 5%;" class="font-bold">D.</div>
+            <div style="width: 35%;" class="font-bold">OBJETO DE LA PERICIA:</div>
+            <div style="width: 60%;">{{informe.objeto_pericia}}</div>
+        </div>
+        <div style="display: flex;">
+            <div style="width: 5%;" class="font-bold">E.</div>
+            <div style="width: 35%;" class="font-bold">HORA DEL INCIDENTE:</div>
+            <div style="width: 60%;">{{oficio.hora_incidente}} DEL {{formatLongDate oficio.fecha_incidente}}</div>
+        </div>
+        <div style="display: flex;">
+            <div style="width: 5%;" class="font-bold">F.</div>
+            <div style="width: 35%;" class="font-bold">HORA DE TOMA DE MUESTRA:</div>
+            <div style="width: 60%;">{{oficio.hora_toma_muestra}} DEL {{formatLongDate oficio.fecha_toma_muestra}}</div>
+        </div>
+        <div style="display: flex;">
+            <div style="width: 5%;" class="font-bold">G.</div>
+            <div style="width: 35%;" class="font-bold">CONDUCTOR:</div>
+            <div style="width: 60%;">{{oficio.conductor}}</div>
+        </div>
+        <div style="display: flex; margin-bottom: 10px;">
+            <div style="width: 5%;" class="font-bold">H.</div>
+            <div style="width: 35%;" class="font-bold">MUESTRA TOMADA A:</div>
+            <div style="width: 60%;">{{oficio.examinado_incriminado}} ({{oficio.edad_examinado}}).</div>
+        </div>
+
+        <div style="display: flex; margin-bottom: 10px;">
+            <div style="width: 5%;" class="font-bold">I.</div>
+            <div style="width: 95%;" class="font-bold">MUESTRAS:</div>
+        </div>
+        <div style="padding-left: 5%;">
+            {{#each informe.muestras}}
+            <p style="margin: 0 0 10px 0;">
+                <span class="font-bold">{{this.codigo}}:</span> {{this.descripcion_completa}}
+            </p>
+            {{/each}}
+        </div>
+
+        <div style="display: flex; margin-bottom: 10px;">
+            <div style="width: 5%;" class="font-bold">J.</div>
+            <div style="width: 95%;" class="font-bold">EXAMEN:</div>
+        </div>
+        <div style="padding-left: 5%;">
+            {{#each informe.examenes}}
+            <h4 class="font-bold underline" style="margin: 5px 0;">{{this.nombre}}</h4>
+            <table style="width: 80%; border-collapse: collapse;">
+                {{#each this.resultados}}
+                <tr>
+                    <td style="width: 50%;">{{this.analito}}</td>
+                    <td style="width: 50%;">: {{this.resultado}}</td>
+                </tr>
+                {{/each}}
+            </table>
+            {{/each}}
+        </div>
+
+        <div style="display: flex; margin-top: 10px;">
+            <div style="width: 5%;" class="font-bold">K.</div>
+            <div style="width: 95%;" class="font-bold">CONCLUSIONES:</div>
+        </div>
+        <div style="padding-left: 5%;">
+            <p style="margin: 0;">1. {{{informe.conclusion_principal}}}</p>
+            <hr style="border: none; border-top: 1px dashed black;">
+            <p style="margin: 0;">2. Muestras agotadas en los análisis.</p>
+            <hr style="border: none; border-top: 1px dashed black;">
+        </div>
+
+        <div style="display: flex; margin-top: 10px;">
+            <div style="width: 5%;" class="font-bold">L.</div>
+            <div style="width: 35%;" class="font-bold">MUESTRA TOMADA POR:</div>
+            <div style="width: 60%;">{{informe.recolector_muestra}}</div>
+        </div>
+        <hr style="border: none; border-top: 1px dashed black;">
+        
+        <div style="display: flex; margin-top: 10px;">
+            <div style="width: 5%;" class="font-bold">M.</div>
+            <div style="width: 35%;" class="font-bold">METODO UTILIZADO:</div>
+            <div style="width: 60%;">Experimental.</div>
+        </div>
+        <div style="padding-left: 5%;">
+            {{#each informe.metodos}}
+            <div style="display: flex;">
+                <div style="width: 25%;" class="font-bold">{{this.examen}}:</div>
+                <div style="width: 75%;">{{this.metodo}}</div>
+            </div>
+            {{/each}}
+        </div>
+        
+        <div style="text-align: right; margin-top: 20px;">
+            Huancayo, {{formatLongDate oficio.fecha_creacion}}
+        </div>
+
+        <div style="width: 40%; margin: 3cm auto 0 auto; text-align: center;">
+            <hr style="border: none; border-top: 1px solid black; width: 80%; margin: 0 auto 5px auto;">
+            <p class="font-bold" style="font-size: 9pt; margin: 0;">{{perito.nombre_completo}}</p>
+            <p style="font-size: 9pt; margin: 0;">{{perito.grado}}</p>
+            <p style="font-size: 9pt; margin: 0;">PERITO QUÍMICO FARMACEUTICO</p>
+            <p style="font-size: 9pt; margin: 0;">C.Q.F.P {{perito.cqfp}}</p>
+        </div>
+
+    </div>
+</body>
+</html>

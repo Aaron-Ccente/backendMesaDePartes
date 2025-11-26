@@ -258,11 +258,19 @@ export class Oficio {
     const conn = connection || db.promise();
     try {
       const [oficios] = await conn.query(
-        `SELECT o.*, tp.nombre_prioridad, td.nombre_departamento as especialidad
-         FROM oficio o
-         LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
-         LEFT JOIN tipo_departamento td ON o.id_especialidad_requerida = td.id_tipo_departamento
-         WHERE o.id_oficio = ?`,
+        `SELECT 
+            o.*, 
+            tp.nombre_prioridad, 
+            td.nombre_departamento AS especialidad,
+            GROUP_CONCAT(te.nombre SEPARATOR ', ') AS tipos_de_examenes
+        FROM oficio o
+        LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
+        LEFT JOIN tipo_departamento td ON o.id_especialidad_requerida = td.id_tipo_departamento
+        LEFT JOIN oficio_examen oe ON o.id_oficio = oe.id_oficio
+        LEFT JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen
+        WHERE o.id_oficio = ?
+        GROUP BY o.id_oficio;
+        `,
         [id_oficio]
       );
 
@@ -273,10 +281,11 @@ export class Oficio {
       return { success: true, data: oficios[0] };
     } catch (error) {
       console.error('Error en findById:', error);
-      if (connection) throw error; // Propagate error in transaction
+      if (connection) throw error;
       return { success: false, message: "Error al obtener el oficio" };
     }
   }
+
 
   static async create(oficioData) {
     const connection = await db.promise().getConnection();
@@ -470,7 +479,7 @@ export class Oficio {
       );
 
       const metadataPromise = connection.query(
-        `SELECT objeto_pericia, metodo_utilizado FROM oficio_resultados_metadata WHERE id_oficio = ?`,
+        `SELECT * FROM oficio_resultados_metadata WHERE id_oficio = ?`,
         [id_oficio]
       );
 
@@ -1002,6 +1011,47 @@ export class Oficio {
     } catch (error) {
       console.error('Error en getCasosCulminados:', error);
       return { success: false, message: 'Error al obtener los casos culminados' };
+    }
+  }
+
+  static async getCasosParaRecojo() {
+    try {
+      const query = `
+        SELECT 
+          o.id_oficio,
+          o.numero_oficio,
+          o.fecha_creacion,
+          o.asunto,
+          o.examinado_incriminado,
+          o.delito,
+          s.estado_nuevo AS ultimo_estado,
+          u.nombre_completo AS perito_asignado,
+          (SELECT GROUP_CONCAT(te.nombre SEPARATOR ', ') 
+            FROM oficio_examen oe 
+            JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen 
+            WHERE oe.id_oficio = o.id_oficio) AS tipos_de_examen,
+          tp.nombre_prioridad
+        FROM oficio o
+        LEFT JOIN (
+          SELECT s1.id_oficio, s1.estado_nuevo, s1.fecha_seguimiento
+          FROM seguimiento_oficio s1
+          INNER JOIN (
+            SELECT id_oficio, MAX(fecha_seguimiento) AS max_fecha
+            FROM seguimiento_oficio
+            GROUP BY id_oficio
+          ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
+        ) s ON s.id_oficio = o.id_oficio
+        LEFT JOIN usuario u ON o.id_usuario_perito_asignado = u.id_usuario
+        LEFT JOIN tipos_prioridad tp ON o.id_prioridad = tp.id_prioridad
+        WHERE s.estado_nuevo = 'LISTO_PARA_RECOJO'
+        ORDER BY s.fecha_seguimiento DESC
+      `;
+
+      const [rows] = await db.promise().query(query);
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error en getCasosParaRecojo:', error);
+      return { success: false, message: 'Error al obtener los casos listos para recojo' };
     }
   }
 }

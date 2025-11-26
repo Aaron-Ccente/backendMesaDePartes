@@ -16,4 +16,7 @@ router.get('/casos-recientes', MesaDePartesDashboardController.getRecentCases);
 // Ruta para obtener los casos culminados
 router.get('/casos-culminados', MesaDePartesDashboardController.getCasosCulminados);
 
+// Ruta para obtener los casos listos para recojo
+router.get('/casos-para-recojo', MesaDePartesDashboardController.getCasosParaRecojo);
+
 export default router;
