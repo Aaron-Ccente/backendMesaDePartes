@@ -345,6 +345,23 @@ export class PeritoController {
       });
     }
   }
+  // Obtener estadísticas de un perito por CIP
+  static async getPeritoStatsByCIP(req, res) {
+    try {
+      const { cip } = req.params;
+      const stats = await Perito.getStatsByCIP(cip);
+      res.status(200).json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: "Error interno del servidor",
+        error: error.message,
+      });
+    }
+  }
 
   // Login de perito (ahora genera JWT)
   static async loginPerito(req, res) {

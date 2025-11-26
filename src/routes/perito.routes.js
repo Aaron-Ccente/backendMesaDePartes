@@ -47,4 +47,7 @@ router.patch('/:cip/password', PeritoController.changePeritoPassword);
 // Obtener estadísticas de peritos
 router.get('/stats/overview', PeritoController.getPeritosStats);
 
+// Obtener estadisticas de un perito en especifico
+router.get("/stats/:cip", PeritoController.getPeritoStatsByCIP);
+
 export default router;
