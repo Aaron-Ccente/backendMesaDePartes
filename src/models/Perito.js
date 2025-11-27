@@ -1004,7 +1004,7 @@ export class Perito {
           SELECT 
             CASE
               WHEN so.estado_nuevo = 'CREACION DEL OFICIO' THEN 'ENTRADA'
-              WHEN so.estado_nuevo = 'COMPLETADO' THEN 'COMPLETADO'
+              WHEN so.estado_nuevo = 'LISTO_PARA_RECOJO' THEN 'COMPLETADO'
               ELSE 'PENDIENTE'
             END AS estado_final,
             COUNT(*) AS cantidad
@@ -1022,20 +1022,55 @@ export class Perito {
         ) r ON e.estado_final = r.estado_final;
       `);
 
-      // Productividad por perito
+      // Productividad por perito por dia
       const [productividadPorPerito] = await db.promise().query(`
        SELECT 
+          u.id_usuario,
+          u.nombre_completo,
+          CURDATE() AS fecha_seguimiento,
+          COUNT(so.id_seguimiento) AS acciones_realizadas
+      FROM usuario u
+      INNER JOIN usuario_rol ur ON u.id_usuario = ur.id_usuario
+      LEFT JOIN seguimiento_oficio so 
+          ON u.id_usuario = so.id_usuario
+          AND DATE(so.fecha_seguimiento) = CURDATE()
+      WHERE ur.id_rol = 2
+      GROUP BY u.id_usuario, u.nombre_completo
+      ORDER BY acciones_realizadas DESC;
+            `);
+
+      // Productividad por perito por mes
+      const [productividadPorPeritoMes] = await db.promise().query(`
+      SELECT 
+          u.id_usuario,
+          u.nombre_completo,
+          COALESCE(YEAR(so.fecha_seguimiento), YEAR(CURDATE())) AS anio,
+          COALESCE(MONTH(so.fecha_seguimiento), MONTH(CURDATE())) AS mes,
+          COUNT(so.id_seguimiento) AS acciones_realizadas
+      FROM usuario u
+      INNER JOIN usuario_rol ur ON u.id_usuario = ur.id_usuario
+      LEFT JOIN seguimiento_oficio so 
+          ON u.id_usuario = so.id_usuario
+      WHERE ur.id_rol = 2
+      GROUP BY u.id_usuario, u.nombre_completo, anio, mes
+      ORDER BY anio DESC, mes DESC, acciones_realizadas DESC;
+      `);
+
+      // Productividad por perito por año
+      const [productividadPorPeritoAnio] = await db.promise().query(`
+        SELECT 
             u.id_usuario,
             u.nombre_completo,
+            COALESCE(YEAR(so.fecha_seguimiento), YEAR(CURDATE())) AS anio,
             COUNT(so.id_seguimiento) AS acciones_realizadas
         FROM usuario u
         INNER JOIN usuario_rol ur ON u.id_usuario = ur.id_usuario
         LEFT JOIN seguimiento_oficio so 
             ON u.id_usuario = so.id_usuario
         WHERE ur.id_rol = 2
-        GROUP BY u.id_usuario, u.nombre_completo
-        ORDER BY acciones_realizadas DESC;
-      `);
+        GROUP BY u.id_usuario, u.nombre_completo, anio
+        ORDER BY anio DESC, acciones_realizadas DESC;
+              `);
 
       return {
         totalPeritos: totalPeritos[0].total,
@@ -1046,13 +1081,83 @@ export class Perito {
         oficiosDeLaSemana,
         oficiosPorEspecialidad,
         estadosDeOficios,
-        productividadPorPerito
+        productividadPorPerito,
+        productividadPorPeritoMes,
+        productividadPorPeritoAnio
       };
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
       throw error;
     }
   }
+
+  static async getStatsByCIP(cip) {
+    if (!cip) {
+      throw new Error('El CIP es requerido');
+    }
+    try {
+      // Productividad por perito por dia
+      const [productividadPorPerito] = await db.promise().query(`
+        SELECT
+          u.id_usuario,
+          u.nombre_completo,
+          DATE(so.fecha_seguimiento) AS fecha,
+          COUNT(so.id_seguimiento) AS acciones_realizadas
+        FROM usuario u
+        INNER JOIN usuario_rol ur ON u.id_usuario = ur.id_usuario
+        LEFT JOIN seguimiento_oficio so 
+            ON u.id_usuario = so.id_usuario
+        WHERE ur.id_rol = 2
+          AND u.CIP = ?
+        GROUP BY u.id_usuario, u.nombre_completo, fecha
+        ORDER BY fecha DESC;
+      `, [cip]);
+      
+      // Productividad por perito por mes
+      const [productividadPorPeritoMes] = await db.promise().query(`
+        SELECT
+          u.id_usuario,
+          u.nombre_completo,
+          YEAR(so.fecha_seguimiento) AS anio,
+          MONTH(so.fecha_seguimiento) AS mes,
+          COUNT(so.id_seguimiento) AS acciones_realizadas
+        FROM usuario u
+        INNER JOIN usuario_rol ur ON u.id_usuario = ur.id_usuario
+        LEFT JOIN seguimiento_oficio so 
+            ON u.id_usuario = so.id_usuario
+        WHERE ur.id_rol = 2
+          AND u.CIP = ?
+        GROUP BY u.id_usuario, u.nombre_completo, anio, mes
+        ORDER BY anio DESC, mes DESC;
+      `, [cip]);
+
+      // Productividad por perito por año
+      const [productividadPorPeritoAnio] = await db.promise().query(`
+        SELECT
+          u.id_usuario,
+          u.nombre_completo,
+          YEAR(so.fecha_seguimiento) AS anio,
+          COUNT(so.id_seguimiento) AS acciones_realizadas
+        FROM usuario u
+        INNER JOIN usuario_rol ur ON u.id_usuario = ur.id_usuario
+        LEFT JOIN seguimiento_oficio so 
+            ON u.id_usuario = so.id_usuario
+        WHERE ur.id_rol = 2
+          AND u.CIP = ?
+        GROUP BY u.id_usuario, u.nombre_completo, anio
+        ORDER BY anio DESC;
+      `, [cip]);
+
+      return {
+        productividadPorPerito,
+        productividadPorPeritoMes,
+        productividadPorPeritoAnio
+      };
+    } catch (error) {
+      console.error('Error obteniendo estadísticas por CIP:', error); 
+    }
+  }
+
   // Obtiene la carga de trabajo (oficios activos) y el turno de los peritos de una sección
   static async findCargaTrabajoPorSeccion(id_seccion) {
     if (!id_seccion) {
