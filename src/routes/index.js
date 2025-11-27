@@ -14,6 +14,7 @@ import mesaDePartesDashboardRoutes from './mesadepartes.dashboard.routes.js';
 import procedimientoRoutes from './procedimiento.routes.js';
 import documentoRoutes from './documento.routes.js';
 import dictamenRoutes from './dictamen.routes.js';
+import adminViewerRoutes from './adminViewer.routes.js';
 
 const router = express.Router();
 
@@ -74,5 +75,8 @@ router.use('/api/documentos', documentoRoutes);
 
 // Rutas para la generación de dictamenes
 router.use('/api/dictamen', dictamenRoutes);
+
+// Rutas para el nuevo visor de administrador
+router.use('/api/admin-viewer', adminViewerRoutes);
 
 export default router;
