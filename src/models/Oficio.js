@@ -18,6 +18,35 @@ export class Oficio {
     }
   }
 
+  static async findAllForAdminViewer() {
+    try {
+      const query = `
+        SELECT 
+            o.id_oficio,
+            o.numero_oficio,
+            o.fecha_creacion,
+            o.examinado_incriminado,
+            s.estado_nuevo AS ultimo_estado
+        FROM oficio o
+        LEFT JOIN (
+            SELECT s1.id_oficio, s1.estado_nuevo
+            FROM seguimiento_oficio s1
+            INNER JOIN (
+                SELECT id_oficio, MAX(fecha_seguimiento) AS max_fecha
+                FROM seguimiento_oficio
+                GROUP BY id_oficio
+            ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
+        ) s ON s.id_oficio = o.id_oficio
+        ORDER BY o.fecha_creacion DESC
+      `;
+      const [oficios] = await db.promise().query(query);
+      return { success: true, data: oficios };
+    } catch (error) {
+      console.error('Error en findAllForAdminViewer:', error);
+      return { success: false, message: "Error al obtener la lista de oficios para admin" };
+    }
+  }
+
   static async getTodosLosCasos({ estado = 'pendiente' }) {
     try {
       let estadoFilter = '';
