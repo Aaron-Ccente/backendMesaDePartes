@@ -16,6 +16,31 @@ handlebars.registerHelper('formatLongDate', (date) => {
   return `Huancayo, ${dateString}`;
 });
 
+// helper para formatear hora / fecha corta (ej. "25/11/2025 14:30" o solo "14:30")
+handlebars.registerHelper('formatTime', (date) => {
+  if (!date) return '-';
+  try {
+    const d = new Date(date);
+    // Formato: dd/mm/yyyy HH:MM (si quieres solo hora cambia las opciones)
+    const datePart = d.toLocaleDateString('es-ES');
+    const timePart = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    return `${datePart} ${timePart}`;
+  } catch (err) {
+    return '-';
+  }
+});
+
+// opcional: helper corto solo hora si la plantilla lo usa
+handlebars.registerHelper('formatHour', (date) => {
+  if (!date) return '-';
+  try {
+    const d = new Date(date);
+    return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  } catch (err) {
+    return '-';
+  }
+});
+
 export class DocumentBuilderService {
 
   static async _loadAssets() {
