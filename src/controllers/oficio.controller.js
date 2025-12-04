@@ -64,6 +64,7 @@ export class OficioController {
         delito: oficioData.delito,
         situacion_persona: oficioData.situacionPersona,
         direccion_implicado: oficioData.direccionImplicado,
+        numero_de_registro: oficioData.numeroDeRegistro,
         celular_implicado: oficioData.celular,
         fecha_hora_incidente: `${oficioData.fechaIncidente} ${oficioData.horaIncidente}`,
         especialidad_requerida: oficioData.especialidad_requerida,

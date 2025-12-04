@@ -340,8 +340,8 @@ export class Oficio {
           delito, situacion_persona, direccion_implicado, celular_implicado,
           fecha_hora_incidente, especialidad_requerida, id_especialidad_requerida,
           muestra, perito_asignado, cip_perito_asignado, id_usuario_perito_asignado, 
-          id_prioridad, creado_por, actualizado_por
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          id_prioridad, creado_por, actualizado_por, numero_de_registro
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           oficioPrincipalData.numero_oficio,
           oficioPrincipalData.unidad_solicitante,
@@ -364,7 +364,8 @@ export class Oficio {
           oficioPrincipalData.id_usuario_perito_asignado,
           oficioPrincipalData.id_prioridad,
           oficioPrincipalData.creado_por,
-          oficioPrincipalData.actualizado_por
+          oficioPrincipalData.actualizado_por,
+          oficioPrincipalData.numero_de_registro
         ]
       );
 
