@@ -6,6 +6,7 @@ export async function up(knex) {
   await knex.schema.table('oficio', (table) => {
     table.string('delito', 255).nullable();
     table.string('direccion_implicado', 255).nullable();
+    table.string('numero_de_registro', 255);
     table.string('celular_implicado', 20).nullable();
   });
 }
@@ -18,6 +19,7 @@ export async function down(knex) {
   await knex.schema.table('oficio', (table) => {
     table.dropColumn('delito');
     table.dropColumn('direccion_implicado');
+    table.dropColumn('numero_de_registro');
     table.dropColumn('celular_implicado');
   });
 }
