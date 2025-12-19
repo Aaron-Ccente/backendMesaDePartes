@@ -271,6 +271,39 @@ export class OficioController {
     }
   }
 
+  static async modificarOficioPorAdmin(req, res){
+  try {
+    const {id_oficio} = req.params;
+    const {numero_oficio, asunto, administrado, delito, unidad_solicitante} = req.body;
+    const query = `UPDATE oficio 
+                   SET numero_oficio = ?,
+                       asunto = ?,
+                       examinado_incriminado = ?,
+                       delito = ?,
+                       unidad_solicitante = ?
+                   WHERE id_oficio = ?`;
+    const params = [numero_oficio, asunto, administrado, delito, unidad_solicitante, id_oficio];
+    
+    const result = await Oficio.modificarOficioAdmin(query, params);
+    
+    if(!result.success){
+      return res.status(400).json(result);
+    }
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Oficio actualizado correctamente'
+    });
+    
+  } catch (error) {
+    console.error('Error en modificarOficioPorAdmin:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al modificar el oficio por admin',
+    });
+  }
+}
+
   static async addResultadoOficio(req, res) {
     try {
       const { id } = req.params;
