@@ -87,11 +87,11 @@ export class Oficio {
     }
   }
 
-  static async getCasosPorCreador(id_creador, { estado = 'pendiente' }) {
+  static async getCasosPorCreador({ estado = 'pendiente' }) {
     try {
       let estadoFilter = '';
       if (estado === 'pendiente') {
-        estadoFilter = "AND (s.estado_nuevo IS NULL OR s.estado_nuevo NOT IN ('COMPLETADO', 'CERRADO'))";
+        estadoFilter = "WHERE s.estado_nuevo IS NULL OR s.estado_nuevo NOT IN ('COMPLETADO', 'CERRADO')";
       }
 
       const query = `
@@ -114,11 +114,11 @@ export class Oficio {
           ) mx ON s1.id_oficio = mx.id_oficio AND s1.fecha_seguimiento = mx.max_fecha
         ) s ON s.id_oficio = o.id_oficio
         LEFT JOIN usuario u ON o.id_usuario_perito_asignado = u.id_usuario
-        WHERE o.creado_por = ? ${estadoFilter}
+        ${estadoFilter}
         ORDER BY o.fecha_creacion DESC
       `;
 
-      const [rows] = await db.promise().query(query, [id_creador]);
+      const [rows] = await db.promise().query(query);
       return { success: true, data: rows };
     } catch (error) {
       console.error('Error en getCasosPorCreador:', error);
@@ -157,51 +157,28 @@ export class Oficio {
     }
   }
 
-  // static async findAllForAdminStats(){
-  //   try {
-  //     const [oficios] = await db.promise().query(
-  //       `SELECT 
-  //           o.id_oficio,
-  //           o.numero_oficio, 
-  //           o.fecha_creacion, 
-  //           o.perito_asignado,
-  //           o.especialidad_requerida,
-  //           so.estado_nuevo as ultimo_estado,
-  //           so.fecha_seguimiento as fecha_ultimo_estado
-  //         FROM oficio o
-  //         LEFT JOIN seguimiento_oficio so ON so.id_oficio = o.id_oficio
-  //         WHERE so.id_seguimiento = (
-  //           SELECT MAX(so2.id_seguimiento) 
-  //           FROM seguimiento_oficio so2 
-  //           WHERE so2.id_oficio = o.id_oficio
-  //         )
-  //         OR so.id_seguimiento IS NULL
-  //         ORDER BY o.fecha_creacion DESC`
-  //     );
-  //     return { success: true, data: oficios };
-  //   } catch (error) {
-  //     console.error('Error en findAllForAdminStats:', error);
-  //     return { success: false, message: 'Error al obtener estadísticas para admin' };
-  //   }
-  // }
-
-  // static async getSeguimientoByIdForAdmin(id_oficio){
-  //   try {
-  //     const query = `
-  //       SELECT 
-  //         so.*, u.nombre_completo AS usuario_asignado, u.CIP
-  //       FROM seguimiento_oficio so
-  //       INNER JOIN usuario u ON so.id_conductor = u.id_usuario
-  //       WHERE so.id_oficio = ?
-  //       ORDER BY so.fecha_seguimiento DESC
-  //     `;
-  //     const [rows] = await db.promise().query(query, [id_oficio]);
-  //     return { success: true, data: rows };
-  //   } catch (error) {
-  //     console.error('Error en getSeguimientoByIdForAdmin:', error);
-  //     return { success: false, message: 'Error al obtener seguimiento por ID para admin' };
-  //   }
-  // }
+  static async modificarOficioAdmin(query, params) {
+  try {
+    console.log('Ejecutando query:', query);
+    console.log('Con parámetros:', params);
+    
+    const [result] = await db.promise().query(query, params);
+    
+    console.log('Resultado de la query:', result);
+    
+    if (result.affectedRows === 0) {
+      return { success: false, message: 'Oficio no encontrado o sin cambios' };
+    }
+    return { success: true, message: 'Oficio actualizado correctamente' };
+  } catch (error) {
+    console.error('Error en modificarOficioAdmin:', error);
+    return { 
+      success: false, 
+      message: 'Error al actualizar el oficio',
+      error: error.message 
+    };
+  }
+}
 
   static async getStatsForMesaDePartes(id_creador) {
     try {

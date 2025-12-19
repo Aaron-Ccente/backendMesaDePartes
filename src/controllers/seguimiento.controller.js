@@ -14,7 +14,7 @@ export const getCasosSeguimiento = async (req, res) => {
       casos = await Oficio.getTodosLosCasos({ estado });
     } else if (role === 'mesadepartes') { // Corregido de 'CENTRAL' a 'mesadepartes'
       // Mesa de Partes ve los casos que ha creado
-      casos = await Oficio.getCasosPorCreador(id_usuario, { estado });
+      casos = await Oficio.getCasosPorCreador({ estado });
     } else {
       // Otros peritos no deberían acceder a esta vista general
       return res.status(403).json({ message: 'Acceso no autorizado para este rol.' });
