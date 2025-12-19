@@ -118,6 +118,12 @@ router.post(
   upload.single('archivo_final'), // Middleware de Multer para 1 archivo, campo "archivo_final"
   OficioCierreController.cerrarOficioLocal
 );
+// (Usa :id_oficio para coincidir con la lógica de Multer)
+router.put(
+  '/:id_oficio',
+  requireAdmin, // Solo Admin puede editar el oficio
+  OficioController.modificarOficioPorAdmin
+);
 router.get(
   '/archivos/:id_archivo/descargar',
   authenticateToken, // Asegura que solo usuarios logueados descarguen
