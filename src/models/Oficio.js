@@ -215,50 +215,58 @@ export class Oficio {
     }
   }
 
+static async getCountNewOficios({ id_usuario = null, CIP = null }) {
+  try {
+    let userId;
+    if (id_usuario) {
+      userId = id_usuario;
+    } else if (CIP) {
+      const queryUser = 'SELECT id_usuario FROM usuario WHERE CIP = ? LIMIT 1';
+      const [userRows] = await db.promise().query(queryUser, [CIP]);
+      userId = userRows[0]?.id_usuario;
+    } else {
+      return { success: false, message: 'Se requiere id_usuario o CIP' };
+    }
 
-  static async getCountNewOficios({ id_usuario = null, CIP = null }) {
-    try {
-      const params = [];
-      let userCond = '';
+    if (!userId) {
+      return { success: false, message: 'Usuario no encontrado' };
+    }
 
-      if (id_usuario) {
-        userCond = 'o.id_usuario_perito_asignado = ?';
-        params.push(id_usuario);
-      }
-      if (CIP) {
-        if (userCond) userCond += ' OR ';
-        userCond += `o.id_usuario_perito_asignado = (SELECT id_usuario FROM usuario WHERE CIP = ?)`;
-        params.push(CIP);
-      }
-      if (!userCond) {
-        return { success: false, message: 'Se requiere id_usuario o CIP' };
-      }
-
-      const query = `
+    // Se considera solo el ultimo estado
+    const query = `
       SELECT COUNT(*) AS count_new_oficios
       FROM oficio o
-      WHERE (${userCond})
-      AND o.id_oficio NOT IN (
-        SELECT DISTINCT id_oficio 
-        FROM seguimiento_oficio 
-        WHERE estado_nuevo IN (
-          'OFICIO VISTO', 'OFICIO EN PROCESO', 'COMPLETADO', 
-          'PENDIENTE_ANALISIS_TM', 'ANALISIS_TM_FINALIZADO', 
-          'EXTRACCION_FINALIZADA', 'EXTRACCION_FALLIDA',
-          'ANALISIS_INST_FINALIZADO', 'ANALISIS_LAB_FINALIZADO',
-          'PENDIENTE_CONSOLIDACION', 'CONSOLIDACION_FINALIZADA',
-          'DICTAMEN_EMITIDO'
+      WHERE o.id_usuario_perito_asignado = ?
+      AND NOT EXISTS (
+        -- Subconsulta para obtener el último estado de cada oficio
+        SELECT 1 
+        FROM seguimiento_oficio so
+        WHERE so.id_oficio = o.id_oficio
+        AND so.id_seguimiento = (
+          SELECT MAX(so2.id_seguimiento)
+          FROM seguimiento_oficio so2
+          WHERE so2.id_oficio = so.id_oficio
+        )
+        AND so.estado_nuevo IN (
+          'OFICIO VISTO',
+          'COMPLETADO', 
+          'DICTAMEN_EMITIDO',
+          'LISTO_PARA_RECOJO',
+          'ENTREGADO_Y_ARCHIVADO'
         )
       )
     `;
 
-      const [rows] = await db.promise().query(query, params);
-      return { success: true, data: rows[0].count_new_oficios };
-    } catch (error) {
-      console.error('Error en getCountNewOficios:', error);
-      return { success: false, message: "Error al obtener el conteo de nuevos oficios" };
-    }
+    const [rows] = await db.promise().query(query, [userId]);
+    return { 
+      success: true, 
+      data: rows[0].count_new_oficios
+    };
+  } catch (error) {
+    console.error('Error en getCountNewOficios:', error);
+    return { success: false, message: "Error al obtener el conteo de nuevos oficios" };
   }
+}
 
   static async findById(id_oficio, connection = null) {
     const conn = connection || db.promise();
