@@ -32,6 +32,21 @@ export class ProcedimientoController {
     }
   }
 
+  static async generarInformeNoExtraccion(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
+    try {
+      const { pdfBuffer } = await DocumentBuilderService.generarInformeNoExtraccion(id_oficio, id_usuario);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename=informe_no_extraccion.pdf');
+      res.end(pdfBuffer);
+    } catch (error) {
+      console.error('Error al generar informe de no extracción:', error);
+      res.status(500).json({ success: false, message: 'Error interno al generar el informe.' });
+    }
+  }
+
   static async uploadInformeFirmado(req, res) {
     const { id: id_oficio } = req.params;
     const { id_usuario } = req.user;

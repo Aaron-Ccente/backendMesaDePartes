@@ -284,4 +284,87 @@ export class DocumentBuilderService {
       if (browser) await browser.close();
     }
   }
+
+  static async generarInformeNoExtraccion(id_oficio, id_usuario) {
+    let browser = null;
+    const connection = await db.promise().getConnection();
+    try {
+      // 1. Cargar assets y registrar parciales
+      const assets = await this._loadAssets();
+      const membretePath = this._getTemplatePath('partials/membrete');
+      const membreteContent = await fs.readFile(membretePath, 'utf-8');
+      handlebars.registerPartial('partials/membrete', membreteContent);
+
+      // 2. Obtener datos del caso y del perito
+      const [oficioRows] = await connection.query(
+        `SELECT o.*,
+                GROUP_CONCAT(te.nombre SEPARATOR ', ') AS tipos_de_examen,
+                MAX(s.observaciones) as motivo_no_extraccion
+         FROM oficio o
+         LEFT JOIN oficio_examen oe ON o.id_oficio = oe.id_oficio
+         LEFT JOIN tipo_de_examen te ON oe.id_tipo_de_examen = te.id_tipo_de_examen
+         LEFT JOIN (
+            SELECT id_oficio, observaciones
+            FROM seguimiento_oficio
+            WHERE id_oficio = ? AND estado_nuevo = 'EXTRACCION_FALLIDA'
+            ORDER BY fecha_seguimiento DESC LIMIT 1
+         ) s ON o.id_oficio = s.id_oficio
+         WHERE o.id_oficio = ?
+         GROUP BY o.id_oficio`,
+        [id_oficio, id_oficio]
+      );
+
+      if (oficioRows.length === 0) {
+        throw new Error('Oficio no encontrado.');
+      }
+      const oficio = oficioRows[0];
+
+      const [peritoRows] = await connection.query(
+        `SELECT u.nombre_completo, g.nombre as grado_perito
+         FROM usuario u
+         LEFT JOIN usuario_grado ug ON u.id_usuario = ug.id_usuario
+         LEFT JOIN grado g ON ug.id_grado = g.id_grado
+         WHERE u.id_usuario = ?`,
+        [id_usuario]
+      );
+      const perito = peritoRows[0] || { nombre_completo: 'Desconocido', grado_perito: 'Perito' };
+
+      // 3. Preparar datos para la plantilla
+      const data = {
+        oficio: {
+            ...oficio,
+            numero_informe_pericial: oficio.numero_oficio,
+            anio_actual: new Date().getFullYear(),
+        },
+        perito,
+        observaciones: oficio.motivo_no_extraccion || 'No se especificaron motivos.',
+        ...assets
+      };
+
+      // 4. Compilar y renderizar HTML
+      const templatePath = this._getTemplatePath('tm/informe_no_extraccion');
+      const templateContent = await fs.readFile(templatePath, 'utf-8');
+      const template = handlebars.compile(templateContent);
+      const html = template(data);
+
+      // 5. Generar PDF
+      browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '25mm', right: '25mm', bottom: '25mm', left: '25mm' },
+      });
+
+      return { pdfBuffer, type: 'pdf' };
+
+    } catch (error) {
+      console.error('[DocBuilder] Error generando informe de no extracción:', error);
+      throw error;
+    } finally {
+      if (connection) connection.release();
+      if (browser) await browser.close();
+    }
+  }
 }

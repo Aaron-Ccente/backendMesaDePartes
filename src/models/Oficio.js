@@ -652,7 +652,7 @@ static async getCountNewOficios({ id_usuario = null, CIP = null }) {
           queryWhere += ` AND o.tipo_de_muestra = 'TOMA DE MUESTRAS' 
                           AND NOT EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.SARRO_UNGUEAL);
-          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado IN ('CREACION DEL OFICIO', 'EXTRACCION_FINALIZADA'))";
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado IN ('CREACION DEL OFICIO', 'EXTRACCION_FINALIZADA', 'EXTRACCION_FALLIDA'))";
           break;
 
         case 'analisis_tm':
@@ -666,7 +666,7 @@ static async getCountNewOficios({ id_usuario = null, CIP = null }) {
           queryWhere += ` AND o.tipo_de_muestra = 'TOMA DE MUESTRAS' 
                           AND EXISTS (SELECT 1 FROM oficio_examen oe WHERE oe.id_oficio = o.id_oficio AND oe.id_tipo_de_examen = ?)`;
           params.push(EXAMENES.SARRO_UNGUEAL);
-          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado IN ('CREACION DEL OFICIO', 'PENDIENTE_ANALISIS_TM', 'ANALISIS_TM_FINALIZADO'))";
+          estadoFilter = "AND (o.ultimo_estado IS NULL OR o.ultimo_estado IN ('CREACION DEL OFICIO', 'PENDIENTE_ANALISIS_TM', 'ANALISIS_TM_FINALIZADO', 'EXTRACCION_FALLIDA'))";
           break;
 
         case 'analisis_inst':
