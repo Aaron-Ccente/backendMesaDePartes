@@ -138,13 +138,13 @@
         <div class="header-block block-1">PERÚ</div>
         <div class="header-block block-2">Ministerio<br>del Interior</div>
         <div class="header-block block-3">Policía Nacional<br>del Perú</div>
-        <div class="header-block block-4">{{membreteComando}}</div>
-        <div class="header-block block-5">{{membreteDireccion}}</div>
-        <div class="header-block block-6">{{membreteRegion}}</div>
+        <div class="header-block block-4">{{config.MEMBRETE_COMANDO}}</div>
+        <div class="header-block block-5">{{config.MEMBRETE_DIRECCION}}</div>
+        <div class="header-block block-6">{{config.MEMBRETE_REGION}}</div>
     </div>
 
     <div class="divider"></div>
-    <div class="lema">"Año de la Recuperación y Consolidación de la Economía Peruana"</div>
+    <div class="lema">"{{config.ANIO_LEMA}}"</div>
 
     <div class="oficio-header">
         <div class="lugar-fecha">{{lugarFecha}}</div>
@@ -183,15 +183,15 @@
     </div>
 
     <div class="cuerpo">
-        Le recordamos que los informes periciales constituyen el sustento científico de toda la investigación policial, por consiguiente, su omisión en la remisión a la autoridad competente, infringe normas vigentes que conllevan responsabilidad administrativa, disciplinaria y penal.
+        {{config.TEXTO_LEGAL_INFORME}}
     </div>
 
     <div class="cuerpo">
-        Es propicia la oportunidad para reiterarle los sentimientos de mi especial consideración y deferente estima
+        {{config.TEXTO_DESPEDIDA}}
     </div>
 
     <div class="despedida">
-        Dios guarde a Ud.
+        {{config.TEXTO_DIOS_GUARDE}}
     </div>
 
     <div class="footer">
@@ -211,8 +211,8 @@
     </div>
 
     <div class="contacto-footer">
-        Oficina de Criminalística Huancayo<br>
-        Jr. Cuzco N° 666- Teléfono: 064212453 – Cel: 980122629 – email: rpi.dic.ificri@policia.gob.pe
+        {{config.SEDE_NOMBRE}}<br>
+        {{config.SEDE_DIRECCION}}- Teléfono: {{config.SEDE_TELEFONO}} – Cel: {{config.SEDE_CELULAR}} – email: {{config.SEDE_EMAIL}}
     </div>
 
 </body>

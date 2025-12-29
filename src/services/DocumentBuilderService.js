@@ -6,6 +6,7 @@ import { Oficio } from '../models/Oficio.js';
 import { fileURLToPath } from 'url';
 import db from '../database/db.js';
 import { ProcedimientoService } from './ProcedimientoService.js';
+import { ConfiguracionService } from './ConfiguracionService.js';
 
 // --- Handlebars Helpers ---
 handlebars.registerHelper('formatLongDate', (date) => {
@@ -39,6 +40,15 @@ handlebars.registerHelper('formatHour', (date) => {
   } catch (err) {
     return '-';
   }
+});
+
+handlebars.registerHelper('inc', function(value, options) {
+    return parseInt(value) + 1;
+});
+
+// Helper para index base custom (ej. empezar en 2)
+handlebars.registerHelper('inc', (value, base) => {
+  return parseInt(value) + (typeof base === 'number' ? base : 1);
 });
 
 export class DocumentBuilderService {
@@ -82,8 +92,16 @@ export class DocumentBuilderService {
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = path.dirname(__filename);
 
-      // 1. Cargar assets
-      const assets = await this._loadAssets();
+      // 1. Cargar assets y configuración
+      const [assets, config] = await Promise.all([
+        this._loadAssets(),
+        ConfiguracionService.getPublicConfig()
+      ]);
+
+      console.log('[DocBuilder] Generar Caratula - Debug:');
+      console.log('ExtraData membreteComando:', extraData.membreteComando);
+      console.log('Config MEMBRETE_COMANDO:', config.MEMBRETE_COMANDO);
+      console.log('Resolved Value:', extraData.membreteComando || config.MEMBRETE_COMANDO || 'DEFAULT HARDCODED');
 
       // 2. Obtener datos del caso
       const dataConsolidacion = await ProcedimientoService.getDatosConsolidacion(id_oficio);
@@ -118,38 +136,40 @@ export class DocumentBuilderService {
 
       const templateData = {
         ...assets,
-        lugarFecha: formatDate(new Date()),
-        numOficio: oficio.numero_oficio, // O generar uno nuevo si es necesario
+        config, // Pasamos toda la config para uso libre en plantilla
+        lugarFecha: extraData.lugarFecha || formatDate(new Date()),
+        numOficio: extraData.numOficio || oficio.numero_oficio,
 
-        // Membrete (Hardcoded por ahora o configurable)
-        membreteComando: 'IV MACRO REGION POLICIAL JUNIN',
-        membreteDireccion: 'REGPOL-JUNIN',
-        membreteRegion: 'DIVINCRI-HYO/OFICRI',
+        // Membrete (Prioridad: extraData > Config > Default Hardcoded)
+        membreteComando: extraData.membreteComando || config.MEMBRETE_COMANDO || 'IV MACRO REGION POLICIAL JUNIN',
+        membreteDireccion: extraData.membreteDireccion || config.MEMBRETE_DIRECCION || 'REGPOL-JUNIN',
+        membreteRegion: extraData.membreteRegion || config.MEMBRETE_REGION || 'DIVINCRI-HYO/OFICRI',
+        anioLema: config.ANIO_LEMA || "Año de la Recuperación y Consolidación de la Economía Peruana",
 
         // Destinatario
-        destCargo: `SEÑOR ${oficio.grado_destinatario || 'JEFE'}`, // Ajustar según lógica real
-        destNombre: oficio.unidad_solicitante || 'UNIDAD SOLICITANTE',
-        destPuesto: oficio.region_fiscalia || 'HUANCAYO',
+        destCargo: extraData.destCargo || `SEÑOR ${oficio.grado_destinatario || 'JEFE'}`,
+        destNombre: extraData.destNombre || (oficio.unidad_solicitante || 'UNIDAD SOLICITANTE'),
+        destPuesto: extraData.destPuesto || (oficio.region_fiscalia || 'HUANCAYO'),
 
         // Asunto y Referencia
-        asuntoBase: 'REMITO DICTAMEN PERICIAL DE ',
-        asuntoRemite: (oficio.tipos_de_examen || []).join(' Y '),
-        referencia: `Oficio N° ${oficio.numero_oficio} - ${oficio.unidad_solicitante}`,
+        asuntoBase: extraData.asuntoBase || 'REMITO DICTAMEN PERICIAL DE ',
+        asuntoRemite: extraData.asuntoRemite || (oficio.tipos_de_examen || []).join(' Y '),
+        referencia: extraData.referencia || `Oficio N° ${oficio.numero_oficio} - ${oficio.unidad_solicitante}`,
 
         // Cuerpo
-        cuerpoP1_1: 'Tengo el honor de dirigirme a Ud., en atención al documento de la referencia, remitiendo adjunto al presente el ',
-        cuerpoP1_2: 'DICTAMEN PERICIAL DE ' + (oficio.tipos_de_examen || []).join(' Y '),
-        cuerpoP1_3: ', practicado en la muestra de ',
-        cuerpoP1_4: oficio.examinado_incriminado || 'PERSONA NO IDENTIFICADA',
-        cuerpoP1_5: '; solicitado por su Despacho, para los fines del caso.',
+        cuerpoP1_1: extraData.cuerpoP1_1 || 'Tengo el honor de dirigirme a Ud., en atención al documento de la referencia, remitiendo adjunto al presente el ',
+        cuerpoP1_2: extraData.cuerpoP1_2 || ('DICTAMEN PERICIAL DE ' + (oficio.tipos_de_examen || []).join(' Y ')),
+        cuerpoP1_3: extraData.cuerpoP1_3 || ', practicado en la muestra de ',
+        cuerpoP1_4: extraData.cuerpoP1_4 || (oficio.examinado_incriminado || 'PERSONA NO IDENTIFICADA'),
+        cuerpoP1_5: extraData.cuerpoP1_5 || '; solicitado por su Despacho, para los fines del caso.',
 
         // Firmante
-        regNum: oficio.id_oficio, // O número de registro interno
-        regIniciales: `${(signer.grado || '').substring(0, 3)} - ${(signer.nombre_completo || '').split(' ').map(n => n[0]).join('')}`.toUpperCase(),
-        firmanteQS: signer.grado ? `${signer.grado} PNP` : 'PERITO PNP',
-        firmanteNombre: signer.nombre_completo,
-        firmanteCargo: 'PERITO QUIMICO FORENSE', // O dinámico según sección
-        firmanteDependencia: 'OFICRI-PNP-HYO'
+        regNum: extraData.regNum || oficio.id_oficio,
+        regIniciales: extraData.regIniciales || `${(signer.grado || '').substring(0, 3)} - ${(signer.nombre_completo || '').split(' ').map(n => n[0]).join('')}`.toUpperCase(),
+        firmanteQS: extraData.firmanteQS || (signer.grado ? `${signer.grado} PNP` : 'PERITO PNP'),
+        firmanteNombre: extraData.firmanteNombre || signer.nombre_completo,
+        firmanteCargo: extraData.firmanteCargo || config.FIRMANTE_CARGO_DEF || 'PERITO QUIMICO FORENSE',
+        firmanteDependencia: extraData.firmanteDependencia || config.FIRMANTE_DEP_DEF || 'OFICRI-PNP-HYO'
       };
 
       // 5. Compilar y renderizar HTML
@@ -159,7 +179,7 @@ export class DocumentBuilderService {
       const template = handlebars.compile(templateContent);
       const html = template(templateData);
 
-      // 6. Generar PDF (Usando setContent como en el método build)
+      // 6. Generar PDF
       console.log('[DocBuilder] Iniciando Puppeteer para Caratula...');
       browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
       const page = await browser.newPage();
@@ -171,7 +191,7 @@ export class DocumentBuilderService {
       const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
-        margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' }, // Márgenes controlados por CSS
+        margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' }, 
       });
       console.log(`[DocBuilder] PDF Caratula generado. Tamaño: ${pdfBuffer.length} bytes`);
 
@@ -189,8 +209,12 @@ export class DocumentBuilderService {
   static async build(templateName, id_oficio, extraData = {}) {
     let browser = null;
     try {
-      // 1. Cargar assets y registrar parciales
-      const assets = await this._loadAssets();
+      // 1. Cargar assets, configuración y registrar parciales
+      const [assets, config] = await Promise.all([
+        this._loadAssets(),
+        ConfiguracionService.getPublicConfig()
+      ]);
+
       const membretePath = this._getTemplatePath('partials/membrete');
       const membreteContent = await fs.readFile(membretePath, 'utf-8');
       handlebars.registerPartial('partials/membrete', membreteContent);
@@ -199,20 +223,31 @@ export class DocumentBuilderService {
       const dataConsolidacion = await ProcedimientoService.getDatosConsolidacion(id_oficio);
       const { oficio, resultados_previos, metadata, muestras, recolector_muestra } = dataConsolidacion;
 
-      // 3. Preparar datos del INFORME (lógica de consolidación)
+      // 3. Preparar datos del INFORME
       const examenesConsolidados = {};
-      const metodosConsolidados = {};
-      const examenMetodoMap = {
+      const metodosConsolidados = []; 
+
+      const examenMetodoMapDefault = {
         'Sarro Ungueal': { nombre: 'Análisis de Sarro Ungueal', metodo: 'Químico - colorimétrico' },
         'Toxicológico': { nombre: 'Análisis Toxicológico', metodo: 'Cromatografía en capa fina, Inmunoensayo' },
         'Dosaje Etílico': { nombre: 'Análisis de Dosaje Etílico', metodo: 'Espectrofotometría – UV VIS' }
       };
 
+      if (extraData.informe?.metodos && Array.isArray(extraData.informe.metodos)) {
+          extraData.informe.metodos.forEach(m => metodosConsolidados.push(m));
+      } else {
+          resultados_previos.forEach(res => {
+            const info = examenMetodoMapDefault[res.tipo_resultado] || { nombre: res.tipo_resultado, metodo: 'No especificado' };
+            if (!metodosConsolidados.find(m => m.examen === res.tipo_resultado)) {
+                metodosConsolidados.push({ examen: res.tipo_resultado, metodo: info.metodo });
+            }
+          });
+      }
+
       resultados_previos.forEach(res => {
-        const examenInfo = examenMetodoMap[res.tipo_resultado] || { nombre: res.tipo_resultado, metodo: 'No especificado' };
+        const examenInfo = examenMetodoMapDefault[res.tipo_resultado] || { nombre: res.tipo_resultado, metodo: 'No especificado' };
         if (!examenesConsolidados[res.tipo_resultado]) {
           examenesConsolidados[res.tipo_resultado] = { nombre: examenInfo.nombre, resultados: [] };
-          metodosConsolidados[res.tipo_resultado] = { examen: res.tipo_resultado, metodo: examenInfo.metodo };
         }
         muestras.forEach((muestra, index) => {
           const idMuestra = muestra.id_muestra;
@@ -232,17 +267,23 @@ export class DocumentBuilderService {
           }
         });
       });
+      
+      const muestrasFinales = muestras.map((m, index) => {
+          const editedMuestra = extraData.informe?.muestras?.find(em => em.id_muestra === m.id_muestra) || {};
+          return {
+              codigo: `M${index + 1}`,
+              descripcion_completa: `UN (01) ${m.tipo_muestra || 'frasco'} ${m.cantidad ? `conteniendo ${m.cantidad}` : ''} de ${editedMuestra.descripcion || m.descripcion || 'muestra sin descripción'}`
+          };
+      });
 
       const informeData = {
         objeto_pericia: extraData.informe?.objeto_pericia || metadata.objeto_pericia,
         conclusion_principal: extraData.informe?.conclusion_principal,
+        conclusiones_secundarias: extraData.informe?.conclusiones_secundarias || ['Muestras agotadas en los análisis.'],
         recolector_muestra: extraData.informe?.recolector_muestra || recolector_muestra,
-        muestras: muestras.map((m, index) => ({
-          codigo: `M${index + 1}`,
-          descripcion_completa: `UN (01) ${m.tipo_muestra || 'frasco'} ${m.cantidad ? `conteniendo ${m.cantidad}` : ''} de ${m.descripcion || 'muestra sin descripción'}`
-        })),
+        muestras: muestrasFinales,
         examenes: Object.values(examenesConsolidados),
-        metodos: Object.values(metodosConsolidados),
+        metodos: metodosConsolidados,
       };
 
       // 4. Unir todos los datos para la plantilla final
@@ -251,10 +292,22 @@ export class DocumentBuilderService {
       finalOficioData.fecha_incidente_formateada = formatDate(finalOficioData.fecha_incidente);
       finalOficioData.fecha_toma_muestra_formateada = formatDate(finalOficioData.fecha_toma_muestra);
       finalOficioData.fecha_oficio_formateada = formatDate(finalOficioData.fecha_documento);
+      
+      // Sufijo del número de oficio (Editable desde config)
+      finalOficioData.sufijo_numero_oficio = extraData.informe?.sufijo_numero_oficio || config.SUFIJO_OFICIO || 'IV-MACREPOL-JUN-DIVINCRI/OFICRI.';
 
       const data = {
+        config, // Inject config
         oficio: finalOficioData,
-        perito: { ...oficio.perito_asignado, ...extraData.perito },
+        perito: { 
+          grado: oficio.grado_perito,
+          nombre_completo: oficio.nombre_perito_actual || oficio.perito_asignado,
+          dni_perito: oficio.dni_perito,
+          cip: oficio.cip_perito,
+          cqfp: oficio.cqfp,
+          titulo_profesional: extraData.perito?.titulo_profesional || config.FIRMANTE_CARGO_DEF || 'Perito Químico Farmacéutico',
+          ...extraData.perito 
+        },
         imagenes: assets,
         informe: informeData
       };
@@ -289,13 +342,17 @@ export class DocumentBuilderService {
     let browser = null;
     const connection = await db.promise().getConnection();
     try {
-      // 1. Cargar assets y registrar parciales
-      const assets = await this._loadAssets();
+      // 1. Cargar assets y configuración
+      const [assets, config] = await Promise.all([
+        this._loadAssets(),
+        ConfiguracionService.getPublicConfig()
+      ]);
+
       const membretePath = this._getTemplatePath('partials/membrete');
       const membreteContent = await fs.readFile(membretePath, 'utf-8');
       handlebars.registerPartial('partials/membrete', membreteContent);
 
-      // 2. Obtener datos del caso y del perito
+      // 2. Obtener datos
       const [oficioRows] = await connection.query(
         `SELECT o.*,
                 GROUP_CONCAT(te.nombre SEPARATOR ', ') AS tipos_de_examen,
@@ -329,8 +386,9 @@ export class DocumentBuilderService {
       );
       const perito = peritoRows[0] || { nombre_completo: 'Desconocido', grado_perito: 'Perito' };
 
-      // 3. Preparar datos para la plantilla
+      // 3. Preparar datos
       const data = {
+        config,
         oficio: {
             ...oficio,
             numero_informe_pericial: oficio.numero_oficio,

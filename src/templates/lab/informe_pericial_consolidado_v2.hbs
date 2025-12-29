@@ -18,7 +18,7 @@
     <div class="content-body">
         <div class="text-center" style="margin-bottom: 10px;">
             <span class="font-bold underline" style="font-size: 12pt;">INFORME PERICIAL CONSOLIDADO</span><br>
-            <span class="font-bold" style="font-size: 11pt;">N° {{oficio.nro_oficio}}-{{oficio.anio_actual}}-IV-MACREPOL-JUN-DIVINCRI/OFICRI.</span>
+            <span class="font-bold" style="font-size: 11pt;">N° {{oficio.nro_oficio}}-{{oficio.anio_actual}}-{{oficio.sufijo_numero_oficio}}</span>
         </div>
 
         <div style="display: flex;"><span style="min-width: 8mm;" class="font-bold">A.</span><span style="min-width: 50mm;" class="font-bold">PROCEDENCIA:</span><span>{{oficio.unidad_solicitante}}</span></div>
@@ -56,8 +56,10 @@
         <div style="margin-left: 12mm; text-align: justify;">
             <div style="display: flex;"><span style="margin-right: 5px;">1.</span><span>{{{informe.conclusion_principal}}}</span></div>
             <div style="border-top: 1px dashed #000; margin: 5px 0;"></div>
-            <div style="display: flex;"><span style="margin-right: 5px;">2.</span><span>Muestras agotadas en los análisis.</span></div>
+            {{#each informe.conclusiones_secundarias}}
+            <div style="display: flex;"><span style="margin-right: 5px;">{{inc @index 2}}.</span><span>{{this}}</span></div>
             <div style="border-top: 1px dashed #000; margin: 5px 0;"></div>
+            {{/each}}
         </div>
 
         <div style="display: flex; margin-top: 8px;"><span style="min-width: 8mm;" class="font-bold">L.</span><span style="min-width: 50mm;" class="font-bold">MUESTRA TOMADA POR:</span><span>{{informe.recolector_muestra}}.</span></div>
@@ -81,7 +83,7 @@
             <div style="border-top: 1px solid #000; width: 100%; margin: 0 auto 5px auto;"></div>
             <p class="font-bold" style="margin: 5px 0 0 0;">{{perito.nombre_completo}}</p>
             <p style="margin: 0; font-size: 9pt;">{{perito.grado}}</p>
-            <p style="margin: 0; font-size: 9pt;">Perito Químico Farmacéutico</p>
+            <p style="margin: 0; font-size: 9pt;">{{perito.titulo_profesional}}</p>
         </div>
     </div>
 </body>
