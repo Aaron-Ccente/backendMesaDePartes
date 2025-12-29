@@ -6,6 +6,7 @@ import { Oficio } from '../models/Oficio.js';
 import { fileURLToPath } from 'url';
 import db from '../database/db.js';
 import { ProcedimientoService } from './ProcedimientoService.js';
+import { ConfiguracionService } from './ConfiguracionService.js';
 
 // --- Handlebars Helpers ---
 handlebars.registerHelper('formatLongDate', (date) => {
@@ -91,8 +92,16 @@ export class DocumentBuilderService {
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = path.dirname(__filename);
 
-      // 1. Cargar assets
-      const assets = await this._loadAssets();
+      // 1. Cargar assets y configuración
+      const [assets, config] = await Promise.all([
+        this._loadAssets(),
+        ConfiguracionService.getPublicConfig()
+      ]);
+
+      console.log('[DocBuilder] Generar Caratula - Debug:');
+      console.log('ExtraData membreteComando:', extraData.membreteComando);
+      console.log('Config MEMBRETE_COMANDO:', config.MEMBRETE_COMANDO);
+      console.log('Resolved Value:', extraData.membreteComando || config.MEMBRETE_COMANDO || 'DEFAULT HARDCODED');
 
       // 2. Obtener datos del caso
       const dataConsolidacion = await ProcedimientoService.getDatosConsolidacion(id_oficio);
@@ -127,13 +136,15 @@ export class DocumentBuilderService {
 
       const templateData = {
         ...assets,
+        config, // Pasamos toda la config para uso libre en plantilla
         lugarFecha: extraData.lugarFecha || formatDate(new Date()),
         numOficio: extraData.numOficio || oficio.numero_oficio,
 
-        // Membrete
-        membreteComando: extraData.membreteComando || 'IV MACRO REGION POLICIAL JUNIN',
-        membreteDireccion: extraData.membreteDireccion || 'REGPOL-JUNIN',
-        membreteRegion: extraData.membreteRegion || 'DIVINCRI-HYO/OFICRI',
+        // Membrete (Prioridad: extraData > Config > Default Hardcoded)
+        membreteComando: extraData.membreteComando || config.MEMBRETE_COMANDO || 'IV MACRO REGION POLICIAL JUNIN',
+        membreteDireccion: extraData.membreteDireccion || config.MEMBRETE_DIRECCION || 'REGPOL-JUNIN',
+        membreteRegion: extraData.membreteRegion || config.MEMBRETE_REGION || 'DIVINCRI-HYO/OFICRI',
+        anioLema: config.ANIO_LEMA || "Año de la Recuperación y Consolidación de la Economía Peruana",
 
         // Destinatario
         destCargo: extraData.destCargo || `SEÑOR ${oficio.grado_destinatario || 'JEFE'}`,
@@ -157,8 +168,8 @@ export class DocumentBuilderService {
         regIniciales: extraData.regIniciales || `${(signer.grado || '').substring(0, 3)} - ${(signer.nombre_completo || '').split(' ').map(n => n[0]).join('')}`.toUpperCase(),
         firmanteQS: extraData.firmanteQS || (signer.grado ? `${signer.grado} PNP` : 'PERITO PNP'),
         firmanteNombre: extraData.firmanteNombre || signer.nombre_completo,
-        firmanteCargo: extraData.firmanteCargo || 'PERITO QUIMICO FORENSE',
-        firmanteDependencia: extraData.firmanteDependencia || 'OFICRI-PNP-HYO'
+        firmanteCargo: extraData.firmanteCargo || config.FIRMANTE_CARGO_DEF || 'PERITO QUIMICO FORENSE',
+        firmanteDependencia: extraData.firmanteDependencia || config.FIRMANTE_DEP_DEF || 'OFICRI-PNP-HYO'
       };
 
       // 5. Compilar y renderizar HTML
@@ -168,7 +179,7 @@ export class DocumentBuilderService {
       const template = handlebars.compile(templateContent);
       const html = template(templateData);
 
-      // 6. Generar PDF (Usando setContent como en el método build)
+      // 6. Generar PDF
       console.log('[DocBuilder] Iniciando Puppeteer para Caratula...');
       browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
       const page = await browser.newPage();
@@ -180,7 +191,7 @@ export class DocumentBuilderService {
       const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
-        margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' }, // Márgenes controlados por CSS
+        margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' }, 
       });
       console.log(`[DocBuilder] PDF Caratula generado. Tamaño: ${pdfBuffer.length} bytes`);
 
@@ -198,8 +209,12 @@ export class DocumentBuilderService {
   static async build(templateName, id_oficio, extraData = {}) {
     let browser = null;
     try {
-      // 1. Cargar assets y registrar parciales
-      const assets = await this._loadAssets();
+      // 1. Cargar assets, configuración y registrar parciales
+      const [assets, config] = await Promise.all([
+        this._loadAssets(),
+        ConfiguracionService.getPublicConfig()
+      ]);
+
       const membretePath = this._getTemplatePath('partials/membrete');
       const membreteContent = await fs.readFile(membretePath, 'utf-8');
       handlebars.registerPartial('partials/membrete', membreteContent);
@@ -208,26 +223,21 @@ export class DocumentBuilderService {
       const dataConsolidacion = await ProcedimientoService.getDatosConsolidacion(id_oficio);
       const { oficio, resultados_previos, metadata, muestras, recolector_muestra } = dataConsolidacion;
 
-      // 3. Preparar datos del INFORME (lógica de consolidación)
+      // 3. Preparar datos del INFORME
       const examenesConsolidados = {};
-      const metodosConsolidados = []; // Ahora será un array directo
+      const metodosConsolidados = []; 
 
-      // Mapeo default por si no viene del frontend
       const examenMetodoMapDefault = {
         'Sarro Ungueal': { nombre: 'Análisis de Sarro Ungueal', metodo: 'Químico - colorimétrico' },
         'Toxicológico': { nombre: 'Análisis Toxicológico', metodo: 'Cromatografía en capa fina, Inmunoensayo' },
         'Dosaje Etílico': { nombre: 'Análisis de Dosaje Etílico', metodo: 'Espectrofotometría – UV VIS' }
       };
 
-      // Si vienen métodos personalizados del frontend, usarlos. Si no, generarlos.
       if (extraData.informe?.metodos && Array.isArray(extraData.informe.metodos)) {
-          // Asumimos que el frontend envía [{examen: 'Nombre', metodo: 'Descripcion'}, ...]
           extraData.informe.metodos.forEach(m => metodosConsolidados.push(m));
       } else {
-          // Lógica fallback antigua
           resultados_previos.forEach(res => {
             const info = examenMetodoMapDefault[res.tipo_resultado] || { nombre: res.tipo_resultado, metodo: 'No especificado' };
-            // Evitar duplicados si hay múltiples resultados del mismo tipo
             if (!metodosConsolidados.find(m => m.examen === res.tipo_resultado)) {
                 metodosConsolidados.push({ examen: res.tipo_resultado, metodo: info.metodo });
             }
@@ -258,7 +268,6 @@ export class DocumentBuilderService {
         });
       });
       
-      // Preparar descripciones de muestras (priorizar editadas)
       const muestrasFinales = muestras.map((m, index) => {
           const editedMuestra = extraData.informe?.muestras?.find(em => em.id_muestra === m.id_muestra) || {};
           return {
@@ -284,10 +293,11 @@ export class DocumentBuilderService {
       finalOficioData.fecha_toma_muestra_formateada = formatDate(finalOficioData.fecha_toma_muestra);
       finalOficioData.fecha_oficio_formateada = formatDate(finalOficioData.fecha_documento);
       
-      // Sufijo del número de oficio (Editable)
-      finalOficioData.sufijo_numero_oficio = extraData.informe?.sufijo_numero_oficio || 'IV-MACREPOL-JUN-DIVINCRI/OFICRI.';
+      // Sufijo del número de oficio (Editable desde config)
+      finalOficioData.sufijo_numero_oficio = extraData.informe?.sufijo_numero_oficio || config.SUFIJO_OFICIO || 'IV-MACREPOL-JUN-DIVINCRI/OFICRI.';
 
       const data = {
+        config, // Inject config
         oficio: finalOficioData,
         perito: { 
           grado: oficio.grado_perito,
@@ -295,7 +305,7 @@ export class DocumentBuilderService {
           dni_perito: oficio.dni_perito,
           cip: oficio.cip_perito,
           cqfp: oficio.cqfp,
-          titulo_profesional: extraData.perito?.titulo_profesional || 'Perito Químico Farmacéutico',
+          titulo_profesional: extraData.perito?.titulo_profesional || config.FIRMANTE_CARGO_DEF || 'Perito Químico Farmacéutico',
           ...extraData.perito 
         },
         imagenes: assets,
@@ -332,13 +342,17 @@ export class DocumentBuilderService {
     let browser = null;
     const connection = await db.promise().getConnection();
     try {
-      // 1. Cargar assets y registrar parciales
-      const assets = await this._loadAssets();
+      // 1. Cargar assets y configuración
+      const [assets, config] = await Promise.all([
+        this._loadAssets(),
+        ConfiguracionService.getPublicConfig()
+      ]);
+
       const membretePath = this._getTemplatePath('partials/membrete');
       const membreteContent = await fs.readFile(membretePath, 'utf-8');
       handlebars.registerPartial('partials/membrete', membreteContent);
 
-      // 2. Obtener datos del caso y del perito
+      // 2. Obtener datos
       const [oficioRows] = await connection.query(
         `SELECT o.*,
                 GROUP_CONCAT(te.nombre SEPARATOR ', ') AS tipos_de_examen,
@@ -372,8 +386,9 @@ export class DocumentBuilderService {
       );
       const perito = peritoRows[0] || { nombre_completo: 'Desconocido', grado_perito: 'Perito' };
 
-      // 3. Preparar datos para la plantilla
+      // 3. Preparar datos
       const data = {
+        config,
         oficio: {
             ...oficio,
             numero_informe_pericial: oficio.numero_oficio,
