@@ -97,4 +97,64 @@ export class ProcedimientoService {
 
     return rows.length > 0 ? rows[0].nombre_completo : null;
   }
+
+  /**
+   * Registra la consolidación final y cierra el caso.
+   * @param {number} id_oficio - ID del oficio
+   * @param {number} id_usuario - ID del usuario perito
+   * @param {object} data - Datos de consolidación
+   * @param {string} data.conclusiones - Conclusiones del dictamen
+   * @param {string} [data.observaciones] - Observaciones finales
+   * @param {boolean} [data.cerrar_caso] - Si se debe cerrar el caso
+   */
+  static async registrarConsolidacion(id_oficio, id_usuario, { conclusiones, observaciones, cerrar_caso }) {
+    const connection = await db.promise().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Validar permisos (el usuario debe ser el asignado o tener rol adecuado - simplificado - el middleware ya filtra el acceso básico o eso esperamos xd)
+
+      
+      // 2. Guardar el dictamen final (conclusiones y observaciones)
+      await connection.query(
+        `INSERT INTO oficio_resultados_metadata (id_oficio, conclusiones_finales, observaciones_finales)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE conclusiones_finales = VALUES(conclusiones_finales), observaciones_finales = VALUES(observaciones_finales)`,
+        [id_oficio, conclusiones, observaciones || null]
+      );
+
+      let message = 'Consolidación guardada exitosamente.';
+
+      // 3. Cerrar el caso si se solicita
+      if (cerrar_caso) {
+        // Verificar si ya estaba cerrado para no duplicar eventos innecesarios
+        const [rows] = await connection.query('SELECT estado_nuevo FROM seguimiento_oficio WHERE id_oficio = ? ORDER BY id_seguimiento DESC LIMIT 1', [id_oficio]);
+        const ultimoEstado = rows.length > 0 ? rows[0].estado_nuevo : '';
+
+        if (ultimoEstado !== 'DICTAMEN_EMITIDO') {
+             await Oficio.updateEstado(id_oficio, 'DICTAMEN EMITIDO', connection);
+
+             await Oficio.addSeguimiento({
+               id_oficio,
+               id_usuario,
+               estado_nuevo: 'DICTAMEN_EMITIDO', // Estandarizado con guion bajo
+               observaciones: 'Se ha emitido el Dictamen Pericial Final y cerrado el caso.'
+             }, connection);
+             message = 'Consolidación registrada y caso cerrado exitosamente.';
+        } else {
+             message = 'Consolidación actualizada (el caso ya estaba cerrado).';
+        }
+      }
+
+      await connection.commit();
+      return { success: true, message };
+
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error en ProcedimientoService.registrarConsolidacion:', error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
 }

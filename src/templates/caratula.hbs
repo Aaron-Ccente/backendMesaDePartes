@@ -3,45 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <style>
+        /* CONFIGURACIÓN PÁGINA */
+        @page {
+            size: A4;
+            margin: 0; /* Carátula suele ser full page o márgenes mínimos */
+        }
+        
         body {
             font-family: Arial, sans-serif;
             font-size: 11pt;
             line-height: 1.5;
             margin: 0;
-            padding: 15mm 25mm 20mm 25mm;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+            word-wrap: break-word; /* Prevent text overflow */
+            overflow-wrap: break-word;
+        }
+        
+        /* Contenedor principal para simular página A4 en navegador/iframe */
+        .page-container {
             width: 210mm;
             height: 297mm;
+            padding: 15mm 25mm; /* Margen visual interno */
             box-sizing: border-box;
+            position: relative;
+            background: white;
+            margin: 0 auto;
         }
-        .header-block-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            height: 16mm;
+        /* Ajuste para impresión real sin doble margen */
+        @media print {
+            .page-container {
+                width: 100%;
+                height: 100%;
+                padding: 15mm 25mm; /* Usar padding interno o @page margin según preferencia */
+            }
+        }
+
+        /* MEMBRETE ESTILO TABLA (Más seguro para PDF que Flex) */
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
             margin-bottom: 2mm;
+            height: 16mm;
+            table-layout: fixed; /* CRUCIAL: Respetar anchos */
         }
-        .escudo {
-            width: 12mm;
-            height: 14mm;
-        }
-        .header-block {
-            display: flex;
+        .header-table td {
+            vertical-align: middle;
+            text-align: center;
             color: white;
             font-size: 7pt;
-            text-align: center;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            padding: 0 5px;
-            flex-grow: 1;
+            font-weight: bold;
+            padding: 0 2px;
+            overflow: hidden; /* Cortar si es excesivo */
+            white-space: normal; /* Permitir wrap si es necesario dentro del bloque */
         }
-        /* ... Specific widths for blocks ... */
-        .block-1 { background-color: #D32F2F; width: 17mm; }
-        .block-2 { background-color: #424242; width: 25mm; }
-        .block-3 { background-color: #616161; width: 25mm; }
-        .block-4 { background-color: #757575; width: 29mm; }
-        .block-5 { background-color: #9E9E9E; width: 29mm; }
-        .block-6 { background-color: #BDBDBD; width: 22mm; }
+        .escudo-cell { width: 15mm; background-color: transparent !important; }
+        .escudo-img { width: 12mm; height: 14mm; display: block; margin: auto; }
+        
+        .bg-peru { background-color: #D32F2F; width: 17mm; }
+        .bg-ministerio { background-color: #424242; width: 25mm; }
+        .bg-policia { background-color: #616161; width: 25mm; }
+        .bg-comando { background-color: #757575; width: 29mm; }
+        .bg-direccion { background-color: #9E9E9E; width: 29mm; }
+        .bg-region { background-color: #BDBDBD; width: 22mm; }
 
         .divider {
             border-top: 1.5px solid black;
@@ -53,167 +79,188 @@
             font-style: italic;
             font-size: 9pt;
             margin-bottom: 10mm;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .oficio-header {
-            position: relative;
-            height: 20mm;
-        }
-        .lugar-fecha {
-            text-align: right;
-        }
-        .oficio-numero {
-            margin-top: 2mm;
-        }
-        .oficio-numero b {
-            font-weight: bold;
-        }
-        .seccion {
-            display: flex;
+
+        /* HEADER OFICIO */
+        .oficio-header-table {
+            width: 100%;
             margin-bottom: 5mm;
+            table-layout: fixed;
         }
-        .seccion-label {
-            font-weight: bold;
+        .text-right { text-align: right; }
+        .bold { font-weight: bold; }
+        
+        /* SECCIONES */
+        .section-table {
+            width: 100%;
+            margin-bottom: 4mm;
+            vertical-align: top;
+            table-layout: fixed;
+        }
+        .label-col {
             width: 25mm;
+            font-weight: bold;
+            vertical-align: top;
         }
-        .seccion-content {
-            width: 135mm;
+        .content-col {
+            vertical-align: top;
+            text-align: justify;
+            word-break: break-word; /* Prevenir rompimiento horizontal */
         }
+
         .cuerpo {
             text-align: justify;
             margin-bottom: 5mm;
+            margin-top: 5mm;
+            word-break: break-word;
         }
+        
         .despedida {
             text-align: right;
             margin-top: 10mm;
         }
-        .footer {
+
+        /* FOOTER ABSOLUTO AL FINAL DE LA PAGINA A4 */
+        .footer-wrapper {
             position: absolute;
-            bottom: 30mm;
-            width: calc(100% - 50mm); /* Page width - left/right margin */
+            bottom: 15mm; /* Respetar margen inferior */
+            width: calc(100% - 50mm); /* Ancho menos márgenes laterales */
+            left: 25mm;
         }
+
         .firma-container {
             position: relative;
             height: 40mm;
+            margin-bottom: 5mm;
         }
-        .registros {
-            position: absolute;
-            left: 0;
-            bottom: 0;
+        
+        .registros-bloque {
+            float: left;
             font-size: 9pt;
+            width: 40%;
+            padding-top: 20mm; /* Bajarlo visualmente */
         }
-        .sello {
-            position: absolute;
-            left: 85mm;
-            bottom: 0;
-            width: 30mm;
-            height: 30mm;
-        }
-        .firma-block {
-            position: absolute;
-            right: 0;
-            bottom: 0;
+        
+        .firma-bloque {
+            float: right;
             text-align: left;
+            width: 50%;
         }
-        .firma-img {
-            width: 40mm;
-            height: 15mm;
-        }
+
         .contacto-footer {
-            position: absolute;
-            bottom: 10mm;
-            width: calc(100% - 50mm);
             text-align: center;
             font-size: 8pt;
             border-top: 1.5px solid black;
             padding-top: 2mm;
+            margin-top: 2mm;
+            width: 100%;
         }
-        b, strong { font-weight: bold; }
-        u { text-decoration: underline; }
+
+        /* Utils */
+        .underline { text-decoration: underline; }
     </style>
 </head>
 <body>
+    <div class="page-container">
+        
+        <!-- MEMBRETE -->
+        <table class="header-table">
+            <tr>
+                <td class="escudo-cell"><img src="{{escudoUrl}}" alt="Escudo" class="escudo-img"></td>
+                <td class="bg-peru">PERÚ</td>
+                <td class="bg-ministerio">Ministerio<br>del Interior</td>
+                <td class="bg-policia">Policía Nacional<br>del Perú</td>
+                <td class="bg-comando">{{config.MEMBRETE_COMANDO}}</td>
+                <td class="bg-direccion">{{config.MEMBRETE_DIRECCION}}</td>
+                <td class="bg-region">{{config.MEMBRETE_REGION}}</td>
+            </tr>
+        </table>
 
-    <div class="header-block-container">
-        <img src="{{escudoUrl}}" alt="Escudo" class="escudo">
-        <div class="header-block block-1">PERÚ</div>
-        <div class="header-block block-2">Ministerio<br>del Interior</div>
-        <div class="header-block block-3">Policía Nacional<br>del Perú</div>
-        <div class="header-block block-4">{{config.MEMBRETE_COMANDO}}</div>
-        <div class="header-block block-5">{{config.MEMBRETE_DIRECCION}}</div>
-        <div class="header-block block-6">{{config.MEMBRETE_REGION}}</div>
-    </div>
+        <div class="divider"></div>
+        <div class="lema">"{{anioLema}}"</div>
 
-    <div class="divider"></div>
-    <div class="lema">"{{config.ANIO_LEMA}}"</div>
+        <table class="oficio-header-table">
+            <tr>
+                <td class="text-right">{{lugarFecha}}</td>
+            </tr>
+            <tr>
+                <td class="text-right" style="padding-top: 2mm;">
+                    OF. N° <span class="bold">{{numOficio}}</span>
+                </td>
+            </tr>
+        </table>
 
-    <div class="oficio-header">
-        <div class="lugar-fecha">{{lugarFecha}}</div>
-        <div class="oficio-numero">
-            OF. N° <b>{{numOficio}}</b>
+        <table class="section-table">
+            <tr>
+                <td class="label-col">SEÑOR:</td>
+                <td class="content-col">
+                    {{destCargo}}<br>
+                    {{destNombre}}<br>
+                    {{destPuesto}}
+                </td>
+            </tr>
+        </table>
+
+        <table class="section-table">
+            <tr>
+                <td class="label-col">ASUNTO:</td>
+                <td class="content-col">
+                    {{asuntoBase}} <span class="bold underline">{{asuntoRemite}}</span>
+                </td>
+            </tr>
+        </table>
+
+        <table class="section-table">
+            <tr>
+                <td class="label-col">REF.:</td>
+                <td class="content-col">
+                    {{referencia}}
+                </td>
+            </tr>
+        </table>
+
+        <div class="divider"></div>
+
+        <div class="cuerpo">
+            {{cuerpoP1_1}}<span class="bold">{{cuerpoP1_2}}</span>{{cuerpoP1_3}}<span class="bold underline">{{cuerpoP1_4}}</span>{{cuerpoP1_5}}
         </div>
-    </div>
 
-    <div class="seccion">
-        <div class="seccion-label">SEÑOR:</div>
-        <div class="seccion-content">
-            {{destCargo}}<br>
-            {{destNombre}}<br>
-            {{destPuesto}}
+        <div class="cuerpo">
+            {{config.TEXTO_LEGAL_INFORME}}
         </div>
-    </div>
 
-    <div class="seccion">
-        <div class="seccion-label">ASUNTO:</div>
-        <div class="seccion-content">
-            {{asuntoBase}} <b><u>{{asuntoRemite}}</u></b>
+        <div class="cuerpo">
+            {{config.TEXTO_DESPEDIDA}}
         </div>
-    </div>
 
-    <div class="seccion">
-        <div class="seccion-label">REF.:</div>
-        <div class="seccion-content">
-            {{referencia}}
+        <div class="despedida">
+            {{config.TEXTO_DIOS_GUARDE}}
         </div>
-    </div>
 
-    <div class="divider"></div>
-
-    <div class="cuerpo">
-        {{cuerpoP1_1}}<b>{{cuerpoP1_2}}</b>{{cuerpoP1_3}}<b><u>{{cuerpoP1_4}}</u></b>{{cuerpoP1_5}}
-    </div>
-
-    <div class="cuerpo">
-        {{config.TEXTO_LEGAL_INFORME}}
-    </div>
-
-    <div class="cuerpo">
-        {{config.TEXTO_DESPEDIDA}}
-    </div>
-
-    <div class="despedida">
-        {{config.TEXTO_DIOS_GUARDE}}
-    </div>
-
-    <div class="footer">
-        <div class="firma-container">
-            <div class="registros">
-                REG: {{regNum}}<br>
-                {{regIniciales}}
+        <!-- FOOTER STICKY/ABSOLUTE -->
+        <div class="footer-wrapper">
+            <div class="firma-container">
+                <div class="registros-bloque">
+                    REG: {{regNum}}<br>
+                    {{regIniciales}}
+                </div>
+                <div class="firma-bloque">
+                    <br><br> <!-- Espacio firma -->
+                    <span class="bold">{{firmanteQS}}</span><br>
+                    <span class="bold">{{firmanteNombre}}</span><br>
+                    {{firmanteCargo}}<br>
+                    {{firmanteDependencia}}
+                </div>
+                <div style="clear: both;"></div>
             </div>
-            <div class="firma-block">
-                <br>
-                <b>{{firmanteQS}}</b><br>
-                <b>{{firmanteNombre}}</b><br>
-                {{firmanteCargo}}<br>
-                {{firmanteDependencia}}
+
+            <div class="contacto-footer">
+                {{config.SEDE_NOMBRE}}<br>
+                {{config.SEDE_DIRECCION}} - Teléfono: {{config.SEDE_TELEFONO}} – Cel: {{config.SEDE_CELULAR}} – email: {{config.SEDE_EMAIL}}
             </div>
         </div>
     </div>
-
-    <div class="contacto-footer">
-        {{config.SEDE_NOMBRE}}<br>
-        {{config.SEDE_DIRECCION}}- Teléfono: {{config.SEDE_TELEFONO}} – Cel: {{config.SEDE_CELULAR}} – email: {{config.SEDE_EMAIL}}
-    </div>
-
 </body>
 </html>
