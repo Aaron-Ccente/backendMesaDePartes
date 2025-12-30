@@ -164,39 +164,44 @@ export class DocumentBuilderService {
             }
           };
           
-          // Mapeo de datos para Carátula (Config Global < DB Oficio < ExtraData Formulario)
+          // Mapeo de datos para Carátula (Config Global < DB Oficio < ExtraData Flat < ExtraData Nested)
+          // Se prioriza extraData.caratula.prop (si existe) -> extraData.prop (flat) -> DB/Config
+          const getVal = (key, fallback) => {
+              return extraData.caratula?.[key] || extraData[key] || fallback;
+          };
+
           templateData = {
             ...assets,
             config,
-            lugarFecha: extraData.caratula?.lugarFecha || formatDate(new Date()),
-            numOficio: extraData.caratula?.numOficio || oficio.numero_oficio,
+            lugarFecha: getVal('lugarFecha', formatDate(new Date())),
+            numOficio: getVal('numOficio', oficio.numero_oficio),
             
-            membreteComando: extraData.caratula?.membreteComando || config.MEMBRETE_COMANDO,
-            membreteDireccion: extraData.caratula?.membreteDireccion || config.MEMBRETE_DIRECCION,
-            membreteRegion: extraData.caratula?.membreteRegion || config.MEMBRETE_REGION,
-            anioLema: config.ANIO_LEMA, // Generalmente no editable por form, solo por config global
+            membreteComando: getVal('membreteComando', config.MEMBRETE_COMANDO),
+            membreteDireccion: getVal('membreteDireccion', config.MEMBRETE_DIRECCION),
+            membreteRegion: getVal('membreteRegion', config.MEMBRETE_REGION),
+            anioLema: config.ANIO_LEMA, 
             
-            destCargo: extraData.caratula?.destCargo || `SEÑOR ${oficio.grado_destinatario || 'JEFE'}`,
-            destNombre: extraData.caratula?.destNombre || (oficio.unidad_solicitante || 'UNIDAD SOLICITANTE'),
-            destPuesto: extraData.caratula?.destPuesto || (oficio.region_fiscalia || 'HUANCAYO'),
+            destCargo: getVal('destCargo', `SEÑOR ${oficio.grado_destinatario || 'JEFE'}`),
+            destNombre: getVal('destNombre', (oficio.unidad_solicitante || 'UNIDAD SOLICITANTE')),
+            destPuesto: getVal('destPuesto', (oficio.region_fiscalia || 'HUANCAYO')),
             
-            asuntoBase: extraData.caratula?.asuntoBase || 'REMITO DICTAMEN PERICIAL DE ',
-            asuntoRemite: extraData.caratula?.asuntoRemite || (oficio.tipos_de_examen || []).join(' Y '),
-            referencia: extraData.caratula?.referencia || `Oficio N° ${oficio.numero_oficio} - ${oficio.unidad_solicitante}`,
+            asuntoBase: getVal('asuntoBase', 'REMITO DICTAMEN PERICIAL DE '),
+            asuntoRemite: getVal('asuntoRemite', (oficio.tipos_de_examen || []).join(' Y ')),
+            referencia: getVal('referencia', `Oficio N° ${oficio.numero_oficio} - ${oficio.unidad_solicitante}`),
             
-            cuerpoP1_1: extraData.caratula?.cuerpoP1_1 || 'Tengo el honor de dirigirme a Ud., en atención al documento de la referencia, remitiendo adjunto al presente el ',
-            cuerpoP1_2: extraData.caratula?.cuerpoP1_2 || ('DICTAMEN PERICIAL DE ' + (oficio.tipos_de_examen || []).join(' Y ')),
-            cuerpoP1_3: extraData.caratula?.cuerpoP1_3 || ', practicado en la muestra de ',
-            cuerpoP1_4: extraData.caratula?.cuerpoP1_4 || (oficio.examinado_incriminado || 'PERSONA NO IDENTIFICADA'),
-            cuerpoP1_5: extraData.caratula?.cuerpoP1_5 || '; solicitado por su Despacho, para los fines del caso.',
+            cuerpoP1_1: getVal('cuerpoP1_1', 'Tengo el honor de dirigirme a Ud., en atención al documento de la referencia, remitiendo adjunto al presente el '),
+            cuerpoP1_2: getVal('cuerpoP1_2', ('DICTAMEN PERICIAL DE ' + (oficio.tipos_de_examen || []).join(' Y '))),
+            cuerpoP1_3: getVal('cuerpoP1_3', ', practicado en la muestra de '),
+            cuerpoP1_4: getVal('cuerpoP1_4', (oficio.examinado_incriminado || 'PERSONA NO IDENTIFICADA')),
+            cuerpoP1_5: getVal('cuerpoP1_5', '; solicitado por su Despacho, para los fines del caso.'),
             
-            regNum: extraData.caratula?.regNum || oficio.id_oficio,
-            regIniciales: extraData.caratula?.regIniciales || `${(signer.grado || '').substring(0, 3)} - ${(signer.nombre_completo || '').split(' ').map(n => n[0]).join('')}`.toUpperCase(),
+            regNum: getVal('regNum', oficio.id_oficio),
+            regIniciales: getVal('regIniciales', `${(signer.grado || '').substring(0, 3)} - ${(signer.nombre_completo || '').split(' ').map(n => n[0]).join('')}`.toUpperCase()),
             
-            firmanteQS: extraData.caratula?.firmanteQS || (signer.grado ? `${signer.grado} PNP` : 'PERITO PNP'),
-            firmanteNombre: extraData.caratula?.firmanteNombre || signer.nombre_completo,
-            firmanteCargo: extraData.caratula?.firmanteCargo || config.FIRMANTE_CARGO_DEF || 'PERITO QUIMICO FORENSE',
-            firmanteDependencia: extraData.caratula?.firmanteDependencia || config.FIRMANTE_DEP_DEF || 'OFICRI-PNP-HYO'
+            firmanteQS: getVal('firmanteQS', (signer.grado ? `${signer.grado} PNP` : 'PERITO PNP')),
+            firmanteNombre: getVal('firmanteNombre', signer.nombre_completo),
+            firmanteCargo: getVal('firmanteCargo', config.FIRMANTE_CARGO_DEF || 'PERITO QUIMICO FORENSE'),
+            firmanteDependencia: getVal('firmanteDependencia', config.FIRMANTE_DEP_DEF || 'OFICRI-PNP-HYO')
           };
 
       } else { 
