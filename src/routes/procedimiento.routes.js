@@ -61,8 +61,10 @@ router.get('/:id/siguiente-paso', requirePerito, ProcedimientoController.obtener
 router.post('/:id/derivar', requirePerito, ProcedimientoController.derivarCaso);
 router.get('/:id/resultados-completos', requirePerito, ProcedimientoController.obtenerResultadosCompletos);
 router.get('/:id/datos-consolidacion', requirePerito, ProcedimientoController.getDatosConsolidacion);
+router.post('/:id/preview-consolidacion', requirePerito, ProcedimientoController.previewConsolidacion);
 router.post('/:id/consolidacion', requirePerito, ProcedimientoController.registrarConsolidacion);
 router.post('/:id/generar-caratula', requirePerito, ProcedimientoController.generarCaratula);
+router.get('/:id/generar-informe-no-extraccion', requirePerito, ProcedimientoController.generarInformeNoExtraccion);
 
 // Nuevas rutas para subida de archivos
 router.post('/:id/upload-informe-firmado', requirePerito, uploadInformeFirmado.single('informe_firmado'), ProcedimientoController.uploadInformeFirmado);

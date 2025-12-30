@@ -378,4 +378,28 @@ export class Validators {
 
     return { isValid: true };
 }
+
+  // Validar datos de consolidación/dictamen
+  static validateConsolidacion(data) {
+    const { conclusiones, observaciones, cerrar_caso } = data;
+    const errors = [];
+
+    if (!conclusiones || typeof conclusiones !== 'string' || conclusiones.trim() === '') {
+      errors.push('Las conclusiones son requeridas y deben ser texto.');
+    }
+
+    if (observaciones && typeof observaciones !== 'string') {
+      errors.push('Las observaciones deben ser texto.');
+    }
+
+    if (cerrar_caso !== undefined && typeof cerrar_caso !== 'boolean') {
+      errors.push('El flag cerrar_caso debe ser booleano.');
+    }
+
+    if (errors.length > 0) {
+      return { isValid: false, message: errors.join(' ') };
+    }
+
+    return { isValid: true };
+  }
 }

@@ -32,6 +32,21 @@ export class ProcedimientoController {
     }
   }
 
+  static async generarInformeNoExtraccion(req, res) {
+    const { id: id_oficio } = req.params;
+    const { id_usuario } = req.user;
+    try {
+      const { pdfBuffer } = await DocumentBuilderService.generarInformeNoExtraccion(id_oficio, id_usuario);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename=informe_no_extraccion.pdf');
+      res.end(pdfBuffer);
+    } catch (error) {
+      console.error('Error al generar informe de no extracción:', error);
+      res.status(500).json({ success: false, message: 'Error interno al generar el informe.' });
+    }
+  }
+
   static async uploadInformeFirmado(req, res) {
     const { id: id_oficio } = req.params;
     const { id_usuario } = req.user;
@@ -697,49 +712,63 @@ export class ProcedimientoController {
   static async registrarConsolidacion(req, res) {
     const { id: id_oficio } = req.params;
     const { id_usuario } = req.user;
-    const { conclusiones, observaciones, cerrar_caso } = req.body;
+    
+    // Validar entrada
+    const validation = Validators.validateConsolidacion(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ success: false, message: validation.message });
+    }
 
-    const connection = await db.promise().getConnection();
     try {
-      await connection.beginTransaction();
+      const result = await ProcedimientoService.registrarConsolidacion(id_oficio, id_usuario, req.body);
+      res.status(200).json(result); // Usamos 200 OK para actualizaciones/creaciones exitosas
+    } catch (error) {
+      console.error('Error en registrarConsolidacion (controller):', error);
+      res.status(500).json({ success: false, message: error.message || 'Error interno al registrar la consolidación.' });
+    }
+  }
 
-      // 1. Guardar el dictamen final (podríamos crear una tabla 'dictamenes' o usar 'oficio_resultados_metadata')
-      // Usamos 'oficio_resultados_metadata' actualizando o insertando
-      await connection.query(
-        `INSERT INTO oficio_resultados_metadata (id_oficio, conclusiones_finales, observaciones_finales)
-         VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE conclusiones_finales = VALUES(conclusiones_finales), observaciones_finales = VALUES(observaciones_finales)`,
-        [id_oficio, conclusiones, observaciones]
-      );
+  /**
+   * Genera una vista previa HTML del dictamen final.
+   */
+  static async previewConsolidacion(req, res) {
+    const { id: id_oficio } = req.params;
+    const { template = 'reporte' } = req.body; // Default: reporte
+    
+    const { conclusiones } = req.body;
 
-      // 2. Generar el documento PDF final y guardarlo (opcional, o se genera al vuelo)
-      // Aquí asumimos que se genera al vuelo cuando se solicita, pero marcamos el hito.
+    try {
+      let extraData = {};
 
-      // 3. Cerrar el caso si se solicita
-      if (cerrar_caso) {
-        await Oficio.updateEstado(id_oficio, 'DICTAMEN EMITIDO', connection);
-
-        await Oficio.addSeguimiento({
-          id_oficio,
-          id_usuario,
-          estado_nuevo: 'DICTAMEN EMITIDO',
-          observaciones: 'Se ha emitido el Dictamen Pericial Final y cerrado el caso.'
-        }, connection);
+      if (template === 'caratula') {
+          extraData = {
+              caratula: req.body.caratula, // Datos del form de carátula
+              id_usuario: req.user.id_usuario // Para firmante
+          };
+      } else {
+          const sourceInforme = req.body.informe || {};
+          
+          extraData = {
+              informe: {
+                ...sourceInforme,
+                // Fallbacks para compatibilidad si se envían datos planos en la raíz
+                conclusion_principal: sourceInforme.conclusion_principal || req.body.conclusiones,
+                conclusiones_secundarias: sourceInforme.conclusiones_secundarias || (req.body.observaciones ? [req.body.observaciones] : []), 
+                // Si el body plano tiene otros campos que queremos pasar (legacy)
+                ...(!req.body.informe ? req.body : {}) 
+              },
+              perito: req.body.perito // Pasamos datos del perito explícitamente
+          };
       }
 
-      await connection.commit();
-
-      res.status(201).json({
-        success: true,
-        message: 'Consolidación registrada y dictamen emitido exitosamente.'
-      });
+      const html = await DocumentBuilderService.buildHTML(template, id_oficio, extraData);
+      
+      res.setHeader('Content-Type', 'text/html');
+      res.status(200).send(html);
 
     } catch (error) {
-      await connection.rollback();
-      console.error('Error en registrarConsolidacion:', error);
-      res.status(500).json({ success: false, message: 'Error interno al registrar la consolidación.' });
-    } finally {
-      connection.release();
+      console.error('Error en previewConsolidacion:', error);
+      res.status(500).send('Error generando la vista previa.');
     }
   }
 
